@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Escritório – Next Co.</title>
+<link rel="stylesheet" href="css/base.css">
+<style>
+html,body{height:100%;overflow:hidden}
+#cv{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block}
+.top{position:fixed;top:8px;left:8px;right:8px;display:flex;gap:6px;align-items:center;z-index:10;pointer-events:none}
+.top>*{pointer-events:auto}
+#sala{padding:9px 13px;font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:50vw}
+#eu{margin-left:auto;display:flex;align-items:center;gap:8px;padding:5px 10px 5px 5px;font-weight:650;font-size:14px}
+#eu canvas{width:30px;height:30px;border-radius:8px;background:#cfc7b6}
+.zoom{position:fixed;right:8px;top:62px;display:flex;flex-direction:column;z-index:10;overflow:hidden}
+.zoom button{width:42px;height:42px;font-size:20px;font-weight:700}
+.emotes{position:fixed;left:50%;transform:translateX(-50%);bottom:max(12px,env(safe-area-inset-bottom));display:flex;gap:4px;padding:5px;z-index:10}
+.emotes button{padding:9px 12px;border-radius:9px;font-weight:650;font-size:13px;white-space:nowrap}
+.emotes button:active{background:var(--chip)}
+#hint{position:fixed;left:8px;top:62px;z-index:9;font-size:12px;color:#fff;background:rgba(20,16,32,.7);padding:6px 10px;border-radius:9px;pointer-events:none}
+#joy{position:fixed;left:22px;bottom:84px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.3);z-index:11;display:none;touch-action:none}
+#knob{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.75);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.sheet{position:fixed;z-index:20;background:var(--panel);border:1px solid var(--line);box-shadow:0 8px 30px rgba(0,0,0,.35);overflow:auto;transition:transform .18s ease}
+@media (max-width:760px){.sheet{left:0;right:0;bottom:0;max-height:70vh;border-radius:16px 16px 0 0;padding:14px 14px calc(16px + env(safe-area-inset-bottom))}.sheet.hidden{transform:translateY(105%)}#sala{max-width:42vw}}
+@media (min-width:761px){.sheet{top:60px;right:60px;width:340px;max-height:calc(100vh - 130px);border-radius:14px;padding:14px}.sheet.hidden{transform:translateX(calc(100% + 90px))}}
+.sheet h3{margin:0 0 10px;font-size:16px;display:flex;align-items:center}
+.sheet h3 .x{margin-left:auto;font-size:22px;width:34px;height:34px;border-radius:8px}
+.mi{display:flex;width:100%;text-align:left;padding:11px 10px;border-radius:9px;font-weight:600;gap:10px;align-items:center;text-decoration:none;color:inherit}
+.mi:hover{background:var(--chip)}
+.sep{height:1px;background:var(--line);margin:6px 0}
+.act{display:flex;gap:10px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:13px}
+.act b{display:block}.act small{color:var(--mut)}
+.ico{width:28px;height:28px;border-radius:8px;background:var(--chip);display:grid;place-items:center;flex:none}
+#toast{position:fixed;left:50%;top:64px;transform:translateX(-50%);background:#1d1d1f;color:#fff;padding:9px 14px;border-radius:10px;font-size:13px;z-index:40;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+#toast.show{opacity:1}
+#load{position:fixed;inset:0;display:grid;place-items:center;color:#fff;z-index:50;background:#16141f;font-weight:600}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div class="top">
+  <div class="pill" id="sala">Carregando…</div>
+  <button class="pill" id="eu" aria-label="Menu"><canvas id="mini" class="px" width="32" height="32"></canvas><span id="nome"></span></button>
+</div>
+<div class="zoom pill"><button id="zin" aria-label="Aproximar">+</button><button id="zout" aria-label="Afastar">−</button></div>
+<div class="emotes pill">
+  <button data-emote="5">👋 Acenar</button><button data-emote="6">💃 Dançar</button><button data-emote="4">🪑 Sentar</button>
+</div>
+<div id="hint">Setas ou WASD para andar · clique no chão para ir até lá</div>
+<div id="joy"><div id="knob"></div></div>
+<aside id="menu" class="sheet hidden"></aside>
+<div id="toast"></div>
+<div id="load">Entrando no escritório…</div>
+<script src="assets.js"></script>
+<script src="js/dados.js"></script>
+<script src="js/mapa-core.js"></script>
+<script src="js/avatar.js"></script>
+<script>
+const EMAIL = Dados.exigirSessao("index.html");
+window.OCULTAR_PESSOAS = true; // no escritório só aparecem pessoas de verdade
+let S = null, grid = null, user = null, sheet = null;
+const mapaId = Dados.mapaAtualId();
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+let DPR = 1, VW = 0, VH = 0, zoom = innerWidth <= 760 ? 1.6 : 2;
+const P = { x: 0, y: 0, dir: 0, moving: false, frame: 0, path: null, emote: null, emoteT: 0, sala: null };
+const keys = new Set(); let joyV = null;
+
+function resize(){ DPR = Math.min(devicePixelRatio || 1, 2); VW = innerWidth; VH = innerHeight; cv.width = VW*DPR; cv.height = VH*DPR; }
+addEventListener("resize", resize); resize();
+
+function onAssetsReady(){ buildPatterns(ctx); boot(); }
+if (imgsLeft === 0) onAssetsReady();
+
+async function boot(){
+  if (!EMAIL) return;
+  user = await Dados.getUsuario(EMAIL);
+  if (!user.avatar) { location.href = "avatar.html"; return; }
+  document.getElementById("nome").textContent = user.nome;
+  S = Dados.lerMapaLocal(mapaId) || templateNext();
+  grid = buildBlocked();
+  sheet = await Avatar.montar(user.avatar);
+  const m = document.getElementById("mini").getContext("2d"); m.imageSmoothingEnabled = false; m.drawImage(sheet, 8, 4, 16, 16, 0, 0, 32, 32);
+  spawn();
+  document.getElementById("load").remove();
+  if (matchMedia("(pointer:coarse)").matches) { document.getElementById("joy").style.display = "block"; document.getElementById("hint").textContent = "Use o controle ou toque no chão para andar"; }
+  setTimeout(() => document.getElementById("hint").style.opacity = 0, 7000);
+  checarSala(true);
+  last = performance.now(); requestAnimationFrame(loop);
+}
+function livre(x, y){ // caixa dos pés (12x6 px) livre?
+  for (const [dx, dy] of [[-6,-3],[6,-3],[-6,3],[6,3]]) if (grid.blocked(Math.floor((x+dx)/C16), Math.floor((y+dy)/C16))) return false;
+  return x > 8 && y > 8 && x < S.w*T-8 && y < S.h*T-8;
+}
+function spawn(){
+  const pos = user.posicao;
+  if (pos && pos.mapa === mapaId && livre(pos.x, pos.y)) { P.x = pos.x; P.y = pos.y; P.dir = pos.direcao || 0; return; }
+  const r = S.rooms.find(r => r.type === "recepcao") || S.rooms[0];
+  let cx = r ? (r.x + r.w/2)*T : S.w*T/2, cy = r ? (r.y + r.h/2)*T : S.h*T/2;
+  for (let rad = 0; rad < 40; rad++) for (let a = 0; a < 16; a++){
+    const x = cx + Math.cos(a/16*Math.PI*2)*rad*16, y = cy + Math.sin(a/16*Math.PI*2)*rad*16;
+    if (livre(x, y)) { P.x = x; P.y = y; return; }
+  }
+  P.x = cx; P.y = cy;
+}
+
+/* ---------- entrada ---------- */
+const DIRKEYS = {ArrowUp:[0,-1],w:[0,-1],W:[0,-1],ArrowDown:[0,1],s:[0,1],S:[0,1],ArrowLeft:[-1,0],a:[-1,0],A:[-1,0],ArrowRight:[1,0],d:[1,0],D:[1,0]};
+addEventListener("keydown", e => { if (e.target.matches("input,select,textarea")) return; if (DIRKEYS[e.key]) { keys.add(e.key); P.path = null; P.emote = null; e.preventDefault(); }
+  if (e.key === "1") emote(5); if (e.key === "2") emote(6); if (e.key === "3") emote(4); });
+addEventListener("keyup", e => keys.delete(e.key));
+addEventListener("blur", () => keys.clear());
+const toWorld = (sx, sy) => { const c = cam(); return [(sx - c.ox)/zoom, (sy - c.oy)/zoom]; };
+const ptrs = new Map(); let pinch = null, pularUp = 0;
+cv.addEventListener("pointerdown", e => {
+  ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  document.getElementById("menu").classList.add("hidden");
+  if (ptrs.size === 2){ const [a,b] = [...ptrs.values()]; pinch = {d: Math.hypot(a.x-b.x, a.y-b.y), z: zoom}; }
+});
+cv.addEventListener("pointermove", e => { if (!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if (pinch && ptrs.size === 2){ const [a,b] = [...ptrs.values()]; zoom = Math.max(0.6, Math.min(4, pinch.z * Math.hypot(a.x-b.x, a.y-b.y) / pinch.d)); } });
+const up = e => {
+  const had = ptrs.get(e.pointerId); ptrs.delete(e.pointerId);
+  if (pinch){ if (ptrs.size < 2){ pinch = null; pularUp = ptrs.size; } return; }
+  if (pularUp > 0){ pularUp--; return; }
+  if (!had || !grid) return;
+  const [wx, wy] = toWorld(e.clientX, e.clientY);
+  const path = findPath(grid, Math.floor(P.x/C16), Math.floor(P.y/C16), Math.floor(wx/C16), Math.floor(wy/C16));
+  if (path && path.length) { P.path = path; P.emote = null; marca = {x: path[path.length-1][0], y: path[path.length-1][1], t: 1}; }
+  else toast("Não dá para chegar aí");
+};
+cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", e => { ptrs.delete(e.pointerId); pinch = null; });
+cv.addEventListener("wheel", e => { e.preventDefault(); zoom = Math.max(0.6, Math.min(4, zoom * Math.exp(-e.deltaY*0.0015))); }, {passive:false});
+document.getElementById("zin").onclick = () => zoom = Math.min(4, zoom*1.25);
+document.getElementById("zout").onclick = () => zoom = Math.max(0.6, zoom/1.25);
+// joystick
+const joy = document.getElementById("joy"), knob = document.getElementById("knob");
+let joyId = null;
+joy.addEventListener("pointerdown", e => { joyId = e.pointerId; try { joy.setPointerCapture(e.pointerId); } catch (_) {} joyMove(e); });
+joy.addEventListener("pointermove", e => { if (e.pointerId === joyId) joyMove(e); });
+const joyEnd = e => { if (e.pointerId !== joyId) return; joyId = null; joyV = null; knob.style.transform = ""; };
+joy.addEventListener("pointerup", joyEnd); joy.addEventListener("pointercancel", joyEnd);
+function joyMove(e){
+  const r = joy.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width/2), dy = e.clientY - (r.top + r.height/2);
+  const d = Math.hypot(dx, dy), max = 40; if (d > max){ dx *= max/d; dy *= max/d; }
+  knob.style.transform = `translate(${dx}px,${dy}px)`;
+  joyV = d > 8 ? [dx/max, dy/max] : null; if (joyV){ P.path = null; P.emote = null; }
+}
+document.querySelector(".emotes").onclick = e => { const b = e.target.closest("[data-emote]"); if (b) emote(+b.dataset.emote); };
+function emote(row){
+  P.emote = row; P.emoteT = 0; P.path = null;
+  const nomes = {5:"acenou", 6:"dançou", 4:"sentou"};
+  Dados.registrarAtividade(EMAIL, "acao", `${nomes[row][0].toUpperCase()+nomes[row].slice(1)}${P.sala ? " em " + P.sala : ""}`, {sala: P.sala});
+}
+
+/* ---------- loop ---------- */
+let last = 0, marca = null, anim = 0, sujo = false, ultimoSave = 0;
+const VEL = 120;
+function loop(now){
+  const dt = Math.min(0.05, (now - last)/1000); last = now;
+  let vx = 0, vy = 0;
+  for (const k of keys){ const d = DIRKEYS[k]; if (d){ vx += d[0]; vy += d[1]; } }
+  if (joyV){ vx = joyV[0]; vy = joyV[1]; }
+  if (!vx && !vy && P.path){
+    const [tx, ty] = P.path[0]; const dx = tx - P.x, dy = ty - P.y, d = Math.hypot(dx, dy);
+    if (d < 3){ P.path.shift(); if (!P.path.length) P.path = null; }
+    else { vx = dx/d; vy = dy/d; }
+  }
+  const mag = Math.hypot(vx, vy);
+  P.moving = mag > 0.01;
+  if (P.moving){
+    if (mag > 1){ vx /= mag; vy /= mag; }
+    const sx = vx*VEL*dt, sy = vy*VEL*dt;
+    if (livre(P.x + sx, P.y)) P.x += sx;
+    if (livre(P.x, P.y + sy)) P.y += sy;
+    P.dir = Math.abs(vx) > Math.abs(vy) ? (vx < 0 ? 1 : 2) : (vy < 0 ? 3 : 0);
+    P.emote = null; sujo = true;
+    anim += dt*8; P.frame = 1 + (Math.floor(anim) % 4);
+  } else P.frame = 0;
+  if (P.emote != null) P.emoteT += dt;
+  checarSala(false);
+  if (sujo && now - ultimoSave > 4000){ salvarPos(); ultimoSave = now; }
+  if (marca){ marca.t -= dt*1.5; if (marca.t <= 0) marca = null; }
+  draw();
+  requestAnimationFrame(loop);
+}
+function salvarPos(){ sujo = false; Dados.salvarPosicao(EMAIL, {mapa: mapaId, x: Math.round(P.x), y: Math.round(P.y), direcao: P.dir}); }
+addEventListener("pagehide", salvarPos);
+document.addEventListener("visibilitychange", () => { if (document.hidden) salvarPos(); });
+function checarSala(first){
+  const r = roomAt(P.x, P.y - 4);
+  const nome = r ? r.name : "Área externa";
+  if (nome === P.sala && !first) return;
+  P.sala = nome; document.getElementById("sala").textContent = "📍 " + nome;
+  if (!first) Dados.registrarAtividade(EMAIL, "sala", `Entrou em ${nome}`, {sala: nome});
+}
+function cam(){
+  const W = S.w*T*zoom, H = S.h*T*zoom;
+  let ox = VW/2 - P.x*zoom, oy = VH/2 - (P.y - 20)*zoom;
+  if (W > VW) ox = Math.min(0, Math.max(VW - W, ox)); else ox = (VW - W)/2;
+  if (H > VH) oy = Math.min(0, Math.max(VH - H, oy)); else oy = (VH - H)/2;
+  return {ox: Math.round(ox), oy: Math.round(oy)};
+}
+function draw(){
+  ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle = "#16141f"; ctx.fillRect(0, 0, cv.width, cv.height);
+  const c = cam();
+  ctx.imageSmoothingEnabled = false;
+  ctx.setTransform(zoom*DPR, 0, 0, zoom*DPR, c.ox*DPR, c.oy*DPR);
+  const eu = { sort: P.y + 0.5, draw(g){
+    let row = P.dir, col = P.frame;
+    if (P.emote != null && !P.moving){ row = P.emote; const n = row === 6 ? 6 : row === 5 ? 4 : 2;
+      col = row === 4 ? (P.dir === 3 ? 2 : 0) + (Math.floor(P.emoteT*2) % 2) : Math.floor(P.emoteT*7) % n;
+      if (row !== 4 && P.emoteT > 3) P.emote = null; }
+    g.fillStyle = "rgba(20,15,30,.25)"; g.beginPath(); g.ellipse(P.x, P.y + 1, 8, 3, 0, 0, Math.PI*2); g.fill();
+    g.drawImage(sheet, col*32, row*48, 32, 48, Math.round(P.x - 16), Math.round(P.y - 45), 32, 48);
+  }};
+  drawWorld(ctx, [eu]);
+  if (marca){ ctx.strokeStyle = `rgba(61,90,254,${marca.t})`; ctx.lineWidth = 2/zoom*1.5; ctx.beginPath(); ctx.ellipse(marca.x, marca.y, 10*(1.6-marca.t*.6), 5*(1.6-marca.t*.6), 0, 0, Math.PI*2); ctx.stroke(); }
+  // nome sobre a cabeça (tela)
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const sx = P.x*zoom + c.ox, sy = (P.y - 48)*zoom + c.oy;
+  ctx.font = "700 12px system-ui,sans-serif"; const w = ctx.measureText(user.nome).width + 14;
+  ctx.fillStyle = "rgba(20,16,32,.75)"; ctx.beginPath(); ctx.roundRect(sx - w/2, sy - 20, w, 19, 7); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(user.nome, sx, sy - 10.5); ctx.textAlign = "left";
+}
+
+/* ---------- menu ---------- */
+const menu = document.getElementById("menu");
+document.getElementById("eu").onclick = async () => {
+  if (!menu.classList.contains("hidden")) { menu.classList.add("hidden"); return; }
+  const acts = await Dados.listarAtividades(EMAIL, 40);
+  const ico = {cadastro:"✨", entrou:"🚪", saiu:"👋", avatar:"🧍", sala:"📍", acao:"🎉", editor:"🛠️"};
+  menu.innerHTML = `<h3>${esc(user.nome)} <button class="x" data-close aria-label="Fechar">×</button></h3>
+    <div style="color:var(--mut);font-size:13px;margin:-6px 0 8px">${esc(user.email)}</div>
+    <a class="mi" href="avatar.html">🧍 Editar meu personagem</a>
+    <a class="mi" href="editor.html">🛠️ Editor de salas</a>
+    <button class="mi" data-exp>💾 Baixar meus dados (JSON)</button>
+    <button class="mi" data-sair>🚪 Sair</button>
+    <div class="sep"></div>
+    <div style="font-weight:700;margin:8px 0 4px">O que eu fiz</div>
+    ${acts.map(a => `<div class="act"><div class="ico">${ico[a.tipo]||"•"}</div><div><b>${esc(a.detalhe||a.tipo)}</b><small>${new Date(a.quando).toLocaleString("pt-BR")}</small></div></div>`).join("") || `<p style="color:var(--mut)">Nada ainda.</p>`}`;
+  menu.classList.remove("hidden");
+};
+menu.onclick = async e => {
+  if (e.target.closest("[data-close]")) menu.classList.add("hidden");
+  if (e.target.closest("[data-sair]")) { salvarPos(); await Dados.sair(); location.href = "index.html"; }
+  if (e.target.closest("[data-exp]")) {
+    const dados = { usuario: await Dados.getUsuario(EMAIL), atividades: await Dados.listarAtividades(EMAIL, 1000) };
+    const blob = new Blob([JSON.stringify(dados, null, 2)], {type: "application/json"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `meus-dados-${EMAIL}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+  }
+};
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]); }
+let toastT = null;
+function toast(t){ const el = document.getElementById("toast"); el.textContent = t; el.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("show"), 1800); }
+</script>
+</body>
+</html>

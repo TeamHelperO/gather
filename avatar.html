@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seu personagem – Escritório Virtual Next Co.</title>
+<link rel="stylesheet" href="css/base.css">
+<style>
+body{min-height:100vh}
+.wrap{max-width:980px;margin:0 auto;padding:16px;display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start}
+.wrap>*{min-width:0}
+@media (max-width:760px){.wrap{grid-template-columns:minmax(0,1fr);padding:10px}}
+.stage{padding:16px;position:sticky;top:10px;text-align:center}
+@media (max-width:760px){.stage{position:sticky;top:0;z-index:5;padding:10px;border-radius:0 0 18px 18px}}
+.stage h1{margin:0 0 2px;font-size:20px}
+.stage p{margin:0 0 10px;color:var(--mut);font-size:13px}
+.view{background:#cfc7b6 url("assets/piso.png");border-radius:14px;display:grid;place-items:center;height:250px;position:relative}
+@media (max-width:760px){.view{height:170px}}
+#pv{width:128px;height:192px}
+@media (max-width:760px){#pv{width:96px;height:144px}}
+.rot{display:flex;gap:6px;justify-content:center;margin:10px 0 4px;flex-wrap:wrap}
+.rot button{padding:6px 10px;border-radius:9px;border:1px solid var(--line);background:var(--chip);font-size:13px;font-weight:600}
+.rot button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.acts{display:flex;gap:8px;margin-top:10px}.acts .btn{flex:1}
+.opts{padding:14px}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.tabs button{white-space:nowrap;padding:8px 12px;border-radius:999px;border:1px solid var(--line);font-weight:650;font-size:13px}
+.tabs button.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+h3{font-size:13px;color:var(--mut);margin:14px 0 8px;text-transform:uppercase;letter-spacing:.04em}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{padding:9px 13px;border-radius:10px;border:1px solid var(--line);background:var(--chip);font-weight:600;font-size:14px}
+.chips button.on{outline:3px solid var(--brand);outline-offset:1px}
+.sw{display:flex;flex-wrap:wrap;gap:10px}
+.sw button{width:38px;height:38px;border-radius:50%;border:2px solid rgba(0,0,0,.25)}
+.sw button.on{outline:3px solid var(--brand);outline-offset:2px}
+.err{margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="card stage">
+    <h1 id="titulo">Crie seu personagem</h1>
+    <p id="quem"></p>
+    <div class="view"><canvas id="pv" class="px" width="32" height="48"></canvas></div>
+    <div class="rot" id="rot">
+      <button data-a="0" class="on">Andar ↓</button><button data-a="1">←</button><button data-a="3">↑</button><button data-a="2">→</button>
+      <button data-a="5">Acenar</button><button data-a="6">Dançar</button><button data-a="4">Sentar</button>
+    </div>
+    <div class="acts"><button class="btn" id="rand">🎲 Aleatório</button><button class="btn pri" id="save">Salvar e entrar</button></div>
+    <div class="err" id="err"></div>
+  </section>
+  <section class="card opts">
+    <div class="tabs" id="tabs"></div>
+    <div id="panel"></div>
+  </section>
+</div>
+<script src="js/dados.js"></script>
+<script src="js/avatar.js"></script>
+<script>
+const EMAIL = Dados.exigirSessao("index.html");
+let av = null, sheet = null, anim = 0, aba = "pele";
+const ABAS = [["pele","Pele"],["rosto","Rosto"],["cabelo","Cabelo"],["barba","Barba"],["cima","Roupa"],["baixo","Calça/saia"],["calcado","Calçado"],["acess","Acessórios"]];
+(async () => {
+  const u = await Dados.getUsuario(EMAIL);
+  document.getElementById("quem").textContent = `${u.nome} · ${u.email}`;
+  if (u.avatar) { av = JSON.parse(JSON.stringify(u.avatar)); document.getElementById("titulo").textContent = "Seu personagem"; }
+  else av = Avatar.aleatorio();
+  tabs(); painel(); refazer();
+})();
+function tabs(){
+  const el = document.getElementById("tabs");
+  el.innerHTML = ABAS.map(([k,l]) => `<button data-t="${k}" class="${k===aba?"on":""}">${l}</button>`).join("");
+  el.onclick = e => { const b = e.target.closest("[data-t]"); if (!b) return; aba = b.dataset.t; tabs(); painel(); };
+}
+function chips(lista, atual, attr){ return `<div class="chips">${lista.map(([v,l]) => `<button ${attr}="${v}" class="${v===atual?"on":""}">${l}</button>`).join("")}</div>`; }
+function swatches(cores, atual, attr){ return `<div class="sw">${Object.entries(cores).map(([v,c]) => `<button ${attr}="${v}" class="${v===atual?"on":""}" style="background:${c}" title="${v.replace(/_/g," ")}" aria-label="${v.replace(/_/g," ")}"></button>`).join("")}</div>`; }
+function blocoEstilo(parte, titulo){
+  const C = Avatar.CAT[parte], sel = av[parte] || {estilo:Object.keys(C.estilos)[0]};
+  let h = `<h3>${titulo || C.label}</h3>` + chips(Object.entries(C.estilos).map(([k,e]) => [k, e.nome]), sel.estilo, `data-est="${parte}" data-v`);
+  const e = C.estilos[sel.estilo];
+  if (e && e.cores) h += `<h3>Cor</h3>` + swatches(e.cores, sel.cor, `data-cor="${parte}" data-v`);
+  return h;
+}
+function painel(){
+  const p = document.getElementById("panel"); let h = "";
+  if (aba === "pele") h = `<h3>Tom de pele</h3>` + swatches(Avatar.CAT.pele.cores, av.pele, `data-pele data-v`);
+  if (aba === "rosto") h = `<h3>Olhos</h3>` + chips(Object.entries(Avatar.CAT.olhos.estilos), av.olhos, `data-olhos data-v`) + `<h3>Sobrancelha</h3>` + chips(Object.entries(Avatar.CAT.sobrancelha.estilos), av.sobrancelha, `data-sob data-v`);
+  if (["cabelo","barba","cima","baixo","calcado"].includes(aba)) h = blocoEstilo(aba);
+  if (aba === "acess") h = blocoEstilo("oculos") + blocoEstilo("chapeu") + blocoEstilo("fone");
+  p.innerHTML = h;
+}
+document.getElementById("panel").onclick = e => {
+  const b = e.target.closest("button"); if (!b) return;
+  const v = b.dataset.v;
+  if (b.hasAttribute("data-pele")) av.pele = v;
+  else if (b.hasAttribute("data-olhos")) av.olhos = v;
+  else if (b.hasAttribute("data-sob")) av.sobrancelha = v;
+  else if (b.dataset.est){ const parte = b.dataset.est, e = Avatar.CAT[parte].estilos[v];
+    const corAnt = av[parte] && av[parte].cor;
+    av[parte] = { estilo: v, cor: e.cores ? (corAnt in e.cores ? corAnt : Object.keys(e.cores)[0]) : null };
+    if (parte === "cima" && v === "vestido" && av.baixo && av.baixo.estilo === "calca") av.baixo = { estilo:"nenhuma", cor:null }; }
+  else if (b.dataset.cor){ av[b.dataset.cor].cor = v; }
+  painel(); refazer();
+};
+let gen = 0;
+async function refazer(){
+  const my = ++gen;
+  try { const s = await Avatar.montar(av); if (my === gen) sheet = s; }
+  catch (e) { document.getElementById("err").textContent = "Não foi possível carregar uma peça: " + e.message; }
+}
+document.getElementById("rot").onclick = e => { const b = e.target.closest("[data-a]"); if (!b) return; anim = +b.dataset.a;
+  document.querySelectorAll("#rot button").forEach(x => x.classList.toggle("on", x===b)); };
+document.getElementById("rand").onclick = () => { av = Avatar.aleatorio(); painel(); refazer(); };
+document.getElementById("save").onclick = async () => {
+  const b = document.getElementById("save"); b.disabled = true; b.textContent = "Salvando…";
+  await Dados.salvarAvatar(EMAIL, av);
+  location.href = "escritorio.html";
+};
+const pv = document.getElementById("pv"), px = pv.getContext("2d");
+let t = 0;
+setInterval(() => {
+  t++; if (!sheet) return;
+  let col, row = anim;
+  if (anim <= 3) col = 1 + (t % 4);
+  else if (anim === 4) col = t % 2;
+  else if (anim === 5) col = t % 4;
+  else col = t % 6;
+  px.clearRect(0, 0, 32, 48); px.drawImage(sheet, col*32, row*48, 32, 48, 0, 0, 32, 48);
+}, 150);
+</script>
+</body>
+</html>

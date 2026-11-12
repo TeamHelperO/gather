@@ -109,176 +109,21 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
   </ul>
   <div class="btns"><button class="btn pri" id="helpOk">Entendi</button></div>
 </div></div>
+<script src="assets.js"></script>
+<script src="js/dados.js"></script>
+<script src="js/mapa-core.js"></script>
 <script>
-const ASSETS = /*ASSETS*/null;
-const T = 32;
-const TYPES = {
-  recepcao:{label:"Recepção",floor:"f_ceramica",d:"Logo, balcão, mascote, sofá"},
-  trabalho:{label:"Área de trabalho",floor:"f_madeira",d:"Mesas com monitores e cadeiras"},
-  reuniao:{label:"Sala de reunião",floor:"f_carpete_cinza",d:"Mesa, cadeiras e TV",glass:true},
-  telao:{label:"Área do telão",floor:"f_carpete_azul",d:"Telão de gestão e cadeiras"},
-  silenciosa:{label:"Área silenciosa",floor:"f_carpete_verde",d:"Pufes, poltronas, estante"},
-  auditorio:{label:"Auditório",floor:"f_madeira",d:"Palco, púlpito e plateia"},
-  copa:{label:"Copa e lazer",floor:"f_ceramica",d:"Café, mesas, jogos"},
-  corredor:{label:"Corredor",floor:"f_madeira",d:"Passagem, sem paredes",noWalls:true},
-  livre:{label:"Sala vazia",floor:"f_madeira",d:"Sem móveis, você monta"}
-};
-const FLOORS = ["f_madeira","f_carpete_azul","f_carpete_verde","f_carpete_cinza","f_ceramica","f_grama","f_palco"];
-const SIDES = {baixo:"Embaixo",cima:"Em cima",esquerda:"Esquerda",direita:"Direita",nenhuma:"Sem porta"};
+const EMAIL = window.claude ? null : Dados.exigirSessao("index.html");
 
-/* ---------- images ---------- */
-const IMG = {};
-let imgsLeft = 0;
-for (const [k, a] of Object.entries(ASSETS)) { imgsLeft++; const im = new Image(); im.onload = () => { if (--imgsLeft === 0) { buildPatterns(); draw(); } }; im.src = a.src; IMG[k] = im; }
-const PAT = {};
+function onAssetsReady(){ buildPatterns(ctx); draw(); }
 
 /* ---------- state ---------- */
-const uid = () => Math.random().toString(36).slice(2, 9);
 let S = null;            // current map
 let mapId = null;
 let sel = null;          // {kind:'room'|'item', id}
 let mode = "select";
 let showGrid = false;
 const undoStack = [], redoStack = [];
-
-function blankMap(name){ return {v:1,name:name||"Novo escritório",w:40,h:28,rooms:[],items:[]}; }
-function room(type,name,x,y,w,h,door){ return {id:uid(),type,name,x,y,w,h,floor:null,door:{side:door||"baixo",pos:.5},auto:true}; }
-function templateNext(){
-  const m = {v:1,name:"Escritório Next Co.",w:60,h:40,rooms:[],items:[]};
-  m.rooms.push(room("recepcao","Recepção",2,3,13,15));
-  m.rooms.push(room("trabalho","Área de trabalho",15,3,19,15));
-  m.rooms.push(room("silenciosa","Área silenciosa",34,3,7,15));
-  m.rooms.push(room("telao","Telão da equipe",41,3,17,15));
-  m.rooms.push(room("corredor","Corredor",2,18,56,3,"nenhuma"));
-  m.rooms.push(room("reuniao","Sala 1",2,23,6,15,"cima"));
-  m.rooms.push(room("reuniao","Sala 2",8,23,7,15,"cima"));
-  m.rooms.push(room("reuniao","Sala 3",15,23,7,15,"cima"));
-  m.rooms.push(room("auditorio","Auditório",22,23,21,15,"cima"));
-  m.rooms.push(room("copa","Copa e lazer",43,23,15,15,"cima"));
-  [[1,8,10],[2,20,16.3],[3,46,13],[4,30,19],[5,50,30],[6,12,19.5],[7,36,9],[8,26,32]].forEach(([n,x,y])=>m.items.push({id:uid(),k:"pessoa"+n,x,y,room:null}));
-  return m;
-}
-
-/* ---------- auto layouts (tile units) ---------- */
-function aw(k){ return ASSETS[k].w / T; }
-function ah(k){ return ASSETS[k].h / T; }
-function layout(r){
-  const out = []; const {x,y,w,h} = r; const cx = x + w/2;
-  const P = (k,tx,ty,o={}) => out.push(Object.assign({k,x:tx,y:ty,room:r.id,auto:true},o));
-  const fits = (tx,ty,k) => tx >= x-0.05 && tx+aw(k) <= x+w+0.05 && ty+ah(k) <= y+h+0.15;
-  switch (r.type) {
-    case "recepcao": {
-      if (w >= 4) P("logo", x+0.4, y-1.85, {z:"wall"});
-      if (w >= 8) P("quadro_avisos", x+w-2.4, y-1.3, {z:"wall"});
-      P("relogio_ponto", x+0.1, y-0.6);
-      if (h >= 4 && w >= 3) { P("npc_mascote", cx-0.5, y+0.35); P("mesa", cx-1, y+1.6); P("sino", cx+0.15, y+1.05); }
-      if (h >= 7 && w >= 5) P("tapete", cx-1.5, y+h-3.9, {z:"floor"});
-      if (h >= 6 && w >= 5) P("sofa", cx-1.5, y+h-1.3);
-      if (w >= 6 && h >= 5) { P("planta_grande", x+0.1, y+h-2.1); P("planta_grande", x+w-1.1, y+h-2.1); }
-      break;
-    }
-    case "trabalho": {
-      if (w >= 7) P("estante", x+w-2.3, y-1.4);
-      if (w >= 4) P("relogio", cx-0.5, y-1.6, {z:"wall"});
-      P("planta", x+0.1, y-0.25);
-      const n = Math.max(1, Math.floor((w-1)/3)), m = Math.max(1, Math.floor((h-1)/3));
-      const span = n*3-1, sx = x + (w-span)/2;
-      for (let j=0;j<m;j++) for (let i=0;i<n;i++) {
-        const tx = sx+i*3, ty = y+1+j*3;
-        if (tx+2 > x+w+0.01 || ty+1.8 > y+h+0.1) continue;
-        P("mesa", tx, ty);
-        P("monitor", tx, ty-0.38, {sort:(ty+1)*T-2}); P("monitor", tx+1, ty-0.38, {sort:(ty+1)*T-2});
-        if (ty+1.8 <= y+h+0.1) P("cadeira_cima", tx+0.5, ty+0.8);
-      }
-      break;
-    }
-    case "reuniao": {
-      if (w >= 3) P("tv", cx-1.5, y-1.25);
-      if (w >= 8) P("placa", x+0.2, y-1.7, {z:"wall", label:r.name});
-      const tw = w >= 7 ? 5 : (w >= 4 ? 3 : 2);
-      const tk = tw === 5 ? "mesa_reuniao10" : tw === 3 ? "mesa_reuniao6" : "mesa_copa";
-      let ty = y + Math.max(1.6, (h-2.2)/2); ty = Math.min(ty, y+h-2.05);
-      if (h >= 3) {
-        P(tk, cx - aw(tk)/2, ty);
-        if (tw >= 3) for (let j=0;j<tw;j++) {
-          const tx = cx - tw/2 + j;
-          if (ty-0.81 >= y+0.5) P("cadeira_baixo", tx, ty-0.81);
-          if (ty+2.94 <= y+h+0.15) P("cadeira_cima", tx, ty+1.94);
-        }
-      }
-      if (h >= 8 && w >= 3) { P("planta", x+0.1, y+h-1.1); P("planta", x+w-1.1, y+h-1.1); }
-      if (h >= 10 && w >= 5) P("quadro_branco", cx-1.5, y+h-2.2);
-      break;
-    }
-    case "telao": {
-      if (w >= 6) P("telao", cx-3, y-1.85); else if (w >= 3) P("tv", cx-1.5, y-1.25);
-      if (w >= 10) P("npc_robo", cx+3.3, y+0.1);
-      if (w >= 8) { P("planta_grande", x+0.1, y-0.6); P("planta_grande", x+w-1.1, y-0.6); }
-      const bottom = h >= 9 ? y+h-2.4 : y+h-0.1;
-      for (let ty=y+2.6; ty+1<=bottom; ty+=2) for (let tx=x+1; tx+1<=x+w-0.5; tx+=2) P("cadeira_cima", tx, ty);
-      if (h >= 9) { if (w>=4) P("quadro_branco", x+0.2, y+h-2.1); if (w >= 7) { P("poltrona", x+w-1.1, y+h-1.1); P("poltrona", x+w-2.2, y+h-1.1); } }
-      break;
-    }
-    case "silenciosa": {
-      if (w >= 3) P("placa", cx-1, y-1.7, {z:"wall", label:"SILÊNCIO"});
-      if (w >= 5) P("estante", x+0.2, y-1.4);
-      let row = 0;
-      for (let ty=y+1.3; ty+1<=y+h-0.2; ty+=2.6, row++) for (let tx=x+0.6+(row%2)*1.4; tx+1<=x+w-0.3; tx+=2.8) P(((row+Math.round(tx))%3===0)?"poltrona":"pufe", tx, ty);
-      if (h >= 6) { P("planta_grande", x+w-1.1, y-0.6); }
-      break;
-    }
-    case "auditorio": {
-      const sh = h >= 10 ? 3 : 2;
-      const sx0 = w >= 5 ? x+1 : x, sx1 = w >= 5 ? x+w-2 : x+w-1;
-      for (let ty=y; ty<y+sh; ty++) for (let tx=sx0; tx<=sx1; tx++) P("f_palco", tx, ty, {z:"floor"});
-      for (let tx=sx0; tx<=sx1; tx++) P("palco_frente", tx, y+sh, {z:"floor"});
-      P("pulpito", cx-0.5, y+sh-1.3);
-      if (w >= 5) { P("caixa_som", x+0.05, y-0.6); P("caixa_som", x+w-1.05, y-0.6); }
-      const aisle = w >= 7 ? Math.floor(cx) : null;
-      for (let ty=y+sh+1.5; ty+1<=y+h+0.05; ty+=1.5) for (let tx=x+1; tx<=x+w-2; tx++) { if (tx===aisle) continue; P("cadeira_plateia", tx, ty); }
-      if (h > sh+2) P("megafone", x+0.05, y+sh+0.9);
-      break;
-    }
-    case "copa": {
-      P("cafeteira", x, y-0.1); if (w >= 2) P("cafeteira", x+1, y-0.1);
-      if (w >= 3) P("geladeira", x+2, y-1.05); if (w >= 5) P("bebedouro", x+3, y-0.1);
-      if (w >= 6) P("jukebox", x+w-1.05, y-1.05); if (w >= 8) P("fliperama", x+w-2.1, y-1.05);
-      const pp = w >= 6 && h >= 8;
-      const limit = y + h - (pp ? 2.6 : 0.1);
-      for (let ty=y+1.6; ty+2<=limit; ty+=3.4) for (let tx=x+0.6; tx+2<=x+w-0.3; tx+=3.6) P("mesa_copa", tx, ty);
-      if (pp) P("pingpong", cx-1.5, y+h-2.2);
-      if (h >= 5 && w >= 4) P("pet", pp ? x+0.2 : x+w-1.1, y+h-1.05);
-      break;
-    }
-  }
-  return out;
-}
-
-/* ---------- geometry helpers ---------- */
-const roomById = id => S.rooms.find(r => r.id === id);
-const itemById = id => S.items.find(i => i.id === id);
-function roomAt(wx, wy){ // world px → topmost room
-  for (let i=S.rooms.length-1;i>=0;i--){ const r=S.rooms[i]; if (wx>=r.x*T && wx<(r.x+r.w)*T && wy>=r.y*T && wy<(r.y+r.h)*T) return r; }
-  return null;
-}
-function roomAtTile(tx,ty){ for (let i=S.rooms.length-1;i>=0;i--){ const r=S.rooms[i]; if (tx>=r.x && tx<r.x+r.w && ty>=r.y && ty<r.y+r.h) return r; } return null; }
-function doorTile(r){
-  const d=r.door||{side:"baixo",pos:.5};
-  if (d.side==="baixo"||d.side==="cima") return r.x + Math.max(0,Math.min(r.w-1, Math.round(d.pos*(r.w-1))));
-  if (d.side==="esquerda"||d.side==="direita") return r.y + Math.max(0,Math.min(r.h-1, Math.round(d.pos*(r.h-1))));
-  return null;
-}
-function allItems(){
-  const out=[];
-  for (const r of S.rooms) if (r.auto) for (const it of layout(r)) out.push(it);
-  for (const it of S.items) out.push(it);
-  return out;
-}
-function sortKey(it){
-  if (it.sort!=null) return it.sort;
-  if (it.z==="wall"){ const r=roomById(it.room); return (r? r.y*T : it.y*T) + 0.5; }
-  return it.y*T + ASSETS[it.k].h;
-}
 
 /* ---------- view ---------- */
 const cv = document.getElementById("cv"); const ctx = cv.getContext("2d");
@@ -308,7 +153,6 @@ function focusRoom(r){
 }
 
 /* ---------- drawing ---------- */
-function buildPatterns(){ for (const k of FLOORS) PAT[k] = ctx.createPattern(IMG[k], "repeat"); }
 let raf = 0;
 function draw(){ if (!raf) raf = requestAnimationFrame(()=>{ raf=0; render(ctx, view, true); }); }
 function render(c, v, ui){
@@ -319,37 +163,7 @@ function render(c, v, ui){
   if (!S || imgsLeft>0) return;
   c.imageSmoothingEnabled = false;
   c.setTransform(v.s*dpr,0,0,v.s*dpr,v.ox*dpr,v.oy*dpr);
-  // ground
-  c.fillStyle = PAT.f_grama; c.fillRect(0,0,S.w*T,S.h*T);
-  // floors
-  for (const r of S.rooms){ c.fillStyle = PAT[r.floor || TYPES[r.type].floor] || PAT.f_madeira; c.fillRect(r.x*T, r.y*T, r.w*T, r.h*T); }
-  const items = allItems();
-  const floorItems = items.filter(i=>i.z==="floor");
-  for (const it of floorItems) c.drawImage(IMG[it.k], Math.round(it.x*T), Math.round(it.y*T));
-  // drawables
-  const D = [];
-  for (const r of S.rooms){
-    if (TYPES[r.type].noWalls) continue;
-    const dt = doorTile(r), glass = TYPES[r.type].glass;
-    for (let tx=r.x; tx<r.x+r.w; tx++){
-      let k = glass ? "parede_vidro" : "parede";
-      if (r.door && r.door.side==="cima" && tx===dt) k = r.type==="reuniao" ? "porta_privada" : "porta";
-      D.push({k, x:tx, y:r.y-2, sort:r.y*T-0.5, wallpiece:true});
-    }
-  }
-  for (const it of items) if (it.z!=="floor") D.push(it);
-  D.sort((a,b)=>sortKey(a)-sortKey(b));
-  for (const it of D){
-    const im = IMG[it.k]; if (!im) continue;
-    const px = Math.round(it.x*T), py = Math.round(it.y*T);
-    c.drawImage(im, px, py);
-    if (it.k==="placa" && it.label){
-      c.save(); c.fillStyle="#fff"; c.font="bold 8px system-ui,sans-serif"; c.textAlign="center"; c.textBaseline="middle";
-      c.fillText(String(it.label).toUpperCase().slice(0,12), px+35, py+17); c.restore();
-    }
-  }
-  // side + bottom wall caps
-  for (const r of S.rooms){ if (!TYPES[r.type].noWalls) drawCaps(c, r); }
+  drawWorld(c);
   if (!ui) return;
   // grid
   if (showGrid && v.s >= 0.35){
@@ -391,18 +205,6 @@ function render(c, v, ui){
     badge(c, `${q.w} × ${q.h}`, sx+q.w*T*v.s/2, sy+q.h*T*v.s/2);
   }
 }
-function drawCaps(c, r){
-  const dt = doorTile(r), side = r.door ? r.door.side : "nenhuma";
-  const band = (x,y,w,h) => { c.fillStyle="#2a2333"; c.fillRect(x,y,w,h); c.fillStyle="#efe9dc"; c.fillRect(x+1,y+1,w-2,h-2); };
-  const x0=r.x*T, y0=r.y*T, x1=(r.x+r.w)*T, y1=(r.y+r.h)*T;
-  // left & right
-  for (const [sd, X] of [["esquerda", x0-4], ["direita", x1-4]]){
-    if (side===sd){ const gy=dt*T; band(X, y0-T*2+9, 8, gy-(y0-T*2+9)); band(X, gy+T, 8, y1+4-(gy+T)); c.fillStyle="rgba(120,90,60,.55)"; c.fillRect(X-6, gy+4, 20, T-8); }
-    else band(X, y0-T*2+9, 8, y1-(y0-T*2+9)+4);
-  }
-  if (side==="baixo"){ const gx=dt*T; band(x0-4, y1-4, gx-x0+4, 8); band(gx+T, y1-4, x1+4-(gx+T), 8); c.fillStyle="rgba(120,90,60,.55)"; c.fillRect(gx+4, y1-6, T-8, 12); }
-  else band(x0-4, y1-4, x1-x0+8, 8);
-}
 function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
 function badge(c, t, x, y){ c.font="700 14px system-ui,sans-serif"; const w=c.measureText(t).width+16; c.fillStyle="rgba(29,29,31,.88)"; roundRect(c,x-w/2,y-13,w,26,8); c.fill(); c.fillStyle="#fff"; c.textAlign="center"; c.textBaseline="middle"; c.fillText(t,x,y); c.textAlign="left"; }
 function handles(r, v){
@@ -441,7 +243,7 @@ async function save(){
   saving = true; dirty = false;
   S.rev = uid(); lastRev = S.rev; S.updatedAt = Date.now();
   const body = JSON.parse(JSON.stringify(S));
-  LS.set("nextco_map_"+mapId, JSON.stringify(body)); LS.set("nextco_map_id", mapId);
+  Dados.salvarMapaLocal(mapId, body, EMAIL);
   if (db){
     try { await db.doc("maps/"+mapId).set(body); setSaveState("Salvo ✓"); }
     catch(e){
@@ -478,9 +280,9 @@ function subscribe(){
   }, err=>{ clearTimeout(timer); setSaveState("Salvando neste aparelho"); });
 }
 async function openMap(id, fallback){
-  mapId = id; LS.set("nextco_map_id", id); dbLoaded = false; lastRev = null; undoStack.length = 0; redoStack.length = 0; sel = null;
-  const local = LS.get("nextco_map_"+id);
-  S = local ? JSON.parse(local) : (fallback || null);
+  mapId = id; dbLoaded = false; lastRev = null; undoStack.length = 0; redoStack.length = 0; sel = null;
+  const local = Dados.lerMapaLocal(id);
+  S = local ? JSON.parse(JSON.stringify(local)) : (fallback || null);
   if (S) afterLoad(true);
   if (db) subscribe(); else { if (!S){ S = templateNext(); afterLoad(true); } setSaveState("Salvo neste aparelho"); }
 }
@@ -767,15 +569,20 @@ async function openMenu(){
     ${downloads?`<button class="mi" data-m="png">🖼️ Baixar imagem do mapa (PNG)</button><button class="mi" data-m="json">📄 Baixar arquivo do mapa (JSON)</button>`:""}
     <button class="mi" data-m="copy">📋 Copiar JSON do mapa</button>
     <label class="mi" style="cursor:pointer">📥 Importar JSON <input type="file" accept=".json,application/json" id="imp" hidden></label>
+    <a class="mi" href="escritorio.html">🚶 Voltar ao escritório</a>
     <button class="mi" data-m="help">❓ Como usar</button>
     <div class="sep"></div>
-    <div style="font-weight:700;margin:6px 0">Mapas salvos</div><div class="maps" id="mapsList"><p class="note">${db?"Carregando…":"Salvos só neste aparelho."}</p></div>`;
+    <div style="font-weight:700;margin:6px 0">Mapas salvos</div><div class="maps" id="mapsList"><p class="note">Carregando…</p></div>`;
   menu.classList.remove("hidden");
   menu.querySelector("#imp").onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
     try { const m = JSON.parse(await f.text()); if (!m.rooms || !m.w) throw 0; const b = snapshot(); m.name = m.name || "Importado"; Object.assign(S, {name:m.name,w:m.w,h:m.h,rooms:m.rooms,items:m.items||[]}); afterLoad(true); commit(b); toast("Mapa importado"); }
     catch(_) { toast("Arquivo inválido"); }
   };
+  if (!db){
+    const ms = await Dados.listarMapas(); const el = menu.querySelector("#mapsList");
+    el.innerHTML = ms.length ? ms.map(m=>`<button data-open="${m.id}" class="${m.id===mapId?"cur":""}">${esc(m.name||m.id)}</button>`).join("") : `<p class="note">Nenhum mapa salvo ainda.</p>`;
+  }
   if (db){
     try {
       const q = await db.collection("maps").orderBy("updatedAt","desc").limit(50).get();
@@ -795,7 +602,7 @@ menu.addEventListener("click", async e=>{
   const m = e.target.closest("[data-m]"); if (!m) return;
   const k = m.dataset.m;
   if (k==="new" || k==="tpl"){ await flush(); const id = "m"+Date.now().toString(36); const fresh = k==="new" ? blankMap("Novo escritório") : templateNext();
-    menu.classList.add("hidden"); mapId = id; S = fresh; undoStack.length=0; redoStack.length=0; sel=null; lastRev=null; dbLoaded=true; LS.set("nextco_map_id", id);
+    menu.classList.add("hidden"); mapId = id; S = fresh; undoStack.length=0; redoStack.length=0; sel=null; lastRev=null; dbLoaded=true;
     if (db) subscribe(); afterLoad(true); dirty=true; save(); if (k==="new"){ setMode("room"); toast("Arraste no mapa para criar a primeira sala"); } return; }
   if (k==="help"){ menu.classList.add("hidden"); document.getElementById("help").classList.remove("hidden"); return; }
   if (k==="copy"){ try { await navigator.clipboard.writeText(JSON.stringify(S)); toast("JSON copiado"); } catch(_) { toast("Não foi possível copiar aqui"); } return; }
@@ -845,7 +652,8 @@ info("");
 
 /* ---------- boot ---------- */
 resize();
-const startId = LS.get("nextco_map_id") || "principal";
+if (imgsLeft === 0) { buildPatterns(ctx); }
+const startId = Dados.mapaAtualId();
 openMap(startId, null);
 if (!S){ S = templateNext(); afterLoad(true); setSaveState("Carregando…"); }
 if (!LS.get("nextco_help_seen")) document.getElementById("help").classList.remove("hidden");
@@ -854,13 +662,13 @@ const browserDownloads = { save: async ({filename, data}) => {
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); return {status:"saved"};
 }};
-if (!window.claude) { downloads = browserDownloads; setSaveState(LS.get("nextco_map_"+mapId) ? "Salvo neste aparelho" : "Edite para salvar"); }
+if (!window.claude) { downloads = browserDownloads; setSaveState(Dados.lerMapaLocal(mapId) ? "Salvo neste aparelho" : "Edite para salvar"); if (EMAIL) Dados.registrarAtividade(EMAIL, "editor", "Abriu o editor de salas"); }
 else (async () => {
   try {
     const [d, dl] = await Promise.all([window.claude ? window.claude.use("db") : null, window.claude ? window.claude.use("downloads") : null]);
     downloads = dl;
     if (d){ db = d; subscribe(); }
-    else setSaveState(LS.get("nextco_map_"+mapId) ? "Salvo neste aparelho" : "Edite para salvar");
+    else setSaveState(Dados.lerMapaLocal(mapId) ? "Salvo neste aparelho" : "Edite para salvar");
   } catch(e){ setSaveState("Salvo neste aparelho"); }
 })();
 </script>

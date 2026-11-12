@@ -1,8 +1,26 @@
 # Escritório Virtual Next Co.
 
-- `/` – Editor de salas (zoom, criar salas do zero, redimensionar, móveis automáticos ou manuais).
-- `/galeria` – Todas as artes em pixel art (personagens, itens do mapa, splash art).
-- `artgen/` – Código Python que gera todas as artes (`python3 gen_chars.py`, `gen_items.py`, `splash.py`).
+Site estático publicado na Vercel (cada push na `main` publica sozinho).
 
-Site estático, publicado na Vercel. Os mapas ficam salvos no navegador de cada pessoa (localStorage);
-use Menu → Baixar/Importar JSON para levar um mapa de um aparelho para outro.
+| Página | O que faz |
+| --- | --- |
+| `/` (index.html) | Entrar com e-mail (primeiro acesso pede o nome) |
+| `/avatar` | Criar/editar o personagem com as camadas da planilha (P01–P18) |
+| `/escritorio` | Andar pelo escritório: setas/WASD, clique/toque para ir, joystick no celular, acenar/dançar/sentar |
+| `/editor` | Editor de salas (zoom, criar do zero, redimensionar, móveis automáticos ou manuais) |
+| `/galeria` | Todas as artes em pixel art |
+
+## Onde ficam os dados
+
+**Tudo passa por um único arquivo: `js/dados.js`.** Ele salva por e-mail:
+usuário, personagem, última posição, tudo o que a pessoa fez (atividades) e os mapas.
+
+Hoje grava no navegador (localStorage). Para ir para um banco, troque só o adaptador
+no topo de `js/dados.js` – as páginas não mudam. As tabelas prontas estão em `data/schema.sql`.
+
+## Outros arquivos
+
+- `js/mapa-core.js` – motor do mapa (salas, móveis automáticos, paredes, colisão, caminho)
+- `js/avatar.js` – catálogo das camadas do personagem e montagem do spritesheet
+- `assets/` – artes (personagens em camadas, piso, splash); `assets.js` – itens do mapa
+- `artgen/` – código Python que gera todas as artes
