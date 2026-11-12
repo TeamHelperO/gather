@@ -126,6 +126,7 @@ function layoutBase(r){
       const sx0 = w >= 5 ? x+1 : x, sx1 = w >= 5 ? x+w-2 : x+w-1;
       for (let ty=y; ty<y+sh; ty++) for (let tx=sx0; tx<=sx1; tx++) P("f_palco", tx, ty, {z:"floor"});
       for (let tx=sx0; tx<=sx1; tx++) P("palco_frente", tx, y+sh, {z:"floor"});
+      if (w >= 8 && ASSETS.projecao) P("projecao", cx-3, y-1.9, {z:"wall"});
       P("pulpito", cx-0.5, y+sh-1.3);
       if (w >= 5) { P("caixa_som", x+0.05, y-0.6); P("caixa_som", x+w-1.05, y-0.6); }
       const aisle = w >= 7 ? Math.floor(cx) : null;
@@ -154,7 +155,7 @@ function layout(r){
   const side = r.door ? r.door.side : "nenhuma"; if (side === "nenhuma") return its;
   const dt = doorTile(r), {x, y, w, h} = r;
   const livres = side==="baixo" ? [[dt,y+h-1],[dt,y+h-2]] : side==="cima" ? [[dt,y],[dt,y+1]] : side==="esquerda" ? [[x,dt],[x+1,dt]] : [[x+w-1,dt],[x+w-2,dt]];
-  const SOLTO = /^(cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$|teclado|mouse$|notebook$|gabinete$)/;
+  const SOLTO = /^(cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$|teclado|mouse$|notebook$|gabinete$|projecao$)/;
   const pe = (it, dx) => { const a = ASSETS[it.k]; const bx0 = (it.x+dx)*T+4, bx1 = (it.x+dx)*T+a.w-4, bb = it.y*T+a.h-2, bt = bb-Math.min(a.h*0.45,26); return [bx0,bt,bx1,bb]; };
   const bate = (it, dx) => { const [a0,b0,a1,b1] = pe(it, dx); return livres.some(([tx,ty]) => a1 > tx*T-6 && a0 < (tx+1)*T+6 && b1 > ty*T && b0 < (ty+1)*T); };
   const out = [];
@@ -216,7 +217,7 @@ function sortKey(it){
   if (it._sobre != null) return it._sobre;
   if (it._sobre === undefined && SOBRE_MESA.test(it.k)){ const v = topoDaMesa(it); if (v != null) return v; }
   if (it.sort!=null) return it.sort;
-  if (it.z==="wall"){ const r=roomById(it.room); return (r? r.y*T : it.y*T) + 0.5; }
+  if (it.z==="wall" || it.k==="projecao"){ const r=it.room && roomById(it.room); return (r? r.y*T : it.y*T) + 0.5; }
   return it.y*T + ASSETS[it.k].h;
 }
 
@@ -274,7 +275,7 @@ function drawCaps(c, r){
 
 /* ---------- colisão (grade de 16 px) ---------- */
 const C16 = 16;
-const SEM_COLISAO = /^(cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$|teclado|mouse$|notebook$|gabinete$)/;
+const SEM_COLISAO = /^(cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$|teclado|mouse$|notebook$|gabinete$|projecao$)/;
 function buildBlocked(){
   const cols = S.w*2, rows = S.h*2, g = new Uint8Array(cols*rows);
   const set = (cx, cy) => { if (cx>=0 && cy>=0 && cx<cols && cy<rows) g[cy*cols+cx] = 1; };

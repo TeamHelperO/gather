@@ -36,6 +36,23 @@ html,body{height:100%;overflow:hidden}
 .ico{width:28px;height:28px;border-radius:8px;background:var(--chip);display:grid;place-items:center;flex:none}
 #toast{position:fixed;left:50%;top:64px;transform:translateX(-50%);background:#1d1d1f;color:#fff;padding:9px 14px;border-radius:10px;font-size:13px;z-index:40;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
 #toast.show{opacity:1}
+/* ---- telão de projeção ---- */
+#btnProj{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:70px;z-index:12;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe;white-space:nowrap}
+#btnProj.parar{background:#e5484d;border-color:#e5484d}
+#btnProj:disabled{background:var(--panel);color:var(--ink);border-color:var(--line);opacity:1;cursor:default}
+.proj-bg{position:fixed;inset:0;z-index:60;background:rgba(8,6,14,.82);display:grid;place-items:center;padding:16px}
+.proj-win{width:min(1200px,100%);background:#14121c;border:1px solid #2e2b3a;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6);display:flex;flex-direction:column;max-height:100%}
+.proj-top{display:flex;align-items:center;gap:8px;padding:10px 12px;color:#fff;border-bottom:1px solid #2e2b3a;font-size:14px}
+.proj-top b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proj-status{color:#ff8a8f;font-size:12px;font-weight:700;margin-right:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proj-btn{color:#fff;background:#2a2736;border:1px solid #3a3648;border-radius:8px;padding:6px 10px;font-weight:700;font-size:13px;white-space:nowrap}
+.proj-btn:hover{background:#353145}
+.proj-palco{position:relative;background:#000;aspect-ratio:16/9;max-height:calc(100vh - 110px);width:100%}
+.proj-palco video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
+.proj-vazio{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:#cfcbd9;font-weight:650;padding:20px}
+.proj-vazio small{color:#8f8a9e;font-weight:500}
+.proj-palco:fullscreen{max-height:none;aspect-ratio:auto}
+@media (max-width:760px){.proj-btn[data-cheia]{font-size:0;padding:6px 9px}.proj-btn[data-cheia]::before{content:"⛶";font-size:15px}}
 /* ---- configurações de áudio ---- */
 .cfg-sec{margin:4px 0 14px}
 .cfg-sec>b{display:block;font-size:13px;margin:0 0 6px}
@@ -69,6 +86,7 @@ html,body{height:100%;overflow:hidden}
 <div class="emotes pill">
   <button id="btnAudio" style="background:#3d5afe;color:#fff">🎧 Ligar áudio</button><button id="btnCfgAudio" title="Microfone, saída de áudio e volume de cada pessoa" aria-label="Configurar áudio">⚙️</button><button data-emote="5">👋 Acenar</button><button data-emote="6">💃 Dançar</button><button data-emote="4">🪑 Sentar/levantar</button>
 </div>
+<button class="pill" id="btnProj"></button>
 <button class="pill" id="btnTelao" style="display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:70px;z-index:12;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe">📊 Abrir telão</button>
 <div id="hint">Setas/WASD ou clique para andar · pare perto de uma cadeira para sentar</div>
 <div id="joy"><div id="knob"></div></div>
@@ -77,6 +95,7 @@ html,body{height:100%;overflow:hidden}
 <div id="toast"></div>
 <div id="load">Entrando no escritório…</div>
 <script src="assets.js"></script>
+<script src="js/projecao.js"></script>
 <script src="js/vendor/supabase.js"></script>
 <script src="js/config.js"></script>
 <script src="js/dados.js"></script>
@@ -120,6 +139,7 @@ async function boot(){
   P = new Ator({ id: Dados.meuId(), nome: user.nome, sheet, x: 0, y: 0 });
   const m = document.getElementById("mini").getContext("2d"); m.imageSmoothingEnabled = false; m.drawImage(sheet, 8, 4, 16, 16, 0, 0, 32, 32);
   spawn();
+  Projecao.iniciar({ eu: () => P, outros: () => outros, toast, registrar: (d, sala) => Dados.registrarAtividade(EMAIL, "acao", d, {sala}) });
   conectarSala();
   document.getElementById("load").remove();
   ligarAudioAuto();
@@ -144,7 +164,7 @@ function conectarSala(){
     aoMover(id, st){
       const a = outros.find(o => o.id === id); if (!a) return;
       if (!a.visto){ a.x = st.x; a.y = st.y; a.visto = true; }
-      a.alvo = { x: st.x, y: st.y }; a.dir = st.dir; a.remotoAndando = !!st.mov; a.mic = !!st.mic; a.audio = st.audio === undefined ? undefined : !!st.audio;
+      a.alvo = { x: st.x, y: st.y }; a.dir = st.dir; a.remotoAndando = !!st.mov; a.mic = !!st.mic; a.audio = st.audio === undefined ? undefined : !!st.audio; a.proj = st.proj || null;
       if (st.emote !== a.emote){ a.emote = st.emote; a.emoteT = 0; }
       const atual = a.assento ? a.assento.id : null;
       if (st.assento !== atual){
@@ -153,7 +173,7 @@ function conectarSala(){
         if (s && (!s.ocupante || s.ocupante === a)){ s.ocupante = a; a.assento = s; }
       }
     },
-    aoSinal: msg => Voz.aoSinal(msg),
+    aoSinal: msg => msg.canal === "proj" ? Projecao.aoSinal(msg) : Voz.aoSinal(msg),
     aoDesconectar(){ toast("Conexão instável… tentando de novo"); },
   });
 }
@@ -171,7 +191,7 @@ function moverOutros(dt){
 }
 function recarregarMapa(novo){
   for (const a of [P, ...outros]) if (a.assento){ a.assento.ocupante = null; a.assento = null; }
-  S = novo; grid = buildBlocked(); assentos = construirAssentos();
+  S = novo; grid = buildBlocked(); assentos = construirAssentos(); Projecao.recalcular();
   teloes = allItems().filter(i => i.k === "telao"); monitores = allItems().filter(i => EQUIP.test(i.k));
   if (!livre(P.x, P.y)) spawn();
   toast("O mapa do escritório foi atualizado");
@@ -215,6 +235,7 @@ function abrirTelao(){
   Telao.abrir({ email: EMAIL, nome: user.nome, aoFechar: atualizarTarefas });
 }
 document.getElementById("btnTelao").onclick = abrirTelao;
+document.getElementById("btnProj").onclick = e => { e.stopPropagation(); Projecao.clicarBotao(); };
 function livre(x, y){ // caixa dos pés (12x6 px) livre?
   for (const [dx, dy] of [[-6,-3],[6,-3],[-6,3],[6,3]]) if (grid.blocked(Math.floor((x+dx)/C16), Math.floor((y+dy)/C16))) return false;
   return x > 8 && y > 8 && x < S.w*T-8 && y < S.h*T-8;
@@ -254,6 +275,7 @@ const up = e => {
   const [wx, wy] = toWorld(e.clientX, e.clientY);
   const pessoa = outros.find(o => o.visto && o.sheet && Math.abs(o.px - wx) < 12 && wy > o.py - 34 && wy < o.py + 4);
   if (pessoa){ abrirConfigAudio(pessoa.id); return; }
+  if (Projecao.clicou(wx, wy)) return;
   for (const it of teloes){ if (wx >= it.x*T && wx <= it.x*T + 192 && wy >= it.y*T && wy <= it.y*T + 90){ abrirTelao(); return; } }
   // clicou num assento? vai até ele e senta
   let alvo = null, bd = 1e9;
@@ -323,7 +345,8 @@ function loop(now){
   moverOutros(dt);
   const visiveis = outros.filter(o => o.visto && o.sheet);
   Voz.atualizar(P, visiveis, now);
-  Sala.enviarPosicao({ x: Math.round(P.x), y: Math.round(P.y), dir: P.dir, mov: P.moving, assento: P.assento ? P.assento.id : null, emote: P.emote, mic: Voz.micAberto, audio: Voz.ligado }, now);
+  Projecao.atualizar(now);
+  Sala.enviarPosicao({ x: Math.round(P.x), y: Math.round(P.y), dir: P.dir, mov: P.moving, assento: P.assento ? P.assento.id : null, emote: P.emote, mic: Voz.micAberto, audio: Voz.ligado, proj: Projecao.minhaSala }, now);
   atualizarConversas([P, ...visiveis], dt, (a, o) => {
     if (a !== P) return;
     const agora = Date.now(); if (conversasLog[o.nome] && agora - conversasLog[o.nome] < 60000) return;
@@ -341,7 +364,7 @@ function loop(now){
 }
 function salvarPos(){ if (!P) return; sujo = false; const v = P.assento && P.volta ? P.volta : P;
   Dados.salvarPosicao(EMAIL, {mapa: mapaId, x: Math.round(v.x), y: Math.round(v.y), direcao: P.dir}); }
-addEventListener("pagehide", salvarPos);
+addEventListener("pagehide", () => { salvarPos(); Projecao.parar(false); });
 document.addEventListener("visibilitychange", () => { if (document.hidden) salvarPos(); });
 function checarSala(first){
   const r = roomAt(P.px, P.py - 4);
@@ -366,7 +389,8 @@ function draw(){
   ctx.imageSmoothingEnabled = false;
   ctx.setTransform(zoom*DPR, 0, 0, zoom*DPR, c.ox*DPR, c.oy*DPR);
   drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => Telao.desenharTela(g, it.x*T, it.y*T, tarefas) })))
-    .concat(monitores.map(it => ({ sort: sortKey(it) + 0.01, draw: g => desenharMonitor(g, it, ligados.has(it.x + "," + it.y), t) }))));
+    .concat(monitores.map(it => ({ sort: sortKey(it) + 0.01, draw: g => desenharMonitor(g, it, ligados.has(it.x + "," + it.y), t) })))
+    .concat(Projecao.desenhaveis()));
   for (const a of atores) a.balao(ctx, t);
   if (marca){ ctx.strokeStyle = `rgba(61,90,254,${marca.t})`; ctx.lineWidth = 2/zoom*1.5; ctx.beginPath(); ctx.ellipse(marca.x, marca.y, 10*(1.6-marca.t*.6), 5*(1.6-marca.t*.6), 0, 0, Math.PI*2); ctx.stroke(); }
   // nomes (tela)

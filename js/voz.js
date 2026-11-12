@@ -332,6 +332,6 @@ window.Voz = (function () {
     volumePessoa, definirVolumePessoa,
     get pref() { return { ...pref, vols: { ...pref.vols } }; },
     get ligado() { return ligado; }, get temMic() { return !!stream; }, get micAberto() { return micAberto && !!stream; },
-    get conexoes() { return peers.size; }, get temTurn() { return temTurn(); }, get micAtual() { return stream ? (stream.getAudioTracks()[0] || {}).label || "" : ""; },
+    get conexoes() { return peers.size; }, get iceServers() { return iceServers; }, get temTurn() { return temTurn(); }, get micAtual() { return stream ? (stream.getAudioTracks()[0] || {}).label || "" : ""; },
   };
 })();
