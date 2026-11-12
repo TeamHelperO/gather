@@ -20,6 +20,8 @@ const LIMITE = 54000; // a Vercel (plano Hobby) corta em 60 s
 const restante = () => LIMITE - (Date.now() - INICIO.t);
 const tentativas = [];
 const modelosMortos = new Set();
+const semKw = new Set();      // modelos que não aceitam chat_template_kwargs
+const puladosNaRodada = new Set();
 let catalogo = null; // modelos que a NVIDIA oferece hoje (lido de /v1/models)
 async function modelos() {
   if (!catalogo) {
@@ -31,7 +33,7 @@ async function modelos() {
   }
   const tem = id => !catalogo || catalogo.includes(id);
   const extras = (catalogo || []).filter(id => /instruct|-it$|chat/i.test(id) && !/embed|guard|safety|reward|parse|vision|vlm|coder|code|retriev|chatqa/i.test(id));
-  return [...new Set([process.env.NVIDIA_MODEL, ...PREFERIDOS.filter(tem), ...extras].filter(Boolean))].filter(m => !modelosMortos.has(m));
+  return [...new Set([process.env.NVIDIA_MODEL, ...PREFERIDOS.filter(tem), ...extras].filter(Boolean))].filter(m => !modelosMortos.has(m) && !puladosNaRodada.has(m));
 }
 
 const AGENTES = [
@@ -53,7 +55,8 @@ async function chamar(modelo, chave, n, mensagens, sinal) {
   const r = await fetch(NV, {
     method: "POST",
     headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.6, max_tokens: 2000 }),
+    // desliga o "raciocínio" (senão o modelo gasta os tokens pensando e não escreve a resposta)
+    body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.6, max_tokens: 3000, ...(semKw.has(modelo) ? {} : { chat_template_kwargs: { enable_thinking: false, thinking: false } }) }),
     signal: AbortSignal.any([sinal, AbortSignal.timeout(Math.max(5000, restante() - 3000))]),
   }).catch(e => ({ ok: false, status: 0, text: async () => String(e) }));
   const reg = `${modelo} · chave ${n} · ${r.status} · ${((Date.now() - t0) / 1000).toFixed(1)}s`;
@@ -64,10 +67,11 @@ async function chamar(modelo, chave, n, mensagens, sinal) {
     const j = await r.json(), msg = j.choices?.[0]?.message || {};
     // alguns modelos (com "raciocínio") devolvem a resposta em reasoning_content, ou o JSON dentro de ```json
     const texto = [msg.content, msg.reasoning_content, msg.reasoning].filter(Boolean).join("\n");
-    if (!Object.keys(lerJSON(texto)).length) { console.log("[agentes] sem JSON:", JSON.stringify(msg).slice(0, 400)); throw erro(`${modelo} não devolveu JSON`, "morto"); }
+    if (!Object.keys(lerJSON(texto)).length) { console.log("[agentes] sem JSON:", JSON.stringify(msg).slice(0, 400)); throw erro(`${modelo} não devolveu JSON`, "semJson"); }
     return { texto, chave: n, modelo };
   }
   const txt = await r.text(); console.log("[agentes] resposta:", txt.slice(0, 200));
+  if ((r.status === 400 || r.status === 422) && /chat_template|kwargs|thinking|extra/i.test(txt)) throw erro(`${modelo} não aceita desligar raciocínio`, "semKwargs");
   if ([404, 410, 400, 422].includes(r.status)) throw erro(`${modelo} indisponível (${r.status})`, "morto");
   if (ehFimDeCota(r.status, txt)) throw erro(`chave ${n} sem créditos (${r.status})`, "cota");
   throw erro(`${modelo}: erro ${r.status}`, "morto");
@@ -87,7 +91,7 @@ async function perguntar(mensagens) {
       try { const r = await Promise.any(cands.map(m => chamar(m, lista[i], i + 1, mensagens, ctrl.signal))); ctrl.abort(); return r; }
       catch (agg) {
         const erros = agg.errors || [agg];
-        erros.forEach((e, k) => { if (e.morto) modelosMortos.add(cands[k]); });
+        erros.forEach((e, k) => { if (e.morto) modelosMortos.add(cands[k]); else if (e.semKwargs) semKw.add(cands[k]); else if (e.semJson) puladosNaRodada.add(cands[k]); });
         ultimo = erros.map(e => e.message).filter(m => m !== "cancelado").slice(-1)[0] || ultimo;
         if (erros.some(e => e.cota)) { esgotadas.set(i, Date.now() + 60 * 60000); break; } // acabou: próxima chave
       }
@@ -121,7 +125,7 @@ async function rodada(lista, porAgente) {
   await Promise.all(lista.map(a => status(a.id, "pesquisando", `Pedindo à IA tendências de ${a.cat}`)));
   const hoje = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   const { texto, chave, modelo } = await perguntar([
-    { role: "system", content: "Você é uma equipe de analistas de tendências de mercado. Responda só com JSON válido, em português do Brasil, sem texto fora do JSON." },
+    { role: "system", content: "/no_think\nVocê é uma equipe de analistas de tendências de mercado. Responda só com JSON válido, em português do Brasil, sem texto fora do JSON." },
     { role: "user", content: `Hoje é ${hoje}. Para uma agência/empresa digital brasileira, cada agente lista ${porAgente} tendências atuais e acionáveis da sua área:\n` +
       lista.map(a => `- ${a.id} (${a.nome}): ${a.area}`).join("\n") +
       `\nFormato: {"agente1": [{"titulo": "até 90 caracteres", "resumo": "2 frases: o que é e por que vale (ou não) pegar", "relevancia": 1-5}], ...}. Não invente números nem links.` },
@@ -159,7 +163,7 @@ module.exports = async (req, res) => {
   if (!chaves().length || !process.env.AGENTES_CHAVE) return res.status(200).json({ ok: false, erro: "Configure NVIDIA_API_KEYS e AGENTES_CHAVE na Vercel" });
   const porAgente = Math.max(1, Math.min(5, parseInt(req.query && req.query.n) || 2));
   const so = req.query && req.query.agente;
-  INICIO.t = Date.now(); tentativas.length = 0;
+  INICIO.t = Date.now(); tentativas.length = 0; puladosNaRodada.clear();
   const lista = AGENTES.filter(a => !so || a.id === so);
   let resultado;
   try { resultado = await rodada(lista, porAgente); }
