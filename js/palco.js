@@ -90,8 +90,8 @@ window.Palco = (function () {
     if (bm) {
       const mostra = aud && !palco;
       bm.style.display = mostra ? "" : "none";
-      const txt = maoT ? "✋ Baixar a mão" : "✋ Levantar a mão";
-      if (bm.textContent !== txt) bm.textContent = txt;
+      if (window.ROTULO) ROTULO(bm, "hand", maoT ? "Baixar a mão" : "Levantar a mão");
+      else { const txt = maoT ? "✋ Baixar a mão" : "✋ Levantar a mão"; if (bm.textContent !== txt) bm.textContent = txt; }
       bm.classList.toggle("on", !!maoT);
     }
     const quero = palco && palco.type === "auditorio" ? palco.id : null;

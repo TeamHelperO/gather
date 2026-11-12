@@ -20,7 +20,7 @@ window.Montaria = (function () {
     ativa = quer;
     eu.montaria = ativa;
     const b = document.getElementById("btnMont");
-    if (b) { const t = TIPOS.find(t => t.id === escolha) || TIPOS[3]; const txt = `${t.icone} ${t.nome}`; if (b.textContent !== txt) b.textContent = txt; b.title = "Montaria no corredor (clique para trocar)"; }
+    if (b) { const t = TIPOS.find(t => t.id === escolha) || TIPOS[3]; const ic = { patinete: "wind", skate: "zap", patins: "sparkles" }[t.id] || "footprints"; if (window.ROTULO) ROTULO(b, ic, t.nome); else { const txt = `${t.icone} ${t.nome}`; if (b.textContent !== txt) b.textContent = txt; } b.title = "Montaria no corredor (clique para trocar)"; }
   }
   function velocidade() { return ativa ? VEL_MONTADO[ativa] || VEL_BASE : VEL_BASE; }
   function trocar() {

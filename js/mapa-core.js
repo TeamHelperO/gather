@@ -296,6 +296,7 @@ function drawWorld(c, extra){
   const items = allItems();
   const floorItems = items.filter(i=>i.z==="floor");
   for (const it of floorItems) desenharItem(c, it, IMG[it.k], Math.round(it.x*T), Math.round(it.y*T));
+  luzAmbiente(c, items);
   // drawables
   const D = [];
   for (const r of S.rooms){
@@ -323,6 +324,29 @@ function drawWorld(c, extra){
   }
   // side + bottom wall caps
   for (const r of S.rooms){ if (!TYPES[r.type].noWalls) drawCaps(c, r); }
+}
+/* Acabamento de luz: sombra de contato sob os móveis e sombra suave junto às paredes (desliga com window.SEM_SOMBRAS). */
+function luzAmbiente(c, items){
+  if (window.SEM_SOMBRAS) return;
+  c.save();
+  for (const r of S.rooms){
+    if (TYPES[r.type].noWalls) continue;
+    const x0 = r.x*T, y0 = r.y*T, x1 = (r.x+r.w)*T, y1 = (r.y+r.h)*T;
+    let gr = c.createLinearGradient(0, y0, 0, y0 + 34); gr.addColorStop(0, "rgba(20,14,30,.26)"); gr.addColorStop(1, "rgba(20,14,30,0)");
+    c.fillStyle = gr; c.fillRect(x0, y0, x1 - x0, 34);
+    gr = c.createLinearGradient(x0, 0, x0 + 16, 0); gr.addColorStop(0, "rgba(20,14,30,.16)"); gr.addColorStop(1, "rgba(20,14,30,0)");
+    c.fillStyle = gr; c.fillRect(x0, y0, 16, y1 - y0);
+    gr = c.createLinearGradient(x1, 0, x1 - 16, 0); gr.addColorStop(0, "rgba(20,14,30,.16)"); gr.addColorStop(1, "rgba(20,14,30,0)");
+    c.fillStyle = gr; c.fillRect(x1 - 16, y0, 16, y1 - y0);
+  }
+  c.fillStyle = "rgba(20,14,30,.16)";
+  for (const it of items){
+    if (it.z==="floor" || it.z==="wall" || SEM_COLISAO.test(it.k) || /^(rack_servidor|telao|tv|quadro|relogio|parede)/.test(it.k)) continue;
+    const a = ASSETS[it.k]; if (!a) continue;
+    const b = caixa(it), cx = b.x + b.w/2, by = b.y + b.h - 3, rx = Math.max(8, b.w*0.46);
+    c.beginPath(); c.ellipse(cx, by, rx, Math.min(9, 4 + rx*0.12), 0, 0, Math.PI*2); c.fill();
+  }
+  c.restore();
 }
 function drawCaps(c, r){
   const dt = doorTile(r), side = r.door ? r.door.side : "nenhuma";

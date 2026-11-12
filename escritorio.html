@@ -7,6 +7,37 @@
 <link rel="stylesheet" href="css/base.css">
 <style>
 html,body{height:100%;overflow:hidden}
+/* ---- direção de arte do HUD: vidro escuro da marca, Inter, ícones Lucide ---- */
+@font-face{font-family:Inter;font-weight:600;src:url(assets/fonts/inter-latin-600-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:Inter;font-weight:800;src:url(assets/fonts/inter-latin-800-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:Inter;font-weight:900;src:url(assets/fonts/inter-latin-900-normal.woff2) format("woff2");font-display:swap}
+body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+.hud{background:rgba(22,20,31,.74);color:#fff;border:1px solid rgba(255,255,255,.1);box-shadow:0 8px 28px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);border-radius:14px}
+.hud button{color:#fff}
+.ic{flex:none;display:block}
+.emotes.hud{padding:6px;gap:4px;border-radius:18px}
+.emotes.hud button{display:flex;align-items:center;gap:7px;border-radius:12px;padding:10px 13px;font-weight:800;font-size:13px;transition:background .15s,transform .1s}
+.emotes.hud button:hover{background:rgba(255,255,255,.09)}
+.emotes.hud button:active{transform:scale(.96);background:rgba(255,255,255,.14)}
+.emotes.hud #btnAudio{background:#3d5afe;box-shadow:0 4px 14px rgba(61,90,254,.45)}
+.emotes.hud #btnAudio.mudo{background:#e5484d!important;box-shadow:0 4px 14px rgba(229,72,77,.4)}
+.emotes.hud .div{width:1px;align-self:stretch;margin:6px 2px;background:rgba(255,255,255,.12);flex:none}
+#sala.hud{display:flex;align-items:center;gap:8px;padding:9px 14px 9px 11px;font-weight:800}
+#sala.hud .ic{color:#8a9bff}
+#sala.hud small{font-weight:600;color:rgba(255,255,255,.62);font-size:12.5px}
+#eu.hud{padding:5px 12px 5px 5px;font-weight:800}
+#eu.hud canvas{background:#2a2540;border-radius:10px}
+.zoom.hud{border-radius:14px}
+.zoom.hud button{display:grid;place-items:center}
+.zoom.hud button:hover{background:rgba(255,255,255,.08)}
+#hint.hud{font-weight:600;font-size:12.5px;padding:8px 12px;transition:opacity .6s}
+#btnTelao.hud,#btnProj.hud{display:flex;align-items:center;gap:8px}
+@media (max-width:760px){
+  .emotes.hud button span{display:none}
+  .emotes.hud button{padding:11px}
+  .emotes.hud #btnAudio span{display:inline}
+  #sala.hud small{display:none}
+}
 #cv{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block}
 .top{position:fixed;top:8px;left:8px;right:8px;display:flex;gap:6px;align-items:center;z-index:10;pointer-events:none}
 .top>*{pointer-events:auto}
@@ -182,26 +213,26 @@ html,body{height:100%;overflow:hidden}
 <body>
 <canvas id="cv"></canvas>
 <div class="top">
-  <div class="pill" id="sala">Carregando…</div>
-  <button class="pill" id="eu" aria-label="Menu"><canvas id="mini" class="px" width="32" height="32"></canvas><span id="nome"></span></button>
+  <div class="pill hud" id="sala">Carregando…</div>
+  <button class="pill hud" id="eu" aria-label="Menu"><canvas id="mini" class="px" width="32" height="32"></canvas><span id="nome"></span></button>
 </div>
-<div class="zoom pill"><button id="zin" aria-label="Aproximar">+</button><button id="zout" aria-label="Afastar">−</button></div>
-<div class="emotes pill">
-  <button id="btnAudio" style="background:#3d5afe;color:#fff">🎧 Ligar áudio</button><button id="btnCfgAudio" title="Microfone, saída de áudio e volume de cada pessoa" aria-label="Configurar áudio">⚙️</button><button id="btnMont">🛴 Patinete</button><button id="btnMao" style="display:none">✋ Levantar a mão</button><button data-emote="5">👋 Acenar</button><button data-emote="6">💃 Dançar</button><button data-emote="4">🪑 Sentar/levantar</button>
+<div class="zoom pill hud"><button id="zin" aria-label="Aproximar"></button><button id="zout" aria-label="Afastar"></button></div>
+<div class="emotes pill hud">
+  <button id="btnAudio">Ligar áudio</button><button id="btnCfgAudio" title="Microfone, saída de áudio e volume de cada pessoa" aria-label="Configurar áudio"></button><i class="div"></i><button id="btnMont">Patinete</button><button id="btnMao" style="display:none">Levantar a mão</button><button data-emote="5" title="Acenar"></button><button data-emote="6" title="Dançar"></button><button data-emote="4" title="Sentar ou levantar"></button>
 </div>
-<button class="pill" id="btnProj"></button>
-<button class="pill" id="btnTelao" style="display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:70px;z-index:12;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe">📊 Abrir telão</button>
-<div id="hint">Setas/WASD ou clique para andar · pare perto de uma cadeira para sentar</div>
+<button class="pill hud" id="btnProj"></button>
+<button class="pill hud" id="btnTelao" style="display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:78px;z-index:12;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe">Abrir telão</button>
+<div id="hint" class="hud">Setas/WASD ou clique para andar · pare perto de uma cadeira para sentar</div>
 <div id="joy"><div id="knob"></div></div>
 <aside id="menu" class="sheet hidden"></aside>
 <aside id="audioCfg" class="sheet hidden" aria-label="Configurações de áudio"></aside>
 <div id="toast"></div>
 <div id="load">Entrando no escritório…</div>
+<script src="js/icones-lucide.js"></script>
 <script src="assets.js"></script>
 <script src="js/projecao.js"></script>
 <script src="js/ti.js"></script>
 <script src="js/edicao.js"></script>
-<script src="js/icones-lucide.js"></script>
 <script src="js/video.js"></script>
 <script src="js/palco.js"></script>
 <script src="js/vendor/supabase.js"></script>
@@ -216,12 +247,20 @@ html,body{height:100%;overflow:hidden}
 <script src="js/sala.js"></script>
 <script src="js/voz.js"></script>
 <script>
+/* ícones da barra (Lucide) */
+ROTULO(document.getElementById("btnAudio"), "headphones", "Ligar áudio");
+ROTULO(document.getElementById("btnCfgAudio"), "settings", "");
+ROTULO(document.querySelector('[data-emote="5"]'), "hand", "Acenar");
+ROTULO(document.querySelector('[data-emote="6"]'), "music", "Dançar");
+ROTULO(document.querySelector('[data-emote="4"]'), "armchair", "Sentar");
+ROTULO(document.getElementById("zin"), "plus", ""); ROTULO(document.getElementById("zout"), "minus", "");
+ROTULO(document.getElementById("btnTelao"), "layout-dashboard", "Abrir telão");
 let EMAIL = null;
 window.OCULTAR_PESSOAS = true; // no escritório só aparecem pessoas de verdade
 let S = null, grid = null, user = null, assentos = [];
 const mapaId = "principal";
 const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
-let DPR = 1, VW = 0, VH = 0, zoom = innerWidth <= 760 ? 1.6 : 2;
+let DPR = 1, VW = 0, VH = 0, zoom = innerWidth <= 760 ? 1.6 : Math.max(1.2, Math.min(2.2, (innerHeight - 150) / 450)); // no PC, a sala inteira cabe na tela
 let P = null, tarefas = [], teloes = [], monitores = []; const outros = []; // outras pessoas (entram aqui quando houver modo com várias pessoas)
 const keys = new Set(); let joyV = null;
 
@@ -258,7 +297,7 @@ async function boot(){
   document.getElementById("load").remove();
   ligarAudioAuto();
   if (matchMedia("(pointer:coarse)").matches) { document.getElementById("joy").style.display = "block"; document.getElementById("hint").textContent = "Use o controle ou toque no chão para andar"; }
-  setTimeout(() => document.getElementById("hint").style.opacity = 0, 8000);
+  setTimeout(() => document.getElementById("hint").style.opacity = 0, 6000);
   checarSala(true);
   last = performance.now(); requestAnimationFrame(loop);
 }
@@ -314,7 +353,7 @@ function recarregarMapa(novo){
 /* Ao entrar, o áudio e o microfone já ligam sozinhos (dá para mutar no botão). */
 async function ligarAudioAuto(){
   if (Voz.ligado) return;
-  const b = document.getElementById("btnAudio"); b.textContent = "⏳ Ligando…";
+  const b = document.getElementById("btnAudio"); ROTULO(b, "loader-circle", "Ligando…");
   const r = await Voz.ativar(P.id);
   if (!r.comMicrofone) toast("Microfone bloqueado: permita o microfone no navegador para falar");
   Dados.registrarAtividade(EMAIL, "audio", r.comMicrofone ? "Entrou com o microfone ligado" : "Entrou só ouvindo (microfone bloqueado)");
@@ -325,7 +364,7 @@ for (const ev of ["pointerdown", "keydown", "touchstart"]) addEventListener(ev, 
 async function ligarAudio(){
   const b = document.getElementById("btnAudio");
   if (!Voz.ligado){
-    b.textContent = "⏳ Ligando…";
+    ROTULO(b, "loader-circle", "Ligando…");
     const r = await Voz.ativar(P.id);
     if (!r.comMicrofone) toast("Sem permissão do microfone: você ouve, mas não fala");
     Dados.registrarAtividade(EMAIL, "audio", r.comMicrofone ? "Ligou o áudio com microfone" : "Ligou o áudio só para ouvir");
@@ -340,10 +379,10 @@ async function ligarAudio(){
 }
 function atualizarBotaoAudio(){
   const b = document.getElementById("btnAudio");
-  if (!Voz.ligado) b.textContent = "🎧 Ligar áudio";
-  else if (!Voz.temMic) b.textContent = "🔈 Só ouvindo";
-  else if (Voz.bloqueado) b.textContent = "🔇 Mutado pelo palestrante";
-  else b.textContent = Voz.micAberto ? "🎙️ Microfone ligado" : "🔇 Microfone mudo";
+  if (!Voz.ligado) ROTULO(b, "headphones", "Ligar áudio");
+  else if (!Voz.temMic) ROTULO(b, "volume-1", "Só ouvindo");
+  else if (Voz.bloqueado) ROTULO(b, "mic-off", "Mutado pelo palestrante");
+  else ROTULO(b, Voz.micAberto ? "mic" : "mic-off", Voz.micAberto ? "Microfone ligado" : "Microfone mudo");
   b.classList.toggle("mudo", Voz.ligado && !Voz.micAberto);
 }
 function telaoTrancado(g, x, y, r){
@@ -523,7 +562,7 @@ function loop(now){
   const perto = !!telaoPerto;
   const bt = document.getElementById("btnTelao"); const mostra = perto && !Telao.aberto ? "block" : "none"; if (bt.style.display !== mostra) bt.style.display = mostra;
   for (const a of [P, ...visiveis]){ a.vozReal = now - (a.vozAtiva || -1e9) < 350; if (Voz.ligado) a.falando = a.vozReal; else if (a.vozReal) a.falando = true; }
-  checarSala(false);
+  checarSala(false); moverCamera(dt);
   if (sujo && now - ultimoSave > 4000){ salvarPos(); ultimoSave = now; }
   if (marca){ marca.t -= dt*1.5; if (marca.t <= 0) marca = null; }
   draw();
@@ -538,16 +577,65 @@ function checarSala(first){
   const nome = r ? r.name : "Área externa";
   if (nome === P.sala && !first) return;
   P.sala = nome;
-  const z = Voz.zona(P), regra = z.tipo === "fechada" ? " · 🔊 todos da sala se ouvem" : z.tipo === "silencio" ? " · 🤫 sem áudio" : " · 🗣 ouve quem está perto";
-  document.getElementById("sala").textContent = "📍 " + nome + regra;
+  const z = Voz.zona(P), regra = z.tipo === "fechada" ? "todos da sala se ouvem" : z.tipo === "silencio" ? "sem áudio" : "ouve quem está perto";
+  const el = document.getElementById("sala"); el.innerHTML = ICONE("map-pin", 17) + `<span>${nome.replace(/[<>&]/g, "")}</span><small>· ${regra}</small>`;
   if (!first) Dados.registrarAtividade(EMAIL, "sala", `Entrou em ${nome}`, {sala: nome});
+}
+/* câmera: enquadra a sala inteira quando ela cabe na tela (com o HUD em volta) e anda suave */
+let camPos = null;
+const HUD_TOPO = 64, HUD_BASE = 84;
+function camAlvo(){
+  let cx = P.px, cy = P.py - 20;
+  const r = roomAt(P.px, P.py - 4);
+  if (r && !TYPES[r.type].noWalls){
+    const top = (r.y - 2)*T, bot = (r.y + r.h)*T + 6, left = r.x*T - 6, right = (r.x + r.w)*T + 6;
+    const altVis = (VH - HUD_TOPO - HUD_BASE)/zoom, largVis = (VW - 16)/zoom, meio = (HUD_BASE - HUD_TOPO)/2/zoom;
+    if (bot - top <= altVis) cy = (top + bot)/2 + meio;
+    else cy = Math.max(top + (VH/2 - HUD_TOPO)/zoom, Math.min(bot - (VH/2 - HUD_BASE)/zoom, cy));
+    if (right - left <= largVis) cx = (left + right)/2;
+    else cx = Math.max(left + VW/2/zoom, Math.min(right - VW/2/zoom, cx));
+  }
+  return [cx, cy];
+}
+function moverCamera(dt){
+  const [ax, ay] = camAlvo();
+  if (!camPos || Math.hypot(camPos[0] - ax, camPos[1] - ay) > 900){ camPos = [ax, ay]; return; }
+  const k = 1 - Math.exp(-dt*7); camPos[0] += (ax - camPos[0])*k; camPos[1] += (ay - camPos[1])*k;
 }
 function cam(){
   const W = S.w*T*zoom, H = S.h*T*zoom;
-  let ox = VW/2 - P.px*zoom, oy = VH/2 - (P.py - 20)*zoom;
+  const [px, py] = camPos || camAlvo();
+  let ox = VW/2 - px*zoom, oy = VH/2 - py*zoom;
   if (W > VW) ox = Math.min(0, Math.max(VW - W, ox)); else ox = (VW - W)/2;
   if (H > VH) oy = Math.min(0, Math.max(VH - H, oy)); else oy = (VH - H)/2;
   return {ox: Math.round(ox), oy: Math.round(oy)};
+}
+/* luz: brilho das telas ligadas e dos telões, tom de cada sala e vinheta suave nas bordas */
+const TOM_SALA = { recepcao: "255,214,150", copa: "255,200,140", trabalho: "255,226,180", ti: "80,200,255", edicao: "230,90,190", auditorio: "255,190,120", reuniao: "170,190,255", silenciosa: "150,230,170" };
+function desenharLuz(ligados){
+  ctx.save(); ctx.globalCompositeOperation = "lighter";
+  for (const r of S.rooms){
+    const tom = TOM_SALA[r.type]; if (!tom) continue;
+    const cx = (r.x + r.w/2)*T, cy = (r.y + r.h*0.35)*T, raio = Math.max(r.w, r.h)*T*0.7;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, raio); g.addColorStop(0, `rgba(${tom},.10)`); g.addColorStop(1, `rgba(${tom},0)`);
+    ctx.fillStyle = g; ctx.fillRect(r.x*T, (r.y - 2)*T, r.w*T, (r.h + 2)*T);
+  }
+  const brilho = (x, y, raio, cor, a) => { const g = ctx.createRadialGradient(x, y, 0, x, y, raio); g.addColorStop(0, `rgba(${cor},${a})`); g.addColorStop(1, `rgba(${cor},0)`); ctx.fillStyle = g; ctx.fillRect(x - raio, y - raio, raio*2, raio*2); };
+  const pulso = 0.85 + 0.15*Math.sin(t*2.2);
+  for (const m of monitores) if (ligados.has(m.x + "," + m.y)) brilho(m.x*T + 16, m.y*T + 14, 34, "90,170,255", 0.22*pulso);
+  for (const it of allItems()) if (/^telao/.test(it.k) || it.k === "projecao") brilho(it.x*T + 96, it.y*T + 48, 120, it.k === "telao_rot" ? "230,90,190" : it.k === "telao_tend" ? "60,200,230" : "90,120,255", 0.13*pulso);
+  ctx.restore();
+}
+const PATHS_UI = {};
+function iconeCanvas(g, nome, x, y, tam, cor){
+  const d = (window.ICONES_LUCIDE || {})[nome]; if (!d) return;
+  const p = PATHS_UI[nome] || (PATHS_UI[nome] = new Path2D(d));
+  g.save(); g.translate(x - tam/2, y - tam/2); g.scale(tam/24, tam/24); g.strokeStyle = cor; g.lineWidth = 2.4; g.lineCap = "round"; g.lineJoin = "round"; g.stroke(p); g.restore();
+}
+function vinheta(){
+  const g = ctx.createRadialGradient(VW/2, VH/2, Math.min(VW, VH)*0.45, VW/2, VH/2, Math.hypot(VW, VH)*0.62);
+  g.addColorStop(0, "rgba(12,9,22,0)"); g.addColorStop(1, "rgba(12,9,22,.38)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
 }
 function draw(){
   ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle = "#16141f"; ctx.fillRect(0, 0, cv.width, cv.height);
@@ -558,10 +646,12 @@ function draw(){
   drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => { const r = salaDoTelao(it); if (!dentroDoTelao(it)){ telaoTrancado(g, it.x*T, it.y*T, r); return; } Telao.desenharTela(g, it.x*T, it.y*T, r ? Telao.filtrarSala(tarefas, r.id, salaPadrao()) : tarefas, r ? "TELÃO · " + r.name.toUpperCase() : "TELÃO DA EQUIPE"); } })))
     .concat(monitores.map(it => ({ sort: sortKey(it) + 0.01, draw: g => desenharMonitor(g, it, ligados.has(it.x + "," + it.y), t) })))
     .concat(Projecao.desenhaveis()).concat(TI.desenhaveis(t)).concat(Edicao.desenhaveis()));
+  desenharLuz(ligados);
   for (const a of atores) a.balao(ctx, t);
   if (marca){ ctx.strokeStyle = `rgba(61,90,254,${marca.t})`; ctx.lineWidth = 2/zoom*1.5; ctx.beginPath(); ctx.ellipse(marca.x, marca.y, 10*(1.6-marca.t*.6), 5*(1.6-marca.t*.6), 0, 0, Math.PI*2); ctx.stroke(); }
   // nomes (tela)
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  vinheta();
   for (const a of atores){
     const naMesa = a.assento && a.assento.trabalho;
     const sx = a.px*zoom + c.ox, top = a.assento ? a.assento.sy - 40 : a.y - 45, sy = naMesa ? (a.assento.sy + 14)*zoom + c.oy + 19 : (top - 2)*zoom + c.oy;
@@ -575,12 +665,21 @@ function draw(){
       const by = sy - 46 - Math.abs(Math.sin(t*4))*3;
       ctx.fillStyle = "#fff"; ctx.strokeStyle = "#f2a33a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(sx - 15, by, 30, 26, 8); ctx.fill(); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(sx - 5, by + 26); ctx.lineTo(sx, by + 32); ctx.lineTo(sx + 5, by + 26); ctx.fill();
-      ctx.font = "17px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "#000"; ctx.fillText("✋", sx, by + 14); ctx.textAlign = "left";
+      iconeCanvas(ctx, "hand", sx, by + 13, 18, "#d48a12");
     }
-    const txt = a.nome + (tela ? " 🖥️" : "") + (vp === 0 ? " 🔇" : a !== P && a.ouvindo ? " 🔊" : "") + est + semMic + (vp > 0 && vp < 0.99 ? ` ${Math.round(vp*100)}%` : vp > 1.01 ? ` ${Math.round(vp*100)}%` : "") + (a.vozReal ? " 🗣" : "");
-    ctx.font = "700 12px system-ui,sans-serif"; const w = ctx.measureText(txt).width + 12;
-    ctx.fillStyle = a === P ? "rgba(61,90,254,.92)" : "rgba(20,16,32,.72)"; ctx.beginPath(); ctx.roundRect(sx - w/2, sy - 19, w, 17, 6); ctx.fill();
-    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(txt, sx, sy - 10.5); ctx.textAlign = "left";
+    // etiqueta: nome + volume pessoal em texto; estados de áudio/tela como ícones (Lucide)
+    const txt = a.nome + (vp > 0 && vp < 0.99 || vp > 1.01 ? ` ${Math.round(vp*100)}%` : "");
+    const icones = [];
+    if (a.vozReal) icones.push(["mic", "#7ee787"]);
+    if (tela) icones.push(["monitor", "#8a9bff"]);
+    if (vp === 0) icones.push(["volume-x", "#ff8a8a"]); else if (a !== P && a.ouvindo) icones.push(["volume-1", "rgba(255,255,255,.75)"]);
+    if (est) icones.push(["loader-circle", "#f2c97a"]);
+    if (semMic) icones.push(["mic-off", "#ff8a8a"]);
+    ctx.font = "800 12px Inter,system-ui,sans-serif"; const wt = ctx.measureText(txt).width, w = wt + 16 + icones.length*15;
+    ctx.save(); ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+    ctx.fillStyle = a === P ? "rgba(61,90,254,.95)" : "rgba(22,20,31,.82)"; ctx.beginPath(); ctx.roundRect(sx - w/2, sy - 20, w, 19, 9); ctx.fill(); ctx.restore();
+    ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(txt, sx - w/2 + 8, sy - 10);
+    icones.forEach(([nm, cor], i) => iconeCanvas(ctx, nm, sx - w/2 + 8 + wt + 9 + i*15, sy - 10.5, 12, cor));
   }
   TI.nomes(ctx, c, zoom, t);
   // selo de sala com senha/restrita
@@ -588,10 +687,11 @@ function draw(){
     const selo = Acesso.selo(r); if (!selo) continue;
     const sx = (r.x*T + 6)*zoom + c.ox, sy = (r.y*T + 6)*zoom + c.oy;
     if (sx < -200 || sx > VW + 20 || sy < -20 || sy > VH + 20) continue;
-    const ok = Acesso.podeEntrar(r), txt = `${selo === "senha" ? "🔑" : "🔒"} ${r.name}${ok ? " · liberada p/ você" : ""}`;
-    ctx.font = "700 11px system-ui,sans-serif"; const w = ctx.measureText(txt).width + 12;
-    ctx.fillStyle = ok ? "rgba(63,191,95,.9)" : "rgba(229,72,77,.9)"; ctx.beginPath(); ctx.roundRect(sx, sy, w, 17, 6); ctx.fill();
-    ctx.fillStyle = "#fff"; ctx.textBaseline = "middle"; ctx.fillText(txt, sx + 6, sy + 9);
+    const ok = Acesso.podeEntrar(r), txt = `${r.name}${ok ? " · liberada para você" : ""}`;
+    ctx.font = "800 11px Inter,system-ui,sans-serif"; const w = ctx.measureText(txt).width + 30;
+    ctx.fillStyle = ok ? "rgba(46,158,76,.92)" : "rgba(229,72,77,.92)"; ctx.beginPath(); ctx.roundRect(sx, sy, w, 20, 10); ctx.fill();
+    iconeCanvas(ctx, selo === "senha" ? "key" : "lock", sx + 12, sy + 10, 13, "#fff");
+    ctx.fillStyle = "#fff"; ctx.textBaseline = "middle"; ctx.fillText(txt, sx + 22, sy + 10.5);
   }
 }
 

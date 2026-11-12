@@ -237,7 +237,10 @@ window.Projecao = (function () {
       else txt = podeCompartilhar() ? "🖥️ Compartilhar minha tela no telão" : "🖥️ Compartilhar tela (só no computador)";
     }
     const d = mostra ? "block" : "none"; if (b.style.display !== d) b.style.display = d;
-    if (b.textContent !== txt) b.textContent = txt;
+    // ícone Lucide no lugar do emoji do começo do texto
+    const ic = /^⏹/.test(txt) ? "x" : /^🎤/.test(txt) ? "mic" : /^🎬/.test(txt) ? "presentation" : "monitor";
+    const limpo = txt.replace(/^(⏹|🖥️|🎤|🎬)\s*/u, "");
+    if (window.ROTULO) ROTULO(b, ic === "x" ? "presentation" : ic, limpo); else if (b.textContent !== txt) b.textContent = txt;
     b.disabled = !ativo; b.classList.toggle("parar", !!share);
   }
   function clicarBotao() { if (share) parar(true); else compartilhar(); }
