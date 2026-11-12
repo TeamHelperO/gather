@@ -196,6 +196,11 @@
     async urlVideo(caminho) { const { data, error } = await sb.storage.from("videos").createSignedUrl(caminho, 3600); if (error) throw error; return data.signedUrl; },
     async excluirRoteiro(id) { const { error } = await sb.from("roteiros").delete().eq("id", id); if (error) throw error; },
     async listarAgentes() { const { data } = await sb.from("agentes").select("*").order("id"); return data || []; },
+    async salvarAgente(id, campos) { const { error } = await sb.from("agentes").update(campos).eq("id", id); if (error) throw error; },
+    async listarProspects(n = 400) { const { data, error } = await sb.from("prospects").select("*").order("criado_em", { ascending: false }).limit(n); if (error) return null; return data || []; },
+    ouvirProspects(cb) { return sb.channel("prosp-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "prospects" }, () => cb()).subscribe(); },
+    async mexerProspect(id, campos) { const { error } = await sb.from("prospects").update(campos).eq("id", id); if (error) throw error; },
+    async excluirProspect(id) { const { error } = await sb.from("prospects").delete().eq("id", id); if (error) throw error; },
     ouvirAgentes(cb) { return sb.channel("agentes-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "agentes" }, () => cb()).subscribe(); },
 
     /* ---------- meus dados ---------- */

@@ -7,6 +7,9 @@
      AGENTES_CHAVE     – a chave dos agentes (a mesma usada no agente_publicar).
      NVIDIA_MODEL      – opcional; se não tiver ou for desativado, escolhe sozinho entre os modelos que a NVIDIA oferece hoje (lista PREFERIDOS + catálogo /v1/models).
      CRON_SECRET       – opcional; a Vercel manda no cron. Também serve para chamar de fora: /api/agentes?segredo=…
+     GOOGLE_PLACES_KEY – chave da API "Places API (New)" do Google, para o agente de prospecção achar empresas reais.
+   Nome, foco e instruções de cada agente vêm do banco (aba Agentes do painel); sem a migração, usa a lista abaixo.
+   /api/agentes?acao=prospectar roda só o prospectador (empresas do Google Maps → rascunho de e-mail para aprovar).
    Quem pode rodar: o cron da Vercel, quem tiver o CRON_SECRET, ou um administrador logado (botão no painel). */
 const SUPA = process.env.SUPABASE_URL || "https://geqljiqocpzlkxjjoylk.supabase.co";
 const ANON = process.env.SUPABASE_ANON_KEY || "sb_publishable_eNVC3vsJuDQritXDoVyiOw_FbMokMGj";
@@ -43,6 +46,15 @@ const AGENTES = [
   { id: "agente4", nome: "Pulso", area: "inteligência artificial, ferramentas e automação para negócios", cat: "IA/Tech" },
   { id: "agente5", nome: "Bússola", area: "economia, consumo e oportunidades de negócio no Brasil", cat: "Mercado" },
 ];
+
+// configuração atual dos agentes (editada no painel); sem a migração, usa a lista fixa
+async function carregarAgentes() {
+  try {
+    const r = await rpc("agentes_config", { p_chave: process.env.AGENTES_CHAVE });
+    if (r.ok) { const l = await r.json(); if (Array.isArray(l) && l.length && "tipo" in l[0]) return l.map(a => ({ ...a, area: a.foco || (AGENTES.find(x => x.id === a.id) || {}).area || a.nome, cat: a.categoria || a.nome })); }
+  } catch (e) {}
+  return AGENTES.map(a => ({ ...a, tipo: "pesquisa", ativo: true, config: {} }));
+}
 
 // chaves esgotadas ficam de lado por um tempo (enquanto a função estiver "quente")
 const esgotadas = new Map(); // índice -> até quando
@@ -154,7 +166,7 @@ async function rodada(lista, porAgente) {
   const { texto, chave, modelo } = await perguntar([
     { role: "system", content: "/no_think\nVocê é uma equipe de analistas de tendências de mercado. Responda só com JSON válido, em português do Brasil, sem texto fora do JSON." },
     { role: "user", content: `Hoje é ${hoje}. Para uma agência/empresa digital brasileira, cada agente lista ${porAgente} tendências atuais e acionáveis da sua área:\n` +
-      lista.map(a => `- ${a.id} (${a.nome}): ${a.area}`).join("\n") +
+      lista.map(a => `- ${a.id} (${a.nome}): ${a.area}` + (a.prompt ? `\n  instruções do ${a.nome}: ${String(a.prompt).slice(0, 600).replace(/\s+/g, " ")}` : "")).join("\n") +
       `\nFormato: {"agente1": [{"titulo": "até 90 caracteres", "resumo": "2 frases: o que é e por que vale (ou não) pegar", "relevancia": 1-5}], ...}. Não invente números nem links.` },
   ]);
   const json = lerJSON(texto), resultado = [];
@@ -237,6 +249,120 @@ async function roteirizar(t, formato, pedidoPor, anterior) {
   return { id, cenas: cenas.length, modelo };
 }
 
+/* ---------- Prospecção: empresas reais do Google Maps → e-mail personalizado para aprovar ---------- */
+const SOCIAIS = /(^|\.)(instagram|facebook|fb|wa|whatsapp|linktr|linktree|tiktok|youtube|twitter|x|linkedin|google|goo|bit|ifood|doctoralia|booksy|sympla)\.[a-z.]+$/i;
+const dominioDe = url => { try { const h = new URL(url).hostname.replace(/^www\./, "").toLowerCase(); return SOCIAIS.test(h) ? null : h; } catch (e) { return null; } };
+async function buscarEmpresas(consulta) {
+  const chave = process.env.GOOGLE_PLACES_KEY || process.env.GOOGLE_MAPS_API_KEY;
+  const r = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Goog-Api-Key": chave,
+      "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.rating,places.userRatingCount,places.googleMapsUri,places.businessStatus" },
+    body: JSON.stringify({ textQuery: consulta, languageCode: "pt-BR", regionCode: "BR", pageSize: 20 }),
+    signal: AbortSignal.timeout(Math.min(12000, Math.max(3000, restante() - 30000))),
+  });
+  if (!r.ok) throw new Error(`Google Places recusou (${r.status}): ` + (await r.text()).replace(/\s+/g, " ").slice(0, 160));
+  return ((await r.json()).places || []).filter(p => !p.businessStatus || p.businessStatus === "OPERATIONAL");
+}
+async function baixar(url, ms) {
+  try {
+    const r = await fetch(url, { redirect: "follow", headers: { "User-Agent": "Mozilla/5.0 (compatible; NextCoBot/1.0)", Accept: "text/html" }, signal: AbortSignal.timeout(ms) });
+    if (!r.ok || !/html|text/i.test(r.headers.get("content-type") || "html")) return "";
+    return (await r.text()).slice(0, 500000);
+  } catch (e) { return ""; }
+}
+const LIXO = /\.(png|jpe?g|gif|webp|svg|css|js)$|sentry|wixpress|example|exemplo|seuemail|seu-email|email@email|nome@|usuario@|domain\.|dominio\.|@sentry|@2x|u003e|cloudflare|godaddy|hostgator|wordpress|schema\.org/i;
+function emailsDe(html, dominio) {
+  const t = html.replace(/&#64;|&#x40;|\[at\]|\(at\)|\s@\s/gi, "@").replace(/%40/g, "@");
+  const achados = [...new Set((t.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || []).map(e => e.toLowerCase().replace(/^[._-]+|[._-]+$/g, "")))]
+    .filter(e => !LIXO.test(e) && e.length < 80);
+  const pref = e => (dominio && e.endsWith("@" + dominio) ? 0 : dominio && e.split("@")[1].endsWith(dominio.split(".").slice(-3).join(".")) ? 1 : 2) * 10 +
+    (/^(contato|comercial|atendimento|vendas|marketing|ola|oi|faleconosco|sac)@/.test(e) ? 0 : 5);
+  return achados.sort((a, b) => pref(a) - pref(b)).slice(0, 6);
+}
+function textoDe(html) {
+  const titulo = (html.match(/<title[^>]*>([^<]*)/i) || [])[1] || "";
+  const desc = (html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)/i) || [])[1] || "";
+  const corpo = html.replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ");
+  return `${titulo.trim()} — ${desc.trim()} — ${corpo.trim()}`.slice(0, 900);
+}
+async function lerSite(url) {
+  const dominio = dominioDe(url);
+  if (!dominio) return { dominio: null, emails: [], texto: "" };
+  const ms = Math.min(7000, Math.max(2500, restante() - 28000));
+  const html = await baixar(url, ms);
+  let emails = emailsDe(html, dominio);
+  if (!emails.length) {
+    const base = new URL(url).origin;
+    const extras = await Promise.all(["/contato", "/contato/", "/fale-conosco", "/contact"].map(c => baixar(base + c, Math.min(5000, ms))));
+    emails = emailsDe(extras.join(" "), dominio);
+  }
+  return { dominio, emails, texto: html ? textoDe(html) : "" };
+}
+
+async function prospectar(ag) {
+  if (!(process.env.GOOGLE_PLACES_KEY || process.env.GOOGLE_MAPS_API_KEY)) throw new Error("Configure GOOGLE_PLACES_KEY na Vercel para o prospectador achar empresas");
+  const cfg = ag.config || {}, lista = v => [].concat(v || []).map(x => String(x).trim()).filter(Boolean);
+  const segmentos = lista(cfg.segmentos), cidades = lista(cfg.cidades);
+  if (!segmentos.length || !cidades.length) throw new Error("Defina segmentos e cidades do prospectador na aba Agentes");
+  const quantos = Math.max(1, Math.min(8, parseInt(cfg.por_rodada) || 5));
+  const conhecidos = await rpc("prospects_conhecidos", { p_chave: process.env.AGENTES_CHAVE }).then(r => r.ok ? r.json() : []).catch(() => []);
+  const vistos = { place: new Set(conhecidos.map(c => c.place_id)), dom: new Set(conhecidos.map(c => c.dominio).filter(Boolean)), email: new Set(conhecidos.map(c => c.email).filter(Boolean)) };
+
+  // sorteia segmento × cidade; se tudo já foi visto, tenta outra combinação
+  const combos = segmentos.flatMap(s => cidades.map(c => [s, c])).sort(() => Math.random() - 0.5);
+  let candidatos = [], consulta = "";
+  for (const [seg, cid] of combos.slice(0, 3)) {
+    if (restante() < 35000) break;
+    consulta = `${seg} em ${cid}`;
+    await status(ag.id, "buscando", `Google Maps: ${consulta}`);
+    const achadas = (await buscarEmpresas(consulta)).filter(p => p.websiteUri && !vistos.place.has(p.id) && !vistos.dom.has(dominioDe(p.websiteUri)));
+    candidatos = achadas.slice(0, quantos * 2).map(p => ({ p, seg, cid }));
+    if (candidatos.length) break;
+  }
+  if (!candidatos.length) { await status(ag.id, "sem novidades", `Nenhuma empresa nova com site em: ${consulta}`); return { novas: 0, consulta }; }
+
+  await status(ag.id, "lendo sites", `${candidatos.length} empresas de ${consulta}`);
+  const lidos = await Promise.all(candidatos.map(async c => ({ ...c, site: await lerSite(c.p.websiteUri) })));
+  const comEmail = [], semEmail = [];
+  for (const c of lidos) {
+    c.site.emails = c.site.emails.filter(e => !vistos.email.has(e));
+    (c.site.emails.length ? comEmail : semEmail).push(c);
+  }
+  const escolhidas = comEmail.slice(0, quantos);
+
+  // uma chamada só para escrever todos os e-mails
+  let escritos = {};
+  if (escolhidas.length) {
+    await status(ag.id, "escrevendo", `${escolhidas.length} e-mail(s) personalizados`);
+    const { texto: resp } = await perguntar([
+      { role: "system", content: `/no_think\nVocê é ${ag.nome}, de prospecção comercial da Next Co. Escreve e-mails de primeiro contato, em português do Brasil. Responda só com JSON válido.` },
+      { role: "user", content: `O que a Next Co. oferece:\n${texto(cfg.oferta, 1500)}\n\n` +
+        (ag.prompt ? `Como escrever (instruções do responsável):\n${texto(ag.prompt, 1200)}\n\n` : "") +
+        `Empresas (dados do Google Maps e trecho do site):\n` +
+        escolhidas.map((c, i) => `#${i} ${c.p.displayName?.text || ""} · ${c.seg} · ${c.cid}` + (c.p.rating ? ` · nota ${c.p.rating} (${c.p.userRatingCount || 0} avaliações)` : "") + `\nsite: ${c.p.websiteUri}\ntrecho: ${c.site.texto || "(não consegui ler)"}`).join("\n\n") +
+        `\n\nPara cada empresa, devolva {"emails": [{"i": 0, "analise": "1 a 2 frases: o que a empresa faz e onde a Next Co. pode ajudar", "assunto": "até 60 caracteres, sem emoji, sem caixa alta", "corpo": "o e-mail"}]}.\n` +
+        `Regras do corpo: 90 a 160 palavras; comece com "Olá, equipe <nome da empresa>" ou similar; cite algo concreto do site ou do negócio; apresente a estrutura completa da Next Co. de forma resumida; termine com uma pergunta simples; NÃO coloque assinatura (é colocada depois); não invente números, clientes, resultados nem promessas; nada de "spam" (GRÁTIS, !!!, urgência falsa).` },
+    ]);
+    for (const e of [].concat(lerJSON(resp).emails || [])) if (e && Number.isInteger(+e.i)) escritos[+e.i] = e;
+  }
+
+  let novas = 0, semMail = 0;
+  const salvar = async (c, e) => {
+    const r = await rpc("agente_prospect", { p_chave: process.env.AGENTES_CHAVE, p_agente: ag.id, p: {
+      place_id: c.p.id, empresa: c.p.displayName?.text || "", segmento: c.seg, cidade: c.cid, endereco: c.p.formattedAddress || "",
+      site: c.p.websiteUri || "", dominio: c.site.dominio || "", telefone: c.p.nationalPhoneNumber || "", maps_url: c.p.googleMapsUri || "",
+      avaliacao: c.p.rating ?? "", avaliacoes: c.p.userRatingCount ?? "", email: e ? c.site.emails[0] : "", emails: c.site.emails,
+      analise: e ? texto(e.analise, 2000) : "", assunto: e ? texto(e.assunto, 300) : "", corpo: e ? texto(e.corpo, 6000) : "" } });
+    return r.ok && (await r.json());
+  };
+  for (let i = 0; i < escolhidas.length; i++) if (escritos[i] && escritos[i].corpo && (await salvar(escolhidas[i], escritos[i]))) novas++;
+  // sem e-mail no site: guarda poucas, com telefone, para contato por WhatsApp
+  for (const c of semEmail.slice(0, 3)) if (await salvar(c, null)) semMail++;
+  await status(ag.id, novas ? "rascunhos prontos" : "sem e-mails", `${novas} e-mail(s) para aprovar · ${semMail} sem e-mail · ${consulta}`);
+  return { novas, semEmail: semMail, consulta };
+}
+
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const corpo = typeof req.body === "string" ? (() => { try { return JSON.parse(req.body); } catch (e) { return {}; } })() : (req.body || {});
@@ -246,6 +372,11 @@ module.exports = async (req, res) => {
     if (!uid) return res.status(401).json({ erro: "Entre na sua conta para pedir roteiros" });
     if (!chaves().length || !process.env.AGENTES_CHAVE) return res.status(200).json({ ok: false, erro: "Configure NVIDIA_API_KEYS e AGENTES_CHAVE na Vercel" });
     if (!corpo.tendencia || !corpo.tendencia.titulo) return res.status(400).json({ erro: "Escolha uma tendência" });
+    // só vira roteiro o que foi aprovado (✅ Pega) no painel da sala de Pesquisa
+    const tok = (req.headers.authorization || "").slice(7);
+    const ap = await fetch(`${SUPA}/rest/v1/tendencias?select=id,titulo,resumo,categoria,decisao&id=eq.${encodeURIComponent(corpo.tendencia.id || "")}`, { headers: { apikey: ANON, Authorization: `Bearer ${tok}` } }).then(r => r.ok ? r.json() : []).catch(() => []);
+    if (!ap[0] || ap[0].decisao !== "pega") return res.status(200).json({ ok: false, erro: "Essa tendência ainda não foi aprovada (✅ Pega) na sala de Pesquisa" });
+    corpo.tendencia = { ...corpo.tendencia, ...ap[0] };
     INICIO.t = Date.now(); tentativas.length = 0; puladosNaRodada.clear();
     try { return res.status(200).json({ ok: true, ...(await roteirizar(corpo.tendencia, texto(corpo.formato || "Reels/TikTok de 30 a 60 segundos", 60), uid, corpo.anterior || null)), tentativas }); }
     catch (e) { await status("agente6", "erro", e.message.slice(0, 140)); return res.status(200).json({ ok: false, erro: e.message, tentativas }); }
@@ -253,9 +384,17 @@ module.exports = async (req, res) => {
   if (!(await autorizado(req))) return res.status(401).json({ erro: "Só administradores (ou o cron) podem rodar os agentes" });
   if (!chaves().length || !process.env.AGENTES_CHAVE) return res.status(200).json({ ok: false, erro: "Configure NVIDIA_API_KEYS e AGENTES_CHAVE na Vercel" });
   const porAgente = Math.max(1, Math.min(5, parseInt(req.query && req.query.n) || 2));
-  const so = req.query && req.query.agente;
+  const so = (req.query && req.query.agente) || corpo.agente;
   INICIO.t = Date.now(); tentativas.length = 0; puladosNaRodada.clear();
-  const lista = AGENTES.filter(a => !so || a.id === so);
+  const todos = await carregarAgentes();
+  if ((req.query && req.query.acao) === "prospectar" || corpo.acao === "prospectar" || (so && (todos.find(a => a.id === so) || {}).tipo === "prospeccao")) {
+    const ag = todos.find(a => a.tipo === "prospeccao" && a.ativo !== false && (!so || a.id === so));
+    if (!ag) return res.status(200).json({ ok: false, erro: "Nenhum agente de prospecção ativo (aba Agentes)" });
+    try { return res.status(200).json({ ok: true, agente: ag.nome, ...(await prospectar(ag)), tentativas }); }
+    catch (e) { await status(ag.id, "erro", e.message.slice(0, 140)); return res.status(200).json({ ok: false, erro: e.message, tentativas }); }
+  }
+  const lista = todos.filter(a => a.tipo === "pesquisa" && a.ativo !== false && (!so || a.id === so));
+  if (!lista.length) return res.status(200).json({ ok: false, erro: "Nenhum agente de pesquisa ativo" });
   let resultado;
   try { resultado = await rodada(lista, porAgente); }
   catch (e) { await Promise.all(lista.map(a => status(a.id, "erro", e.message.slice(0, 140)))); resultado = lista.map(a => ({ agente: a.nome, erro: e.message })); }

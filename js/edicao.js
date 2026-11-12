@@ -133,15 +133,13 @@ window.Edicao = (function () {
     carregarPlayers();
   }
   function listaPedir(pegas, feitas) {
-    const outras = tend.filter(t => t.decisao === "pendente").slice(0, 10);
     const item = (t, marcada) => `<article class="tc ${t.decisao}">
         <div class="tc-top"><b>${esc(t.titulo)}</b>${t.relevancia ? `<span class="estrelas">${"★".repeat(t.relevancia)}</span>` : ""}</div>
         ${t.resumo ? `<p>${esc(t.resumo)}</p>` : ""}
         <div class="tc-acoes">${feitas.has(t.id) ? `<span class="chip">já tem roteiro</span>` : ""}
           <button class="btn ${marcada ? "pri" : ""}" data-pedir="${t.id}" ${pedindo ? "disabled" : ""}>${pedindo === t.id ? "⏳ Pena está escrevendo…" : "✍️ Gerar roteiro"}</button></div></article>`;
     return (pegas.length ? `<p class="ed-dica">Tendências marcadas como <b>✅ Pega</b> na Pesquisa:</p>` + pegas.map(t => item(t, true)).join("")
-      : `<p class="tend-vazio">Nenhuma tendência marcada como <b>✅ Pega</b> ainda. Na sala de Pesquisa, abra o painel de tendências e marque as que valem virar vídeo.</p>`)
-      + (outras.length ? `<p class="ed-dica">Ou escolha uma ainda não avaliada:</p>` + outras.map(t => item(t, false)).join("") : "");
+      : `<p class="tend-vazio">Nenhuma tendência aprovada ainda. Só entra na Edição o que for marcado como <b>✅ Pega</b> no painel da sala de Pesquisa.</p>`);
   }
   function listaRoteiros() {
     const visiveis = roteiros.filter(r => verDescartados || r.status !== "descartado");
@@ -203,7 +201,7 @@ window.Edicao = (function () {
     const q = sel => b.closest(sel);
     if (q("[data-aba]")) { aba = q("[data-aba]").dataset.aba; return render(true); }
     if (q("[data-abrir]")) { const id = q("[data-abrir]").dataset.abrir; aberto = aberto === id ? null : id; return render(true); }
-    if (q("[data-pedir]")) { const t = tend.find(x => x.id === q("[data-pedir]").dataset.pedir); return t && produzir(t, null); }
+    if (q("[data-pedir]")) { const t = tend.find(x => x.id === q("[data-pedir]").dataset.pedir); return t && t.decisao === "pega" && produzir(t, null); }
     if (q("[data-aprovar]")) { const id = q("[data-aprovar]").dataset.aprovar; try { await Dados.mexerRoteiro(id, "aprovado"); opt.toast("✅ Vídeo aprovado"); Dados.registrarAtividade(null, "acao", "Aprovou vídeo: " + (roteiros.find(x => x.id === id) || {}).titulo, { sala: "Edição" }); } catch (er) { opt.toast("Não consegui aprovar"); } await recarregar(); return render(true); }
     if (q("[data-recriar]")) return recriar(roteiros.find(x => x.id === q("[data-recriar]").dataset.recriar));
     if (q("[data-copiar]")) { const r = roteiros.find(x => x.id === q("[data-copiar]").dataset.copiar); try { await navigator.clipboard.writeText(textoRoteiro(r)); opt.toast("📋 Roteiro copiado"); } catch (er) { opt.toast("Não consegui copiar"); } return; }

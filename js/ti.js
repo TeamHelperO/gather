@@ -39,6 +39,8 @@
 
 window.TI = (function () {
   let tend = [], agentes = [], pessoas = {}, opt = null, painel = null, filtro = "pendente";
+  let modo = "tend", prosp = [], filtroP = "revisar", buscando = false, enviando = null;
+  const rascP = {}, rascAg = {};   // o que a pessoa está editando (sobrevive às atualizações em tempo real)
   const fmtQuando = d => { const dt = new Date(d), min = Math.round((Date.now() - dt) / 60000); return min < 1 ? "agora" : min < 60 ? `há ${min} min` : min < 1440 ? `há ${Math.round(min / 60)} h` : dt.toLocaleDateString("pt-BR"); };
   const nomeDe = id => (id && pessoas[id]) || "alguém";
   const meuId = () => Dados.meuId();
@@ -47,11 +49,12 @@ window.TI = (function () {
     opt = o;
     await recarregar();
     Dados.ouvirTendencias(recarregar); Dados.ouvirAgentes(recarregar);
+    if (Dados.ouvirProspects) Dados.ouvirProspects(recarregar);
     setInterval(recarregar, 60000);
   }
   async function recarregar() {
-    const [t, a, u] = await Promise.all([Dados.listarTendencias(150), Dados.listarAgentes(), Dados.listarUsuarios()]);
-    tend = t; agentes = a; pessoas = Object.fromEntries(u.map(p => [p.id, p.nome]));
+    const [t, a, u, p] = await Promise.all([Dados.listarTendencias(150), Dados.listarAgentes(), Dados.listarUsuarios(), Dados.listarProspects ? Dados.listarProspects() : null]);
+    tend = t; agentes = a; pessoas = Object.fromEntries(u.map(p => [p.id, p.nome])); prosp = p;
     if (painel) renderPainel();
   }
   const agenteInfo = id => agentes.find(a => a.id === id) || { id, nome: id, status: "parado" };
@@ -190,14 +193,26 @@ window.TI = (function () {
     const busca = (painel.querySelector("[data-busca]") || {}).value || "";
     const lista = tend.filter(t => (filtro === "todas" || t.decisao === filtro) && (!busca || (t.titulo + " " + (t.resumo || "") + " " + (t.categoria || "")).toLowerCase().includes(busca.toLowerCase())));
     const win = painel.querySelector(".tend-win"), rolagem = (win.querySelector(".tend-lista") || {}).scrollTop || 0;
+    // guarda o foco e o que está sendo digitado
+    const foco = document.activeElement && win.contains(document.activeElement) && document.activeElement.dataset.chave ? document.activeElement : null;
+    const fChave = foco && foco.dataset.chave, fSel = foco && "selectionStart" in foco ? [foco.selectionStart, foco.selectionEnd] : null;
+    const daPesquisa = agentes.filter(a => a.tipo !== "edicao" && !/^agente[678]$/.test(a.id));
+    const nP = (prosp || []).filter(p => p.status === "revisar").length;
     win.innerHTML = `
-      <div class="tend-top"><b>📈 Tendências de mercado</b>
-        <div class="tend-agentes">${agentes.map(a => `<span class="ag ${online(a) ? "on" : ""}" title="${esc(a.detalhe || "")}">🤖 ${esc(a.nome)} <small>${online(a) ? esc(a.status) : "parado"}</small></span>`).join("")}</div>
+      <div class="tend-top"><b>🔎 Sala de Pesquisa</b>
+        <div class="tend-agentes">${daPesquisa.map(a => `<span class="ag ${online(a) ? "on" : ""} ${a.ativo === false ? "off" : ""}" title="${esc(a.detalhe || "")}">${a.tipo === "prospeccao" ? "📨" : "🤖"} ${esc(a.nome)} <small>${a.ativo === false ? "desligado" : online(a) ? esc(a.status) : "parado"}</small></span>`).join("")}</div>
         <button class="tend-x" data-fechar aria-label="Fechar">✕</button></div>
+      <div class="tend-modos">${[["tend", "📈 Tendências"], ["prosp", `📨 Prospecção${nP ? ` <i>${nP}</i>` : ""}`], ["agentes", "⚙️ Agentes"]].map(([k, l]) => `<button class="${modo === k ? "on" : ""}" data-modo="${k}">${l}</button>`).join("")}</div>
+      ${modo === "agentes" ? corpoAgentes(daPesquisa, adm) : modo === "prosp" ? corpoProsp(adm) : corpoTend(adm, cont, busca, lista, eu)}`;
+    const l = win.querySelector(".tend-lista"); if (l) l.scrollTop = rolagem;
+    if (fChave) { const el = win.querySelector(`[data-chave="${CSS.escape(fChave)}"]`); if (el) { el.focus(); if (fSel) try { el.setSelectionRange(fSel[0], fSel[1]); } catch (e) {} } }
+  }
+  function corpoTend(adm, cont, busca, lista, eu) {
+    return `
       <div class="tend-barra">
         ${[["pendente", "🆕 Para avaliar"], ["pega", "✅ Pega"], ["nao_pega", "❌ Não pega"], ["todas", "Todas"]].map(([k, l]) => `<button class="tab ${filtro === k ? "on" : ""}" data-filtro="${k}">${l}${k !== "todas" ? ` <i>${cont[k]}</i>` : ""}</button>`).join("")}
-        <input data-busca placeholder="Buscar…" value="${esc(busca)}">
-        ${adm ? `<button class="btn" data-rodar ${rodando ? "disabled" : ""} title="Os 5 agentes pedem tendências à IA da NVIDIA agora">${rodando ? "⏳ Agentes trabalhando…" : "▶ Rodar agentes"}</button><button class="btn pri" data-nova>＋ Nova</button>` : ""}
+        <input data-busca data-chave="busca" placeholder="Buscar…" value="${esc(busca)}">
+        ${adm ? `<button class="btn" data-rodar ${rodando ? "disabled" : ""} title="Os agentes de pesquisa pedem tendências à IA da NVIDIA agora">${rodando ? "⏳ Agentes trabalhando…" : "▶ Rodar agentes"}</button><button class="btn pri" data-nova>＋ Nova</button>` : ""}
       </div>
       ${adm && painel.dataset.nova ? `<form class="tend-form" data-form>
         <input name="titulo" placeholder="Título da tendência" required maxlength="200">
@@ -205,8 +220,87 @@ window.TI = (function () {
         <div class="row2"><input name="categoria" placeholder="Categoria (ex.: IA, Social, Ads)"><input name="fonte_url" placeholder="Link da fonte (opcional)">
         <select name="relevancia"><option value="">Relevância</option>${[5, 4, 3, 2, 1].map(n => `<option value="${n}">${"★".repeat(n)}</option>`).join("")}</select>
         <button class="btn pri">Salvar</button><button type="button" class="btn" data-cancelar>Cancelar</button></div></form>` : ""}
-      <div class="tend-lista">${lista.length ? lista.map(t => cartao(t, eu, adm)).join("") : `<p class="tend-vazio">${tend.length ? "Nada neste filtro." : "Ainda não há tendências. Assim que os agentes publicarem, elas aparecem aqui em tempo real."}</p>`}</div>`;
-    const l = win.querySelector(".tend-lista"); if (l) l.scrollTop = rolagem;
+      <div class="tend-lista">${lista.length ? lista.map(t => cartao(t, eu, adm)).join("") : `<p class="tend-vazio">${tend.length ? "Nada neste filtro." : "Ainda não há tendências. Assim que os agentes publicarem, elas aparecem aqui em tempo real."}</p>`}</div>
+      <p class="tend-rodape">Só as tendências marcadas como <b>✅ Pega</b> seguem para a sala de Edição.</p>`;
+  }
+
+  /* ---------- aba Agentes: nome, foco e instruções de cada pesquisador ---------- */
+  function corpoAgentes(lista, adm) {
+    if (!lista.length) return `<p class="tend-vazio">Nenhum agente encontrado.</p>`;
+    const semMigracao = !lista.some(a => "tipo" in a);
+    const dis = adm && !semMigracao ? "" : "disabled";
+    const v = (a, k, padrao) => { const r = rascAg[a.id]; return r && k in r ? r[k] : padrao; };
+    return `${semMigracao ? `<p class="ed-dica aviso">Para editar os agentes, rode o arquivo <b>rodar_no_supabase_5.sql</b> no Supabase (SQL Editor).</p>` : !adm ? `<p class="ed-dica">Só administradores podem mudar os agentes.</p>` : ""}
+      <div class="tend-lista ag-lista">${lista.map(a => {
+        const c = a.config || {}, pro = v(a, "tipo", a.tipo) === "prospeccao", k = n => `ag-${a.id}-${n}`;
+        return `<form class="tc ag-card ${pro ? "pro" : ""}" data-agform="${a.id}">
+          <div class="tc-top"><b>${pro ? "📨" : "🤖"} ${esc(v(a, "nome", a.nome))}</b><span class="chip">${a.id}</span></div>
+          <label>Nome<input name="nome" data-chave="${k("nome")}" maxlength="30" value="${esc(v(a, "nome", a.nome))}" ${dis}></label>
+          <div class="row2">
+            <label>Função<select name="tipo" data-chave="${k("tipo")}" ${dis}><option value="pesquisa" ${!pro ? "selected" : ""}>Pesquisa de tendências</option><option value="prospeccao" ${pro ? "selected" : ""}>Prospecção de clientes</option></select></label>
+            <label>Categoria<input name="categoria" data-chave="${k("categoria")}" maxlength="40" value="${esc(v(a, "categoria", a.categoria || ""))}" ${dis}></label>
+          </div>
+          <label>${pro ? "Que tipo de empresa procurar" : "O que pesquisar"}<textarea name="foco" data-chave="${k("foco")}" rows="2" ${dis}>${esc(v(a, "foco", a.foco || ""))}</textarea></label>
+          <label>${pro ? "Como escrever o e-mail (prompt)" : "Instruções / prompt"}<textarea name="prompt" data-chave="${k("prompt")}" rows="3" placeholder="${pro ? "Tom, o que destacar, o que evitar…" : "Ex.: foque em novidades das últimas semanas, cite exemplos brasileiros…"}" ${dis}>${esc(v(a, "prompt", a.prompt || ""))}</textarea></label>
+          ${pro ? `
+          <div class="row2">
+            <label>Segmentos (um por linha)<textarea name="segmentos" data-chave="${k("seg")}" rows="4" ${dis}>${esc(v(a, "segmentos", [].concat(c.segmentos || []).join("\n")))}</textarea></label>
+            <label>Cidades (uma por linha)<textarea name="cidades" data-chave="${k("cid")}" rows="4" ${dis}>${esc(v(a, "cidades", [].concat(c.cidades || []).join("\n")))}</textarea></label>
+          </div>
+          <label>O que a Next Co. oferece (vai em todos os e-mails)<textarea name="oferta" data-chave="${k("oferta")}" rows="4" ${dis}>${esc(v(a, "oferta", c.oferta || ""))}</textarea></label>
+          <div class="row2">
+            <label>Assinatura<textarea name="assinatura" data-chave="${k("ass")}" rows="2" ${dis}>${esc(v(a, "assinatura", c.assinatura || ""))}</textarea></label>
+            <label>Empresas por rodada<input name="por_rodada" data-chave="${k("n")}" type="number" min="1" max="8" value="${esc(v(a, "por_rodada", c.por_rodada || 5))}" ${dis}></label>
+          </div>` : ""}
+          <div class="tc-acoes"><label class="liga"><input type="checkbox" name="ativo" ${v(a, "ativo", a.ativo !== false) ? "checked" : ""} ${dis}> Ligado</label>
+            ${adm && !semMigracao ? `<button class="btn pri">Salvar</button>${rascAg[a.id] ? `<button type="button" class="btn" data-agdesfaz="${a.id}">Desfazer</button>` : ""}` : ""}</div>
+        </form>`; }).join("")}</div>`;
+  }
+
+  /* ---------- aba Prospecção: empresas encontradas + e-mail para aprovar ---------- */
+  function corpoProsp(adm) {
+    if (prosp == null) return `<p class="tend-vazio">Para usar a prospecção, rode o arquivo <b>rodar_no_supabase_5.sql</b> no Supabase (SQL Editor).</p>`;
+    const cont = { revisar: 0, sem_email: 0, enviado: 0, descartado: 0 }; prosp.forEach(p => { if (p.status in cont) cont[p.status]++; else if (p.status === "descadastrado") cont.descartado++; });
+    const busca = ((painel.querySelector("[data-busca]") || {}).value || "").toLowerCase();
+    const lista = prosp.filter(p => (filtroP === "todas" || p.status === filtroP || (filtroP === "descartado" && p.status === "descadastrado")) &&
+      (!busca || [p.empresa, p.segmento, p.cidade, p.email, p.site].join(" ").toLowerCase().includes(busca)));
+    const pro = agentes.find(a => a.tipo === "prospeccao");
+    return `<div class="tend-barra">
+        ${[["revisar", "✍️ Para aprovar"], ["sem_email", "📞 Sem e-mail"], ["enviado", "✅ Enviados"], ["descartado", "🗑 Descartados"], ["todas", "Todas"]].map(([k, l]) => `<button class="tab ${filtroP === k ? "on" : ""}" data-filtrop="${k}">${l}${k !== "todas" ? ` <i>${cont[k]}</i>` : ""}</button>`).join("")}
+        <input data-busca data-chave="buscap" placeholder="Buscar empresa, cidade…" value="${esc(busca)}">
+        ${adm ? `<button class="btn" data-prospectar ${buscando || !pro ? "disabled" : ""} title="${pro ? esc(pro.nome) + " busca empresas no Google Maps e escreve os e-mails" : "Escolha um agente de prospecção na aba Agentes"}">${buscando ? "⏳ Buscando empresas…" : "▶ Buscar empresas agora"}</button>` : ""}
+      </div>
+      <div class="tend-lista pr-lista">${lista.length ? lista.map(p => cartaoProsp(p, adm)).join("") : `<p class="tend-vazio">${prosp.length ? "Nada neste filtro." : `Ainda não há empresas. ${adm ? "Clique em <b>▶ Buscar empresas agora</b>." : ""}`}</p>`}</div>
+      <p class="tend-rodape">Nenhum e-mail sai sem alguém clicar em <b>Enviar</b>. Cada empresa recebe no máximo um e-mail, com a opção de pedir para não receber mais.</p>`;
+  }
+  function cartaoProsp(p, adm) {
+    const r = rascP[p.id] || {}, v = (k, d) => k in r ? r[k] : (d ?? ""), k = n => `pr-${p.id}-${n}`;
+    const editar = adm && p.status === "revisar";
+    const meta = `<div class="tc-meta">${p.segmento ? `<span class="chip">${esc(p.segmento)}</span>` : ""}${p.cidade ? `<span>📍 ${esc(p.cidade)}</span>` : ""}
+      ${p.avaliacao ? `<span>⭐ ${esc(p.avaliacao)} (${esc(p.avaliacoes || 0)})</span>` : ""}<span>${fmtQuando(p.criado_em)}</span>
+      ${p.site ? `<a href="${esc(seguro(p.site))}" target="_blank" rel="noopener noreferrer">site ↗</a>` : ""}${p.maps_url ? `<a href="${esc(seguro(p.maps_url))}" target="_blank" rel="noopener noreferrer">mapa ↗</a>` : ""}
+      ${p.telefone ? `<span>📞 ${esc(p.telefone)}</span>` : ""}</div>`;
+    const quem = p.status === "enviado" ? `<div class="tc-quem"><span>✅ Enviado para <b>${esc(p.email)}</b> por <b>${esc(nomeDe(p.enviado_por))}</b> · ${fmtQuando(p.enviado_em)}</span></div>` :
+      p.status === "descadastrado" ? `<div class="tc-quem"><span>🚫 Pediu para não receber e-mails</span></div>` : "";
+    return `<article class="tc pr ${p.status}" data-pid="${p.id}">
+      <div class="tc-top"><b>${esc(p.empresa)}</b></div>${meta}
+      ${p.analise ? `<p class="pr-analise">💡 ${esc(p.analise)}</p>` : ""}
+      ${p.erro && p.status === "revisar" ? `<p class="pr-erro">⚠️ Último envio falhou: ${esc(p.erro)}</p>` : ""}
+      ${editar ? `
+        <label>Para<input data-campo="email" data-chave="${k("email")}" list="${k("lista")}" value="${esc(v("email", p.email))}"></label>
+        <datalist id="${k("lista")}">${(p.emails || []).map(e => `<option value="${esc(e)}">`).join("")}</datalist>
+        <label>Assunto<input data-campo="assunto" data-chave="${k("assunto")}" maxlength="200" value="${esc(v("assunto", p.assunto))}"></label>
+        <label>Mensagem<textarea data-campo="corpo" data-chave="${k("corpo")}" rows="9">${esc(v("corpo", p.corpo))}</textarea></label>
+        <div class="tc-acoes">
+          <button class="btn pri" data-enviar ${enviando ? "disabled" : ""}>${enviando === p.id ? "⏳ Enviando…" : "✉️ Enviar"}</button>
+          <button class="btn" data-teste ${enviando ? "disabled" : ""} title="Manda este texto para o seu e-mail, para conferir">Testar no meu e-mail</button>
+          ${rascP[p.id] ? `<button class="btn" data-salvarp>Salvar texto</button>` : ""}
+          <button class="del" data-pstatus="descartado" title="Descartar">🗑</button></div>`
+      : p.status === "sem_email" ? `<p class="pr-dica">Não achei e-mail no site. Dá para chamar pelo telefone/WhatsApp${p.maps_url ? " ou pelo mapa" : ""}.</p>
+        ${adm ? `<div class="tc-acoes"><button class="btn" data-addemail>＋ Tenho o e-mail</button><button class="del" data-pstatus="descartado" title="Descartar">🗑</button></div>` : ""}`
+      : `${p.assunto ? `<details><summary>${esc(p.assunto)}</summary><pre class="pr-corpo">${esc(p.corpo || "")}</pre></details>` : ""}${quem}
+        ${adm ? `<div class="tc-acoes">${p.status === "enviado" ? `<button class="btn" data-pstatus="descadastrado" title="Respondeu pedindo para sair">🚫 Pediu para sair</button>` : p.status !== "revisar" ? `<button class="btn" data-pstatus="${p.email ? "revisar" : "sem_email"}">↩ Voltar para aprovação</button>` : ""}</div>` : ""}`}
+    </article>`;
   }
   function cartao(t, eu, adm) {
     const travadaOutro = t.travada && t.travada_por !== eu && !adm;
@@ -232,6 +326,11 @@ window.TI = (function () {
   async function aoClicar(e) {
     if (e.target === painel || e.target.closest("[data-fechar]")) return fecharPainel();
     const f = e.target.closest("[data-filtro]"); if (f) { filtro = f.dataset.filtro; return renderPainel(); }
+    const m = e.target.closest("[data-modo]"); if (m) { modo = m.dataset.modo; const b = painel.querySelector("[data-busca]"); if (b) b.value = ""; const l = painel.querySelector(".tend-lista"); if (l) l.scrollTop = 0; return renderPainel(); }
+    const fp = e.target.closest("[data-filtrop]"); if (fp) { filtroP = fp.dataset.filtrop; return renderPainel(); }
+    if (e.target.closest("[data-prospectar]")) return prospectar();
+    const df = e.target.closest("[data-agdesfaz]"); if (df) { delete rascAg[df.dataset.agdesfaz]; return renderPainel(); }
+    const pc = e.target.closest("[data-pid]"); if (pc) return acaoProsp(e, pc.dataset.pid);
     if (e.target.closest("[data-rodar]")) return rodarAgentes();
     if (e.target.closest("[data-nova]")) { painel.dataset.nova = painel.dataset.nova ? "" : "1"; return renderPainel(); }
     if (e.target.closest("[data-cancelar]")) { painel.dataset.nova = ""; return renderPainel(); }
@@ -245,12 +344,78 @@ window.TI = (function () {
   }
   async function aoEnviar(e) {
     e.preventDefault();
+    if (e.target.dataset.agform) return salvarAgente(e.target);
     const fd = new FormData(e.target);
     try {
       await Dados.criarTendencia({ titulo: fd.get("titulo"), resumo: fd.get("resumo"), categoria: fd.get("categoria"), fonte_url: fd.get("fonte_url"), relevancia: +fd.get("relevancia") || null });
       painel.dataset.nova = ""; await recarregar(); opt.toast("Tendência adicionada");
     } catch (err) { opt.toast(traduz(err)); }
   }
+  /* ---------- ações da prospecção e dos agentes ---------- */
+  async function salvarAgente(form) {
+    const id = form.dataset.agform, fd = new FormData(form), a = agentes.find(x => x.id === id) || {};
+    const linhas = t => String(t || "").split(/\n+/).map(x => x.trim()).filter(Boolean);
+    const campos = { nome: String(fd.get("nome") || "").trim() || a.nome, tipo: fd.get("tipo"), categoria: String(fd.get("categoria") || "").trim() || null,
+      foco: String(fd.get("foco") || "").trim() || null, prompt: String(fd.get("prompt") || "").trim() || null, ativo: !!fd.get("ativo") };
+    if (campos.tipo === "prospeccao") {
+      const outro = agentes.find(x => x.tipo === "prospeccao" && x.id !== id);
+      if (outro) return opt.toast(`📨 ${outro.nome} já é o prospectador. Mude ele para pesquisa antes.`);
+      campos.config = { ...(a.config || {}), segmentos: linhas(fd.get("segmentos")), cidades: linhas(fd.get("cidades")), oferta: String(fd.get("oferta") || "").trim(),
+        assinatura: String(fd.get("assinatura") || "").trim(), por_rodada: Math.max(1, Math.min(8, +fd.get("por_rodada") || 5)) };
+      if (fd.get("segmentos") == null) campos.config = { segmentos: [], cidades: [], por_rodada: 5, ...(a.config || {}) };
+    }
+    try { await Dados.salvarAgente(id, campos); delete rascAg[id]; opt.toast(`💾 ${campos.nome} salvo`); await recarregar(); }
+    catch (err) { opt.toast("Não consegui salvar: " + ((err && err.message) || "")); }
+  }
+  async function prospectar() {
+    if (buscando) return; buscando = true; renderPainel();
+    try {
+      const token = Dados.token ? await Dados.token() : null;
+      const r = await fetch("/api/agentes?acao=prospectar", { method: "POST", headers: token ? { Authorization: "Bearer " + token } : {} });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) opt.toast("📨 " + (j.erro || "Não consegui buscar empresas (" + r.status + ")"));
+      else { opt.toast(`📨 ${j.novas} e-mail(s) para aprovar` + (j.semEmail ? ` · ${j.semEmail} sem e-mail` : "") + (j.consulta ? ` · ${j.consulta}` : "")); if (j.novas) filtroP = "revisar"; }
+    } catch (e) { opt.toast("📨 Falha ao chamar o prospectador"); }
+    buscando = false; await recarregar(); renderPainel();
+  }
+  async function acaoProsp(e, id) {
+    const p = (prosp || []).find(x => x.id === id); if (!p) return;
+    const card = e.target.closest("[data-pid]"), val = c => { const el = card.querySelector(`[data-campo="${c}"]`); return el ? el.value.trim() : (rascP[id] || {})[c] ?? p[c]; };
+    try {
+      const st = e.target.closest("[data-pstatus]");
+      if (st) { await Dados.mexerProspect(id, { status: st.dataset.pstatus }); delete rascP[id]; return recarregar(); }
+      if (e.target.closest("[data-salvarp]")) { await Dados.mexerProspect(id, { email: val("email"), assunto: val("assunto"), corpo: val("corpo") }); delete rascP[id]; opt.toast("💾 Texto salvo"); return recarregar(); }
+      if (e.target.closest("[data-addemail]")) {
+        const em = (prompt(`E-mail de ${p.empresa}:`) || "").trim().toLowerCase();
+        if (!em) return; if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(em)) return opt.toast("E-mail inválido");
+        await Dados.mexerProspect(id, { email: em, status: "revisar", corpo: p.corpo || "", assunto: p.assunto || "" }); filtroP = "revisar"; return recarregar();
+      }
+      const teste = !!e.target.closest("[data-teste]");
+      if (!teste && !e.target.closest("[data-enviar]")) return;
+      if (enviando) return;
+      const email = val("email"), assunto = val("assunto"), corpo = val("corpo");
+      if (!teste && !confirm(`Enviar o e-mail para ${email}?`)) return;
+      const pro = agentes.find(a => a.tipo === "prospeccao"), assinatura = (pro && pro.config && pro.config.assinatura) || "";
+      enviando = id; renderPainel();
+      const token = await Dados.token();
+      const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ id, email, assunto, corpo, assinatura, teste }) });
+      const j = await r.json().catch(() => ({}));
+      if (!j.ok) opt.toast("✉️ " + (j.erro || "Falhou (" + r.status + ")"));
+      else if (teste) opt.toast(`✉️ Teste enviado para ${j.para}`);
+      else { delete rascP[id]; opt.toast(`✉️ Enviado para ${j.para} · ${j.hoje}/${j.limite} hoje`); }
+    } catch (err) { opt.toast("Não deu certo: " + ((err && err.message) || "")); }
+    enviando = null; await recarregar();
+  }
+  // guarda o que está sendo digitado (a lista atualiza em tempo real)
+  document.addEventListener("input", e => {
+    if (!painel || !painel.contains(e.target)) return;
+    const pc = e.target.closest("[data-pid]"), c = e.target.dataset.campo;
+    if (pc && c) { (rascP[pc.dataset.pid] = rascP[pc.dataset.pid] || {})[c] = e.target.value; const sv = pc.querySelector("[data-salvarp]"); if (!sv) { const ac = pc.querySelector(".tc-acoes"); ac && ac.querySelector("[data-teste]").insertAdjacentHTML("afterend", `<button class="btn" data-salvarp>Salvar texto</button>`); } }
+    const ag = e.target.closest("[data-agform]");
+    if (ag && e.target.name) { const r = rascAg[ag.dataset.agform] = rascAg[ag.dataset.agform] || {}; r[e.target.name] = e.target.type === "checkbox" ? e.target.checked : e.target.value; if (e.target.name === "tipo") renderPainel(); }
+  });
+  document.addEventListener("change", e => { if (painel && e.target.matches("[data-agform] [name=ativo], [data-agform] select")) e.target.dispatchEvent(new Event("input", { bubbles: true })); });
+
   painelBusca();
   function painelBusca() { document.addEventListener("input", e => { if (painel && e.target.matches("[data-busca]")) { const pos = e.target.selectionStart; renderPainel(); const i = painel.querySelector("[data-busca]"); i.focus(); i.setSelectionRange(pos, pos); } }); }
   const traduz = err => { const m = (err && err.message) || ""; return /travada/.test(m) ? "Travada por outra pessoa" : /destrava/.test(m) ? "Só quem travou (ou um admin) pode destravar" : m || "Não foi possível salvar"; };
@@ -259,5 +424,6 @@ window.TI = (function () {
 
   // fecha o painel se a pessoa sair da sala de TI
   function atualizar() { if (painel && opt && opt.eu && !dentroDaTI()) { fecharPainel(); opt.toast("Você saiu da TI: o painel de tendências foi fechado"); } }
-  return { iniciar, desenhaveis, nomes, clicou, abrirPainel, fecharPainel, atualizar, get aberto() { return !!painel; } };
+  function abrirEm(m) { modo = m || "tend"; abrirPainel(); }
+  return { iniciar, desenhaveis, nomes, clicou, abrirPainel, abrirEm, fecharPainel, atualizar, get aberto() { return !!painel; } };
 })();
