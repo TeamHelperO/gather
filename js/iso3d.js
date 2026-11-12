@@ -9,7 +9,7 @@ import * as THREE from "./vendor/three/three.min.js";
 
 const cv = document.getElementById("cv3d");
 const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -120,8 +120,9 @@ function spriteDe(img, w, h) {
 }
 let ultimaTela = 0;
 function atualizarTelas(desenhaveis, agora, rapido) {
-  if (!rapido && agora - ultimaTela < 250) return; ultimaTela = agora;
+  const todas = agora - ultimaTela >= 500; if (todas) ultimaTela = agora;
   for (const s of telas) {
+    if (!todas && !(rapido && s.it.k === "projecao")) continue;
     const { it, c, g } = s, a = ASSETS[it.k];
     g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height);
     g.setTransform(1, 0, 0, 1, -it.x * T, -it.y * T); g.imageSmoothingEnabled = false;
@@ -146,7 +147,12 @@ function montar(S) {
     const tipo = r.floor || TYPES[r.type].floor, tex = texturaPiso(tipo); tex.repeat.set(r.w / 2, r.h / 2);
     const chao = new THREE.Mesh(new THREE.BoxGeometry(r.w, 0.08, r.h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }));
     chao.position.set(r.x + r.w / 2, 0.04, r.y + r.h / 2); chao.receiveShadow = true; objetos.add(chao);
-    if (TOM_SALA[r.type]) { const l = new THREE.PointLight(TOM_SALA[r.type], 6, Math.max(r.w, r.h) * 1.1, 1.6); l.position.set(r.x + r.w / 2, 2.6, r.y + r.h / 2); objetos.add(l); }
+    if (TOM_SALA[r.type]) { // tom de luz da sala sem custo de luz extra: um brilho suave no piso
+      const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), cor = "#" + TOM_SALA[r.type].toString(16).padStart(6, "0");
+      const rg = g.createRadialGradient(32, 26, 0, 32, 32, 34); rg.addColorStop(0, cor + "55"); rg.addColorStop(1, cor + "00"); g.fillStyle = rg; g.fillRect(0, 0, 64, 64);
+      const tx = new THREE.CanvasTexture(c); const luz = new THREE.Mesh(new THREE.PlaneGeometry(r.w, r.h), new THREE.MeshBasicMaterial({ map: tx, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      luz.rotation.x = -Math.PI / 2; luz.position.set(r.x + r.w / 2, 0.095, r.y + r.h / 2); objetos.add(luz);
+    }
     if (TYPES[r.type].noWalls) continue;
     const vidro = TYPES[r.type].glass, dt = doorTile(r), lado = r.door ? r.door.side : "nenhuma";
     const matVidro = new THREE.MeshStandardMaterial({ color: "#bfe3ff", transparent: true, opacity: 0.35, roughness: 0.1 });
@@ -177,17 +183,26 @@ function montar(S) {
     g.traverse(o => { o.userData.item = it; });
     objetos.add(g);
   }
+  const caixaTmp = new THREE.Box3(), tam = new THREE.Vector3();
+  objetos.updateMatrixWorld(true);
+  objetos.traverse(o => {
+    if (paredes.includes(o) || o.parent && paredes.includes(o.parent) || o.isSprite) return;
+    if (o.isMesh && o.castShadow) { caixaTmp.setFromObject(o).getSize(tam); if (Math.max(tam.x, tam.y, tam.z) < 0.45) o.castShadow = false; }
+    o.matrixAutoUpdate = false; o.updateMatrix();
+  });
 }
 
 /* ---------- luz e câmera ---------- */
 cena.add(new THREE.HemisphereLight(0xdfe8ff, 0x3a3048, 1.15));
-const sol = new THREE.DirectionalLight(0xfff1dc, 1.9); sol.castShadow = true; sol.shadow.mapSize.set(2048, 2048); sol.shadow.bias = -0.0006; sol.shadow.normalBias = 0.02;
+const sol = new THREE.DirectionalLight(0xfff1dc, 1.9); sol.castShadow = true; sol.shadow.mapSize.set(1024, 1024); sol.shadow.bias = -0.0006; sol.shadow.normalBias = 0.02;
 cena.add(sol, sol.target);
 const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 400);
 let giro = 0, giroAlvo = 0, meia = 9, VW = innerWidth, VH = innerHeight;
 const alvo = new THREE.Vector3(); let alvoPronto = false;
+let tamanho = "";
 function ajustar() {
-  VW = innerWidth; VH = innerHeight; renderer.setSize(VW, VH, false);
+  VW = innerWidth; VH = innerHeight;
+  const k = VW + "x" + VH + "@" + renderer.getPixelRatio(); if (k !== tamanho) { tamanho = k; renderer.setSize(VW, VH, false); }
   const asp = VW / VH; camera.left = -meia * asp; camera.right = meia * asp; camera.top = meia; camera.bottom = -meia; camera.updateProjectionMatrix();
 }
 addEventListener("resize", ajustar);
@@ -230,6 +245,20 @@ function cortarParedes() {
   for (const m of paredes) { const [nx, nz] = m.userData.normal, frente = nx * vx + nz * vz > 0.2; const y = frente ? 0.16 : 1; m.scale.y += (y - m.scale.y) * 0.25; }
 }
 
+/* ---------- qualidade adaptativa ---------- */
+let somaDt = 0, nDt = 0, nivel = 0;
+function medirDesempenho(dt) {
+  if (!dt) return; somaDt += dt; nDt++;
+  if (nDt < 90) return;
+  const media = somaDt / nDt; somaDt = 0; nDt = 0;
+  if (media > 1 / 40 && nivel < 2) { // abaixo de ~40 qps
+    nivel++;
+    if (nivel === 1) { renderer.setPixelRatio(1); tamanho = ""; ajustar(); }
+    if (nivel === 2) { renderer.shadowMap.enabled = false; cena.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }
+    console.info("3D: qualidade reduzida para manter a fluidez (nível " + nivel + ")");
+  }
+}
+
 /* ---------- API para o escritório ---------- */
 let ativo = false, montadoPara = null;
 const Iso3D = {
@@ -245,7 +274,8 @@ const Iso3D = {
   },
   render(atores, desenhaveis, t, zoom, P, dt) {
     if (!ativo) return;
-    meia = 11.5 / Math.max(0.6, zoom); ajustar();
+    medirDesempenho(dt);
+    const m = 11.5 / Math.max(0.6, zoom); if (m !== meia) { meia = m; ajustar(); }
     giro += (giroAlvo - giro) * Math.min(1, (dt || 0.016) * 8);
     const foco = new THREE.Vector3(P.px / T, 0.6, P.py / T);
     if (!alvoPronto) { alvo.copy(foco); alvoPronto = true; } else alvo.lerp(foco, Math.min(1, (dt || 0.016) * 6));
@@ -256,7 +286,8 @@ const Iso3D = {
     const vivos = new Set(atores);
     for (const [a, s] of pessoas) if (!vivos.has(a)) { cena.remove(s.sp, s.sombra); s.tex.dispose(); pessoas.delete(a); }
     for (const a of atores) desenharPessoa(a, t);
-    atualizarTelas(desenhaveis, performance.now(), window.Projecao && (Projecao.apresentando || Projecao.estado));
+    const temVideo = window.Projecao && (Projecao.apresentando || document.querySelector("video[autoplay]"));
+    atualizarTelas(desenhaveis, performance.now(), !!temVideo);
     cortarParedes();
     renderer.render(cena, camera);
   },

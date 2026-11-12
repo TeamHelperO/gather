@@ -231,6 +231,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 <aside id="audioCfg" class="sheet hidden" aria-label="Configurações de áudio"></aside>
 <div id="toast"></div>
 <div id="load">Entrando no escritório…</div>
+<script>window.CACHE_ITENS = true;</script>
 <script src="js/icones-lucide.js"></script>
 <script src="assets.js"></script>
 <script src="js/projecao.js"></script>
@@ -634,6 +635,8 @@ function cam(){
 }
 /* luz: brilho das telas ligadas e dos telões, tom de cada sala e vinheta suave nas bordas */
 const TOM_SALA = { recepcao: "255,214,150", copa: "255,200,140", trabalho: "255,226,180", ti: "80,200,255", edicao: "230,90,190", auditorio: "255,190,120", reuniao: "170,190,255", silenciosa: "150,230,170" };
+let _telasMapa = null, _telasDe = null;
+const telasDoMapa = () => (_telasDe === S && _telasMapa) || (_telasDe = S, _telasMapa = allItems().filter(it => /^telao/.test(it.k) || it.k === "projecao"));
 function desenharLuz(ligados){
   ctx.save(); ctx.globalCompositeOperation = "lighter";
   for (const r of S.rooms){
@@ -645,7 +648,7 @@ function desenharLuz(ligados){
   const brilho = (x, y, raio, cor, a) => { const g = ctx.createRadialGradient(x, y, 0, x, y, raio); g.addColorStop(0, `rgba(${cor},${a})`); g.addColorStop(1, `rgba(${cor},0)`); ctx.fillStyle = g; ctx.fillRect(x - raio, y - raio, raio*2, raio*2); };
   const pulso = 0.85 + 0.15*Math.sin(t*2.2);
   for (const m of monitores) if (ligados.has(m.x + "," + m.y)) brilho(m.x*T + 16, m.y*T + 14, 34, "90,170,255", 0.22*pulso);
-  for (const it of allItems()) if (/^telao/.test(it.k) || it.k === "projecao") brilho(it.x*T + 96, it.y*T + 48, 120, it.k === "telao_rot" ? "230,90,190" : it.k === "telao_tend" ? "60,200,230" : "90,120,255", 0.13*pulso);
+  for (const it of telasDoMapa()) if (/^telao/.test(it.k) || it.k === "projecao") brilho(it.x*T + 96, it.y*T + 48, 120, it.k === "telao_rot" ? "230,90,190" : it.k === "telao_tend" ? "60,200,230" : "90,120,255", 0.13*pulso);
   ctx.restore();
 }
 const PATHS_UI = {};

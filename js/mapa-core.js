@@ -247,10 +247,15 @@ function desenharItem(c, it, im, px, py){
   c.save(); c.translate(Math.round(b.cx), Math.round(b.cy)); if (b.rot) c.rotate(b.rot * Math.PI / 180); if (it.flip) c.scale(-1, 1);
   c.drawImage(im, -a.w/2, -a.h/2); c.restore();
 }
+/* No escritório (window.CACHE_ITENS) a lista de móveis é calculada uma vez por mapa: antes era refeita várias vezes por quadro. */
+let _itensCache = null, _itensDe = null;
+function invalidarItens(){ _itensCache = null; }
 function allItems(){
+  if (window.CACHE_ITENS && _itensCache && _itensDe === S) return _itensCache;
   const out=[];
   for (const r of S.rooms) if (r.auto) for (const it of layout(r)){ const aj = r.ajustes && r.ajustes[chaveAuto(it, r)]; if (aj){ if (aj.rot) it.rot = aj.rot; if (aj.flip) it.flip = true; } out.push(it); }
   for (const it of S.items) if (!(window.OCULTAR_PESSOAS && /^pessoa/.test(it.k))) out.push(it);
+  if (window.CACHE_ITENS){ _itensCache = out; _itensDe = S; }
   return out;
 }
 /* Itens de mesa (monitor, teclado, mouse, notebook, gabinete, cafeteira, porta-retrato)
