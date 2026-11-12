@@ -16,7 +16,9 @@ const NV = "https://integrate.api.nvidia.com/v1/chat/completions";
 const PREFERIDOS = ["google/gemma-4-31b-it", "nvidia/nemotron-3.5-lightning-30b-a3b", "nv-mistralai/mistral-nemo-12b-instruct", "deepseek-ai/deepseek-v4.1-flash",
   "google/gemma-3-12b-it", "mistralai/mistral-large-2-instruct", "nvidia/llama-3.1-nemotron-70b-instruct", "openai/gpt-oss-20b"];
 const INICIO = { t: 0 };
-const restante = () => 52000 - (Date.now() - INICIO.t);
+const LIMITE = 280000; // a função pode rodar até 300 s (vercel.json)
+const restante = () => LIMITE - (Date.now() - INICIO.t);
+const tentativas = [];
 const modelosMortos = new Set();
 let catalogo = null; // modelos que a NVIDIA oferece hoje (lido de /v1/models)
 async function modelos() {
@@ -48,7 +50,7 @@ const ehFimDeCota = (status, txt) => [401, 402, 403, 429].includes(status) || /c
 async function perguntar(mensagens) {
   let ultimo;
   for (const modelo of (await modelos()).slice(0, 6)) {
-    if (restante() < 8000) break;
+    if (restante() < 15000) break;
     try { return await perguntarModelo(mensagens, modelo); }
     catch (e) { ultimo = e; if (e.modeloMorto) { modelosMortos.add(modelo); continue; } throw e; }
   }
@@ -60,15 +62,19 @@ async function perguntarModelo(mensagens, modelo) {
   const erros = [];
   for (let i = 0; i < lista.length; i++) {
     if ((esgotadas.get(i) || 0) > Date.now()) continue;
+    const t0 = Date.now();
     const r = await fetch(NV, {
       method: "POST",
       headers: { Authorization: `Bearer ${lista[i]}`, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.7, max_tokens: 2500 }),
-      signal: AbortSignal.timeout(Math.max(5000, Math.min(22000, restante() - 3000))),
+      body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.7, max_tokens: 1200 }),
+      signal: AbortSignal.timeout(Math.max(5000, Math.min(90000, restante() - 5000))),
     }).catch(e => ({ ok: false, status: 0, text: async () => String(e) }));
-    if (r.status === 0) { const e = new Error(`modelo ${modelo} demorou demais`); e.modeloMorto = true; throw e; }
+    const reg = `${modelo} · chave ${i + 1} · ${r.status} · ${((Date.now() - t0) / 1000).toFixed(1)}s`;
+    tentativas.push(reg); console.log("[agentes]", reg);
+    if (r.status === 0) { const et = await r.text(); console.log("[agentes] falha de rede:", et); const e = new Error(/timeout|abort/i.test(et) ? `modelo ${modelo} demorou demais` : `falha ao chamar ${modelo}: ${et.slice(0, 80)}`); e.modeloMorto = true; throw e; }
     if (r.ok) { const j = await r.json(); if (!j.choices?.[0]?.message?.content) { const e = new Error(`modelo ${modelo} respondeu vazio`); e.modeloMorto = true; throw e; } return { texto: j.choices?.[0]?.message?.content || "", chave: i + 1, modelo }; }
     const txt = await r.text();
+    console.log("[agentes] resposta:", txt.slice(0, 300));
     if (r.status === 404 || r.status === 410 || r.status === 400 || r.status === 422) { const e = new Error(`modelo ${modelo} indisponível (${r.status})`); e.modeloMorto = true; throw e; }
     erros.push(`chave ${i + 1}: ${r.status}`);
     if (ehFimDeCota(r.status, txt)) { esgotadas.set(i, Date.now() + 60 * 60000); continue; } // acabou: próxima chave
@@ -133,10 +139,10 @@ module.exports = async (req, res) => {
   if (!chaves().length || !process.env.AGENTES_CHAVE) return res.status(200).json({ ok: false, erro: "Configure NVIDIA_API_KEYS e AGENTES_CHAVE na Vercel" });
   const porAgente = Math.max(1, Math.min(5, parseInt(req.query && req.query.n) || 2));
   const so = req.query && req.query.agente;
-  INICIO.t = Date.now();
+  INICIO.t = Date.now(); tentativas.length = 0;
   const lista = AGENTES.filter(a => !so || a.id === so);
   let resultado;
   try { resultado = await rodada(lista, porAgente); }
   catch (e) { await Promise.all(lista.map(a => status(a.id, "erro", e.message.slice(0, 140)))); resultado = lista.map(a => ({ agente: a.nome, erro: e.message })); }
-  return res.status(200).json({ ok: resultado.some(r => r.publicadas), resultado });
+  return res.status(200).json({ ok: resultado.some(r => r.publicadas), resultado, tentativas });
 };

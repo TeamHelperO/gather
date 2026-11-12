@@ -3,7 +3,7 @@
   "trailingSlash": false,
   "functions": {
     "api/agentes.js": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   },
   "crons": [
