@@ -12,8 +12,11 @@ const SUPA = process.env.SUPABASE_URL || "https://geqljiqocpzlkxjjoylk.supabase.
 const ANON = process.env.SUPABASE_ANON_KEY || "sb_publishable_eNVC3vsJuDQritXDoVyiOw_FbMokMGj";
 const NV = "https://integrate.api.nvidia.com/v1/chat/completions";
 // modelos em ordem de preferência: se um for desativado pela NVIDIA (404/410), passa para o próximo
-const PREFERIDOS = ["deepseek-ai/deepseek-v4.1-flash", "mistralai/mistral-large-4-1t-a52b", "google/gemma-4-31b-it", "nvidia/nemotron-3-super-120b-a12b",
-  "moonshotai/kimi-k2.6", "mistralai/mistral-large-2-instruct", "nvidia/llama-3.1-nemotron-70b-instruct", "google/gemma-3-12b-it", "openai/gpt-oss-20b"];
+// os rápidos primeiro: a Vercel corta a função em 60 s
+const PREFERIDOS = ["google/gemma-4-31b-it", "nvidia/nemotron-3.5-lightning-30b-a3b", "nv-mistralai/mistral-nemo-12b-instruct", "deepseek-ai/deepseek-v4.1-flash",
+  "google/gemma-3-12b-it", "mistralai/mistral-large-2-instruct", "nvidia/llama-3.1-nemotron-70b-instruct", "openai/gpt-oss-20b"];
+const INICIO = { t: 0 };
+const restante = () => 52000 - (Date.now() - INICIO.t);
 const modelosMortos = new Set();
 let catalogo = null; // modelos que a NVIDIA oferece hoje (lido de /v1/models)
 async function modelos() {
@@ -44,7 +47,8 @@ const ehFimDeCota = (status, txt) => [401, 402, 403, 429].includes(status) || /c
 
 async function perguntar(mensagens) {
   let ultimo;
-  for (const modelo of (await modelos()).slice(0, 8)) {
+  for (const modelo of (await modelos()).slice(0, 6)) {
+    if (restante() < 8000) break;
     try { return await perguntarModelo(mensagens, modelo); }
     catch (e) { ultimo = e; if (e.modeloMorto) { modelosMortos.add(modelo); continue; } throw e; }
   }
@@ -59,8 +63,10 @@ async function perguntarModelo(mensagens, modelo) {
     const r = await fetch(NV, {
       method: "POST",
       headers: { Authorization: `Bearer ${lista[i]}`, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.7, max_tokens: 1500 }),
+      body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.7, max_tokens: 2500 }),
+      signal: AbortSignal.timeout(Math.max(5000, Math.min(22000, restante() - 3000))),
     }).catch(e => ({ ok: false, status: 0, text: async () => String(e) }));
+    if (r.status === 0) { const e = new Error(`modelo ${modelo} demorou demais`); e.modeloMorto = true; throw e; }
     if (r.ok) { const j = await r.json(); if (!j.choices?.[0]?.message?.content) { const e = new Error(`modelo ${modelo} respondeu vazio`); e.modeloMorto = true; throw e; } return { texto: j.choices?.[0]?.message?.content || "", chave: i + 1, modelo }; }
     const txt = await r.text();
     if (r.status === 404 || r.status === 410 || r.status === 400 || r.status === 422) { const e = new Error(`modelo ${modelo} indisponível (${r.status})`); e.modeloMorto = true; throw e; }
@@ -80,30 +86,36 @@ const rpc = (fn, corpo, token) => fetch(`${SUPA}/rest/v1/rpc/${fn}`, {
 const status = (agente, s, d) => rpc("agente_status", { p_chave: process.env.AGENTES_CHAVE, p_agente: agente, p_status: s, p_detalhe: d }).catch(() => {});
 
 function lerJSON(txt) {
-  const m = txt.match(/\[[\s\S]*\]/); if (!m) return [];
-  try { return JSON.parse(m[0]); } catch (e) { return []; }
+  const m = txt.match(/\{[\s\S]*\}/); if (!m) return {};
+  try { return JSON.parse(m[0]); } catch (e) { return {}; }
 }
 
-async function rodarAgente(a, porAgente) {
-  await status(a.id, "pesquisando", `Pedindo à IA tendências de ${a.cat}`);
+// uma chamada só para os agentes escolhidos (mais rápido e gasta menos cota)
+async function rodada(lista, porAgente) {
+  await Promise.all(lista.map(a => status(a.id, "pesquisando", `Pedindo à IA tendências de ${a.cat}`)));
   const hoje = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   const { texto, chave, modelo } = await perguntar([
-    { role: "system", content: "Você é um analista de tendências de mercado. Responda só com JSON válido, em português do Brasil." },
-    { role: "user", content: `Hoje é ${hoje}. Você é o agente ${a.nome}, focado em ${a.area}. Liste ${porAgente} tendências atuais e acionáveis para uma agência/empresa digital brasileira. ` +
-      `Formato: [{"titulo": "até 90 caracteres", "resumo": "2 frases: o que é e por que vale a pena (ou não) pegar", "relevancia": 1-5}]. Não invente números nem links.` },
+    { role: "system", content: "Você é uma equipe de analistas de tendências de mercado. Responda só com JSON válido, em português do Brasil, sem texto fora do JSON." },
+    { role: "user", content: `Hoje é ${hoje}. Para uma agência/empresa digital brasileira, cada agente lista ${porAgente} tendências atuais e acionáveis da sua área:\n` +
+      lista.map(a => `- ${a.id} (${a.nome}): ${a.area}`).join("\n") +
+      `\nFormato: {"agente1": [{"titulo": "até 90 caracteres", "resumo": "2 frases: o que é e por que vale (ou não) pegar", "relevancia": 1-5}], ...}. Não invente números nem links.` },
   ]);
-  const itens = lerJSON(texto).filter(t => t && t.titulo).slice(0, porAgente);
-  let publicadas = 0;
-  for (const t of itens) {
-    const r = await rpc("agente_publicar", {
-      p_chave: process.env.AGENTES_CHAVE, p_agente: a.id, p_titulo: String(t.titulo).slice(0, 200),
-      p_resumo: t.resumo ? String(t.resumo).slice(0, 1000) : null, p_fonte_url: null, p_categoria: a.cat,
-      p_relevancia: Math.max(1, Math.min(5, parseInt(t.relevancia) || 3)),
-    });
-    if (r.ok) publicadas++;
+  const json = lerJSON(texto), resultado = [];
+  for (const a of lista) {
+    const itens = [].concat(json[a.id] || json[a.nome] || []).filter(t => t && t.titulo).slice(0, porAgente);
+    let publicadas = 0;
+    for (const t of itens) {
+      const r = await rpc("agente_publicar", {
+        p_chave: process.env.AGENTES_CHAVE, p_agente: a.id, p_titulo: String(t.titulo).slice(0, 200),
+        p_resumo: t.resumo ? String(t.resumo).slice(0, 1000) : null, p_fonte_url: null, p_categoria: a.cat,
+        p_relevancia: Math.max(1, Math.min(5, parseInt(t.relevancia) || 3)),
+      });
+      if (r.ok) publicadas++;
+    }
+    await status(a.id, publicadas ? "publicou" : "erro", publicadas ? `${publicadas} tendência(s) nova(s) · chave ${chave} · ${modelo.split("/").pop()}` : `A IA (${modelo.split("/").pop()}) não devolveu tendências`);
+    resultado.push({ agente: a.nome, publicadas, chave, modelo });
   }
-  await status(a.id, "publicou", `${publicadas} tendência(s) nova(s) · chave ${chave} · ${modelo.split("/").pop()}`);
-  return { agente: a.nome, publicadas, chave, modelo };
+  return resultado;
 }
 
 async function autorizado(req) {
@@ -121,8 +133,10 @@ module.exports = async (req, res) => {
   if (!chaves().length || !process.env.AGENTES_CHAVE) return res.status(200).json({ ok: false, erro: "Configure NVIDIA_API_KEYS e AGENTES_CHAVE na Vercel" });
   const porAgente = Math.max(1, Math.min(5, parseInt(req.query && req.query.n) || 2));
   const so = req.query && req.query.agente;
-  // os agentes trabalham ao mesmo tempo (dividem a mesma lista de chaves)
-  const resultado = await Promise.all(AGENTES.filter(a => !so || a.id === so).map(a =>
-    rodarAgente(a, porAgente).catch(async e => { await status(a.id, "erro", e.message.slice(0, 140)); return { agente: a.nome, erro: e.message }; })));
+  INICIO.t = Date.now();
+  const lista = AGENTES.filter(a => !so || a.id === so);
+  let resultado;
+  try { resultado = await rodada(lista, porAgente); }
+  catch (e) { await Promise.all(lista.map(a => status(a.id, "erro", e.message.slice(0, 140)))); resultado = lista.map(a => ({ agente: a.nome, erro: e.message })); }
   return res.status(200).json({ ok: resultado.some(r => r.publicadas), resultado });
 };
