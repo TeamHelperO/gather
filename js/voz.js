@@ -1,8 +1,7 @@
 /* Áudio do escritório (WebRTC, uma ligação direta entre cada par de pessoas que devem se ouvir).
    Regras:
-     – sala fechada (reunião, telão, auditório): todo mundo dentro da MESMA sala se ouve, volume cheio;
-       quem está fora não ouve.
-     – área aberta (trabalho, recepção, copa, corredor, área externa): ouve quem está perto; o volume cai com a distância.
+     – qualquer sala: todo mundo dentro da MESMA sala se ouve, volume cheio (tamanho não importa); quem está fora não ouve.
+     – corredor e área externa: ouve quem está perto; o volume cai com a distância.
      – área silenciosa: sem áudio.
    Os sinais da ligação passam pelo canal da Sala (Supabase Realtime).
 
@@ -14,7 +13,6 @@
    permite volume acima de 100% e trocar o dispositivo de saída. Nos outros navegadores usa o elemento
    <audio> (volume até 100%; troca de saída só se o navegador tiver setSinkId). */
 window.Voz = (function () {
-  const FECHADAS = new Set(["reuniao", "telao", "auditorio"]);
   const ALCANCE = 210, CHEIO = 70; // px: até CHEIO volume 100%, some em ALCANCE
   const MODO_WEBAUDIO = typeof window.AudioContext === "function" && typeof AudioContext.prototype.setSinkId === "function";
   const SAIDA_NO_ELEMENTO = typeof HTMLMediaElement !== "undefined" && typeof HTMLMediaElement.prototype.setSinkId === "function";
@@ -44,12 +42,13 @@ window.Voz = (function () {
   carregarPref();
 
   /* ---------- zonas ---------- */
+  /* Dentro de qualquer sala: todo mundo da mesma sala se ouve com volume cheio, não importa o tamanho,
+     e ninguém de fora ouve. Corredor e área externa: ouve quem está perto (o volume cai com a distância). */
   function zona(ator) {
     const r = roomAt(ator.px, ator.py - 4);
-    if (!r) return { tipo: "aberta", id: "fora" };
+    if (!r || r.type === "corredor") return { tipo: "aberta", id: r ? r.id : "fora", nome: r ? r.name : "Área externa" };
     if (r.type === "silenciosa") return { tipo: "silencio", id: r.id, nome: r.name };
-    if (FECHADAS.has(r.type)) return { tipo: "fechada", id: r.id, nome: r.name };
-    return { tipo: "aberta", id: r.id, nome: r.name };
+    return { tipo: "fechada", id: r.id, nome: r.name };
   }
   function regra(a, b) { // devem se ouvir? e com que volume
     const za = zona(a), zb = zona(b);

@@ -57,6 +57,14 @@ class Ator {
       if (s.face === "costas") col = 2 + ((this.assento.trabalho && !fala) ? Math.floor(t*5) % 2 : 0);
       else col = 0 + (fala ? Math.floor(t*3) % 2 : 0);
       x = s.sx - 16; y = s.sy - 40;
+    } else if (this.montaria && window.Montaria) {
+      // em cima da montaria (corredor): parado em pé, um pouco mais alto
+      const m = this.montaria, sobe = Montaria.altura(m);
+      g.fillStyle = "rgba(20,15,30,.25)"; g.beginPath(); g.ellipse(this.x, this.y + 1, m === "cavalo" ? 15 : 10, 3, 0, 0, Math.PI*2); g.fill();
+      Montaria.desenharAtras(g, m, this.x, this.y, this.dir, t, this.moving);
+      g.drawImage(sh, 0, row*48, 32, 48, Math.round(x), Math.round(y - sobe), 32, 48);
+      Montaria.desenharFrente(g, m, this.x, this.y, this.dir, t, this.moving);
+      return;
     } else {
       g.fillStyle = "rgba(20,15,30,.25)"; g.beginPath(); g.ellipse(this.x, this.y + 1, 8, 3, 0, 0, Math.PI*2); g.fill();
       if (this.emote != null && !this.moving){ row = this.emote; const n = row === 6 ? 6 : 4; col = Math.floor(this.emoteT*7) % n; }

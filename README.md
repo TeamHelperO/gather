@@ -20,10 +20,10 @@ O banco é o **Supabase** (Postgres + login por link no e-mail + tempo real). En
 ficam em `js/config.js`. As tabelas têm regras de acesso (RLS): só quem entrou lê e grava.
 
 - `js/sala.js` – presença em tempo real: todo mundo se vê andando no mapa
-- `js/voz.js` – áudio por WebRTC: sala fechada (reunião, telão, auditório) só quem está dentro ouve;
+- `js/voz.js` – áudio por WebRTC: dentro de qualquer sala todos da sala se ouvem com volume cheio (e só eles);
   botão ⚙️ (ou clicar numa pessoa no mapa): escolher microfone e saída de áudio, redução de ruído/eco
   e volume individual de cada colega (0–200%, vale só para você; salvo neste navegador);
-  área aberta ouve quem está perto; área silenciosa sem áudio. Botão 🎧 liga o áudio.
+  corredor e área externa ouvem quem está perto; área silenciosa sem áudio.
 
 ## Outros arquivos
 
@@ -31,6 +31,7 @@ ficam em `js/config.js`. As tabelas têm regras de acesso (RLS): só quem entrou
 - `js/vida.js` – assentos, sentar sozinho, trabalhar no PC e conversas
 - `js/projecao.js` – telão de projeção do auditório: quem está em cima do palco compartilha a tela; aparece no telão do mapa
   para quem está na sala; clicar no telão abre a janela maior com tela cheia (também registra a arte do item)
+- `js/montaria.js` – patinete, skate ou cavalo para andar mais rápido no corredor (desce sozinho ao entrar numa sala)
 - `js/palco.js` – moderação do auditório: quem está no palco muta/desmuta todos e atende a fila de ✋ mãos levantadas
 - `js/ti.js` – sala de TI (racks, 5 computadores com agentes de IA) e painel de tendências de mercado (travar/destravar, pega/não pega e por quem)
 - `js/acesso.js` – papéis (admin/usuário), senha e salas restritas; painel de administração no menu (só admin)

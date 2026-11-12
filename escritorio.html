@@ -15,7 +15,7 @@ html,body{height:100%;overflow:hidden}
 #eu canvas{width:30px;height:30px;border-radius:8px;background:#cfc7b6}
 .zoom{position:fixed;right:8px;top:62px;display:flex;flex-direction:column;z-index:10;overflow:hidden}
 .zoom button{width:42px;height:42px;font-size:20px;font-weight:700}
-.emotes{position:fixed;left:50%;transform:translateX(-50%);bottom:max(12px,env(safe-area-inset-bottom));display:flex;gap:4px;padding:5px;z-index:10}
+.emotes{position:fixed;left:50%;transform:translateX(-50%);bottom:max(12px,env(safe-area-inset-bottom));display:flex;gap:4px;padding:5px;z-index:10;max-width:calc(100vw - 16px);overflow-x:auto;scrollbar-width:none}
 .emotes button{padding:9px 12px;border-radius:9px;font-weight:650;font-size:13px;white-space:nowrap}
 .emotes button:active{background:var(--chip)}
 #btnAudio.mudo{background:#e5484d!important}
@@ -159,7 +159,7 @@ html,body{height:100%;overflow:hidden}
 </div>
 <div class="zoom pill"><button id="zin" aria-label="Aproximar">+</button><button id="zout" aria-label="Afastar">−</button></div>
 <div class="emotes pill">
-  <button id="btnAudio" style="background:#3d5afe;color:#fff">🎧 Ligar áudio</button><button id="btnCfgAudio" title="Microfone, saída de áudio e volume de cada pessoa" aria-label="Configurar áudio">⚙️</button><button id="btnMao" style="display:none">✋ Levantar a mão</button><button data-emote="5">👋 Acenar</button><button data-emote="6">💃 Dançar</button><button data-emote="4">🪑 Sentar/levantar</button>
+  <button id="btnAudio" style="background:#3d5afe;color:#fff">🎧 Ligar áudio</button><button id="btnCfgAudio" title="Microfone, saída de áudio e volume de cada pessoa" aria-label="Configurar áudio">⚙️</button><button id="btnMont">🛴 Patinete</button><button id="btnMao" style="display:none">✋ Levantar a mão</button><button data-emote="5">👋 Acenar</button><button data-emote="6">💃 Dançar</button><button data-emote="4">🪑 Sentar/levantar</button>
 </div>
 <button class="pill" id="btnProj"></button>
 <button class="pill" id="btnTelao" style="display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:70px;z-index:12;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe">📊 Abrir telão</button>
@@ -180,6 +180,7 @@ html,body{height:100%;overflow:hidden}
 <script src="js/mapa-core.js"></script>
 <script src="js/avatar.js"></script>
 <script src="js/vida.js"></script>
+<script src="js/montaria.js"></script>
 <script src="js/telao.js"></script>
 <script src="js/sala.js"></script>
 <script src="js/voz.js"></script>
@@ -245,7 +246,7 @@ function conectarSala(){
     aoMover(id, st){
       const a = outros.find(o => o.id === id); if (!a) return;
       if (!a.visto){ a.x = st.x; a.y = st.y; a.visto = true; }
-      a.alvo = { x: st.x, y: st.y }; a.dir = st.dir; a.remotoAndando = !!st.mov; a.mic = !!st.mic; a.audio = st.audio === undefined ? undefined : !!st.audio; a.proj = st.proj || null; a.tela = !!st.tela; a.mao = st.mao || null; a.mod = st.mod || null;
+      a.alvo = { x: st.x, y: st.y }; a.dir = st.dir; a.remotoAndando = !!st.mov; a.mic = !!st.mic; a.audio = st.audio === undefined ? undefined : !!st.audio; a.proj = st.proj || null; a.tela = !!st.tela; a.mao = st.mao || null; a.mod = st.mod || null; a.montaria = st.mont || null;
       if (st.emote !== a.emote){ a.emote = st.emote; a.emoteT = 0; }
       const atual = a.assento ? a.assento.id : null;
       if (st.assento !== atual){
@@ -409,6 +410,7 @@ function joyMove(e){
   joyV = d > 8 ? [dx/max, dy/max] : null; if (joyV && P){ P.path = null; P.emote = null; }
 }
 document.getElementById("btnAudio").onclick = e => { e.stopPropagation(); ligarAudio(); };
+document.getElementById("btnMont").onclick = e => { e.stopPropagation(); toast(Montaria.trocar()); };
 document.getElementById("btnMao").onclick = e => { e.stopPropagation(); Palco.levantarMao(); };
 document.getElementById("btnCfgAudio").onclick = e => { e.stopPropagation(); const el = document.getElementById("audioCfg"); el.classList.contains("hidden") ? abrirConfigAudio() : fecharConfigAudio(); };
 document.querySelector(".emotes").onclick = e => { const b = e.target.closest("[data-emote]"); if (!b) return; const r = +b.dataset.emote; r === 4 ? sentarPerto() : emote(r); };
@@ -437,7 +439,8 @@ function loop(now){
   if (joyV){ vx = joyV[0]; vy = joyV[1]; }
   if ((vx || vy) && P.assento) P.levantar();
   if (!vx && !vy && !P.assento && P.path) [vx, vy] = seguirCaminho(P);
-  if (!P.assento) moverAtor(P, dt, vx, vy, livreP, VEL); else { P.moving = false; P.parado += dt; }
+  Montaria.atualizar(P);
+  if (!P.assento) moverAtor(P, dt, vx, vy, livreP, Montaria.velocidade()); else { P.moving = false; P.parado += dt; }
   if (P.moving){ P.emote = null; sujo = true; }
   if (P.emote != null){ P.emoteT += dt; if (P.emoteT > 3) P.emote = null; }
   if (P.saiuDe && Math.hypot(P.saiuDe.sx - P.x, P.saiuDe.sy - P.y) > 40) P.saiuDe = null;
@@ -453,7 +456,7 @@ function loop(now){
   Voz.atualizar(P, visiveis, now);
   Projecao.atualizar(now);
   Palco.atualizar();
-  Sala.enviarPosicao({ x: Math.round(P.x), y: Math.round(P.y), dir: P.dir, mov: P.moving, assento: P.assento ? P.assento.id : null, emote: P.emote, mic: Voz.micAberto, audio: Voz.ligado, proj: Projecao.minhaSala, tela: Projecao.minhaTela, mao: Palco.mao, mod: Palco.estado }, now);
+  Sala.enviarPosicao({ x: Math.round(P.x), y: Math.round(P.y), dir: P.dir, mov: P.moving, assento: P.assento ? P.assento.id : null, emote: P.emote, mic: Voz.micAberto, audio: Voz.ligado, proj: Projecao.minhaSala, tela: Projecao.minhaTela, mao: Palco.mao, mod: Palco.estado, mont: Montaria.ativa }, now);
   atualizarConversas([P, ...visiveis], dt, (a, o) => {
     if (a !== P) return;
     const agora = Date.now(); if (conversasLog[o.nome] && agora - conversasLog[o.nome] < 60000) return;
@@ -478,7 +481,7 @@ function checarSala(first){
   const nome = r ? r.name : "Área externa";
   if (nome === P.sala && !first) return;
   P.sala = nome;
-  const z = Voz.zona(P), regra = z.tipo === "fechada" ? " · 🔒 só quem está aqui ouve" : z.tipo === "silencio" ? " · 🤫 sem áudio" : " · 🗣 ouve quem está perto";
+  const z = Voz.zona(P), regra = z.tipo === "fechada" ? " · 🔊 todos da sala se ouvem" : z.tipo === "silencio" ? " · 🤫 sem áudio" : " · 🗣 ouve quem está perto";
   document.getElementById("sala").textContent = "📍 " + nome + regra;
   if (!first) Dados.registrarAtividade(EMAIL, "sala", `Entrou em ${nome}`, {sala: nome});
 }
