@@ -64,7 +64,7 @@ curl -X POST "$SUPABASE_URL/rest/v1/rpc/agente_status" \
 ### Agentes com a IA da NVIDIA (`api/agentes.js`)
 Os 5 agentes pedem tendências à IA da NVIDIA (`integrate.api.nvidia.com`) e publicam no painel.
 Variáveis na Vercel: `NVIDIA_API_KEYS` (uma ou mais chaves `nvapi-…`, separadas por vírgula — quando uma acaba os créditos ou é recusada, passa para a próxima sozinho),
-`AGENTES_CHAVE` (a chave dos agentes), `CRON_SECRET` (para o cron diário das 08h) e, opcional, `NVIDIA_MODEL` (padrão `meta/llama-3.3-70b-instruct`).
+`AGENTES_CHAVE` (a chave dos agentes), `CRON_SECRET` (para o cron diário das 08h) e, opcional, `NVIDIA_MODEL` (se o modelo for desativado pela NVIDIA, troca sozinho para o próximo da lista).
 Rodar na hora: botão **▶ Rodar agentes** no painel de Tendências (só administradores) ou `GET /api/agentes?segredo=<CRON_SECRET>&n=2`.
 
 Tabelas: `tendencias`, `agentes`, `regras_salas` (+ `senhas_salas` e `chaves_agentes`, que não são lidas pela API).
