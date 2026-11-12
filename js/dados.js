@@ -2,173 +2,167 @@
    DADOS – Escritório Virtual Next Co.
    ------------------------------------------------------------
    ÚNICO arquivo do projeto que lê e grava dados.
-   Hoje grava no navegador (localStorage), separado por e-mail.
-   Para usar um banco (Supabase, MySQL...), troque só o
-   "ADAPTADOR" no fim deste arquivo: as páginas continuam iguais,
-   porque todas chamam apenas as funções de `Dados`.
-   As tabelas equivalentes estão em data/schema.sql.
-
-   Estrutura salva (espelha as tabelas do banco):
-   {
-     versao: 1,
-     usuarios:   { "<email>": { email, nome, criadoEm, ultimoAcesso,
-                                avatar: {...camadas...},
-                                posicao: { mapa, x, y, direcao } } },
-     atividades: { "<email>": [ { tipo, detalhe, sala, quando } ] },
-     mapas:      { "<id>": { name, w, h, rooms:[...], items:[...], updatedAt, atualizadoPor } },
-     tarefas:    { "<id>": { id, titulo, descricao, responsavel, prazo, status, etapas:[{id,texto,feito}],
-                             progressoManual, ordem, criadoPor, criadoEm, atualizadoEm, historico:[...] } },
-     mapaAtual:  "principal"
-   }
+   Grava no Supabase (projeto "escritorio-virtual"):
+     perfis      – uma linha por pessoa (e-mail, nome, personagem, última posição, preferências)
+     atividades  – tudo o que cada pessoa fez (só ela vê as próprias)
+     mapas       – mapa do escritório (a equipe toda vê e edita)
+     tarefas     – tarefas do telão (a equipe toda vê e edita)
+   Login: link mágico enviado ao e-mail (Supabase Auth).
+   As páginas só chamam as funções de `Dados`; o banco pode ser trocado aqui sem mexer nelas.
    ============================================================ */
 (function () {
-  const CHAVE = "nextco_dados";
-  const SESSAO = "nextco_sessao";
-  const MAX_ATIVIDADES = 1000;
-
-  /* ---------- ADAPTADOR: localStorage ---------- */
-  const armazenamento = {
-    ler() {
-      try {
-        const bruto = localStorage.getItem(CHAVE);
-        if (bruto) return JSON.parse(bruto);
-      } catch (e) {}
-      return migrarAntigo({ versao: 1, usuarios: {}, atividades: {}, mapas: {}, tarefas: {}, mapaAtual: "principal" });
-    },
-    gravar(db) {
-      try { localStorage.setItem(CHAVE, JSON.stringify(db)); return true; }
-      catch (e) { console.warn("Não foi possível salvar:", e); return false; }
-    },
-  };
-
-  // Traz mapas salvos pela versão anterior do editor (chaves nextco_map_*)
-  function migrarAntigo(db) {
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith("nextco_map_") && k !== "nextco_map_id") {
-          db.mapas[k.slice(11)] = JSON.parse(localStorage.getItem(k));
-        }
-      }
-      const atual = localStorage.getItem("nextco_map_id");
-      if (atual) db.mapaAtual = atual;
-    } catch (e) {}
-    return db;
-  }
-
+  const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  });
   const limpaEmail = (e) => String(e || "").trim().toLowerCase();
   const emailValido = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(limpaEmail(e));
   const agora = () => new Date().toISOString();
 
+  let usuarioAuth = null;   // auth.users
+  let perfil = null;        // linha de perfis
+  const mapas = {};         // cache dos mapas carregados
+
+  const pronto = (async () => {
+    const { data } = await sb.auth.getSession();
+    usuarioAuth = data.session ? data.session.user : null;
+    if (usuarioAuth) await carregarPerfil();
+    return usuarioAuth;
+  })();
+  sb.auth.onAuthStateChange((_ev, sessao) => { usuarioAuth = sessao ? sessao.user : null; });
+
+  async function carregarPerfil() {
+    const { data } = await sb.from("perfis").select("*").eq("id", usuarioAuth.id).maybeSingle();
+    perfil = data || null;
+    return perfil;
+  }
+  const paraUsuario = (p) => p && ({ id: p.id, email: p.email, nome: p.nome, avatar: p.avatar, posicao: p.posicao, prefs: p.prefs || {}, criadoEm: p.criado_em, ultimoAcesso: p.ultimo_acesso });
+  const paraTarefa = (r) => ({ id: r.id, titulo: r.titulo, descricao: r.descricao || "", responsavel: r.responsavel || "", prazo: r.prazo || "", status: r.status,
+    etapas: r.etapas || [], progressoManual: r.progresso_manual ?? 0, ordem: r.ordem, historico: r.historico || [], criadoPor: r.criado_por, criadoEm: r.criado_em, atualizadoEm: r.atualizado_em });
+  const daTarefa = (t) => ({ id: t.id, titulo: t.titulo, descricao: t.descricao || null, responsavel: t.responsavel || null, prazo: t.prazo || null, status: t.status || "a_fazer",
+    etapas: t.etapas || [], progresso_manual: t.etapas && t.etapas.length ? null : (+t.progressoManual || 0), ordem: t.ordem ?? 0, historico: t.historico || [], atualizado_em: agora() });
+
   const Dados = {
+    cliente: sb,
+    pronto,
     emailValido,
 
-    /* ---- sessão ---- */
-    sessao() { try { return localStorage.getItem(SESSAO); } catch (e) { return null; } },
-    exigirSessao(destino = "index.html") {
-      const email = this.sessao();
-      if (!email || !armazenamento.ler().usuarios[email]) { location.href = destino; return null; }
-      return email;
-    },
-    async entrar(email, nome) {
+    /* ---------- login ---------- */
+    sessao() { return usuarioAuth ? limpaEmail(usuarioAuth.email) : null; },
+    meuId() { return usuarioAuth ? usuarioAuth.id : null; },
+    async enviarLink(email, nome) {
       email = limpaEmail(email);
       if (!emailValido(email)) throw new Error("E-mail inválido");
-      const db = armazenamento.ler();
-      let u = db.usuarios[email];
-      const novo = !u;
-      if (!u) u = db.usuarios[email] = { email, nome: (nome || email.split("@")[0]).trim(), criadoEm: agora(), avatar: null, posicao: null };
-      else if (nome && nome.trim()) u.nome = nome.trim();
-      u.ultimoAcesso = agora();
-      armazenamento.gravar(db);
-      try { localStorage.setItem(SESSAO, email); } catch (e) {}
-      await this.registrarAtividade(email, novo ? "cadastro" : "entrou", novo ? "Primeiro acesso" : "Entrou no escritório");
-      return { ...u, novo };
+      const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + "/", data: nome ? { nome: nome.trim() } : {} } });
+      if (error) throw error;
+    },
+    /* Garante que quem acabou de entrar tem perfil. Retorna o usuário (com .novo). */
+    async garantirPerfil() {
+      await pronto; if (!usuarioAuth) return null;
+      if (!perfil) await carregarPerfil();
+      let novo = false;
+      if (!perfil) {
+        const nome = (usuarioAuth.user_metadata && usuarioAuth.user_metadata.nome) || usuarioAuth.email.split("@")[0];
+        const { data, error } = await sb.from("perfis").insert({ id: usuarioAuth.id, email: limpaEmail(usuarioAuth.email), nome, ultimo_acesso: agora() }).select().single();
+        if (error) throw error;
+        perfil = data; novo = true;
+        await this.registrarAtividade(null, "cadastro", "Primeiro acesso");
+      } else {
+        await sb.from("perfis").update({ ultimo_acesso: agora() }).eq("id", usuarioAuth.id);
+        if (!sessionStorage.getItem("nextco_entrou")) await this.registrarAtividade(null, "entrou", "Entrou no escritório");
+      }
+      sessionStorage.setItem("nextco_entrou", "1");
+      return { ...paraUsuario(perfil), novo };
+    },
+    /* Usado no topo de cada página: sem login, volta para a entrada. */
+    async exigirSessao(destino = "index.html") {
+      await pronto;
+      if (!usuarioAuth) { location.href = destino; return null; }
+      if (!perfil) await this.garantirPerfil();
+      return this.sessao();
     },
     async sair() {
-      const email = this.sessao();
-      if (email) await this.registrarAtividade(email, "saiu", "Saiu do escritório");
-      try { localStorage.removeItem(SESSAO); } catch (e) {}
+      await this.registrarAtividade(null, "saiu", "Saiu do escritório");
+      sessionStorage.removeItem("nextco_entrou");
+      await sb.auth.signOut();
     },
-    async usuarioExiste(email) { return !!armazenamento.ler().usuarios[limpaEmail(email)]; },
 
-    /* ---- usuário ---- */
-    async getUsuario(email) { return armazenamento.ler().usuarios[limpaEmail(email)] || null; },
-    async listarUsuarios() { return Object.values(armazenamento.ler().usuarios); },
-    async salvarAvatar(email, avatar) {
-      const db = armazenamento.ler(); const u = db.usuarios[limpaEmail(email)]; if (!u) return false;
-      const primeiro = !u.avatar;
-      u.avatar = avatar; u.avatarAtualizadoEm = agora();
-      armazenamento.gravar(db);
-      await this.registrarAtividade(email, "avatar", primeiro ? "Criou o personagem" : "Mudou o personagem");
+    /* ---------- pessoas ---------- */
+    async getUsuario(_email) { if (!perfil && usuarioAuth) await carregarPerfil(); return paraUsuario(perfil); },
+    async listarUsuarios() { const { data } = await sb.from("perfis").select("id,email,nome,avatar").order("nome"); return (data || []).map(paraUsuario); },
+    async salvarNome(nome) { const { data } = await sb.from("perfis").update({ nome }).eq("id", usuarioAuth.id).select().single(); if (data) perfil = data; },
+    async salvarAvatar(_email, avatar) {
+      const primeiro = !perfil.avatar;
+      const { data, error } = await sb.from("perfis").update({ avatar, avatar_atualizado_em: agora() }).eq("id", usuarioAuth.id).select().single();
+      if (error) throw error; perfil = data;
+      await this.registrarAtividade(null, "avatar", primeiro ? "Criou o personagem" : "Mudou o personagem");
       return true;
     },
-    async salvarPosicao(email, posicao) {
-      const db = armazenamento.ler(); const u = db.usuarios[limpaEmail(email)]; if (!u) return false;
-      u.posicao = { ...posicao, em: agora() };
-      return armazenamento.gravar(db);
+    async salvarPosicao(_email, posicao) {
+      if (!usuarioAuth) return false;
+      const { error } = await sb.from("perfis").update({ posicao: { ...posicao, em: agora() } }).eq("id", usuarioAuth.id);
+      return !error;
+    },
+    getPref(_email, chave, padrao) { return perfil && perfil.prefs && chave in perfil.prefs ? perfil.prefs[chave] : padrao; },
+    async setPref(_email, chave, valor) { const prefs = { ...(perfil.prefs || {}), [chave]: valor }; perfil.prefs = prefs; await sb.from("perfis").update({ prefs }).eq("id", usuarioAuth.id); },
+
+    /* ---------- atividades ---------- */
+    async registrarAtividade(_email, tipo, detalhe, extra = {}) {
+      if (!usuarioAuth) return false;
+      const { sala, ...resto } = extra || {};
+      const { error } = await sb.from("atividades").insert({ user_id: usuarioAuth.id, tipo, detalhe, sala: sala || null, extra: resto });
+      return !error;
+    },
+    async listarAtividades(_email, limite = 100) {
+      const { data } = await sb.from("atividades").select("tipo,detalhe,sala,extra,quando").eq("user_id", usuarioAuth.id).order("quando", { ascending: false }).limit(limite);
+      return data || [];
     },
 
-    /* ---- preferências da pessoa (ex.: mostrar colegas de teste) ---- */
-    getPref(email, chave, padrao) { const u = armazenamento.ler().usuarios[limpaEmail(email)]; return u && u.prefs && chave in u.prefs ? u.prefs[chave] : padrao; },
-    async setPref(email, chave, valor) { const db = armazenamento.ler(); const u = db.usuarios[limpaEmail(email)]; if (!u) return false; (u.prefs || (u.prefs = {}))[chave] = valor; return armazenamento.gravar(db); },
+    /* ---------- mapas ---------- */
+    mapaAtualId() { try { return localStorage.getItem("nextco_map_id") || "principal"; } catch (e) { return "principal"; } },
+    async carregarMapa(id) {
+      const { data } = await sb.from("mapas").select("dados").eq("id", id).maybeSingle();
+      mapas[id] = data ? data.dados : null; return mapas[id];
+    },
+    lerMapaLocal(id) { return mapas[id] || null; },
+    salvarMapaLocal(id, mapa) {
+      mapas[id] = mapa; try { localStorage.setItem("nextco_map_id", id); } catch (e) {}
+      return sb.from("mapas").upsert({ id, dados: mapa, atualizado_em: agora(), atualizado_por: usuarioAuth ? usuarioAuth.id : null })
+        .then(({ error }) => { if (error) console.warn(error); return !error; });
+    },
+    async getMapa(id) { return this.carregarMapa(id || this.mapaAtualId()); },
+    async listarMapas() { const { data } = await sb.from("mapas").select("id,dados->>name,atualizado_em").order("atualizado_em", { ascending: false }); return (data || []).map(m => ({ id: m.id, name: m.name, updatedAt: m.atualizado_em })); },
+    ouvirMapa(id, cb) {
+      return sb.channel("mapa-" + id).on("postgres_changes", { event: "*", schema: "public", table: "mapas", filter: `id=eq.${id}` },
+        (p) => { if (p.new && p.new.dados) { mapas[id] = p.new.dados; cb(p.new.dados, p.new.atualizado_por); } }).subscribe();
+    },
 
-    /* ---- atividades (tudo o que a pessoa fez) ---- */
-    async registrarAtividade(email, tipo, detalhe, extra = {}) {
-      const db = armazenamento.ler(); email = limpaEmail(email);
-      const lista = db.atividades[email] || (db.atividades[email] = []);
-      lista.push({ tipo, detalhe, ...extra, quando: agora() });
-      if (lista.length > MAX_ATIVIDADES) lista.splice(0, lista.length - MAX_ATIVIDADES);
-      return armazenamento.gravar(db);
+    /* ---------- tarefas do telão ---------- */
+    async listarTarefas() { const { data } = await sb.from("tarefas").select("*").order("ordem"); return (data || []).map(paraTarefa); },
+    async salvarTarefa(tarefa, _email, acao) {
+      const nova = !tarefa.id;
+      const t = { ...tarefa, id: tarefa.id || "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) };
+      t.historico = (t.historico || []).concat([{ quando: agora(), email: this.sessao(), acao: acao || (nova ? "criou" : "editou") }]).slice(-50);
+      const linha = daTarefa(t); if (nova) linha.criado_por = usuarioAuth.id;
+      const { data, error } = await sb.from("tarefas").upsert(linha).select().single();
+      if (error) throw error;
+      await this.registrarAtividade(null, "tarefa", `${acao || (nova ? "Criou a tarefa" : "Editou a tarefa")}: ${t.titulo}`, { tarefa: t.id });
+      return paraTarefa(data);
     },
-    async listarAtividades(email, limite = 100) {
-      const lista = armazenamento.ler().atividades[limpaEmail(email)] || [];
-      return lista.slice(-limite).reverse();
-    },
-
-    /* ---- mapas ---- */
-    mapaAtualId() { return armazenamento.ler().mapaAtual || "principal"; },
-    lerMapaLocal(id) { return armazenamento.ler().mapas[id] || null; },
-    salvarMapaLocal(id, mapa, email) {
-      const db = armazenamento.ler();
-      db.mapas[id] = { ...mapa, atualizadoPor: email || this.sessao() || null };
-      db.mapaAtual = id;
-      return armazenamento.gravar(db);
-    },
-    async getMapa(id) { return this.lerMapaLocal(id || this.mapaAtualId()); },
-    async listarMapas() { const m = armazenamento.ler().mapas; return Object.keys(m).map(id => ({ id, name: m[id].name, updatedAt: m[id].updatedAt })); },
-
-    /* ---- tarefas do telão (compartilhadas pela equipe) ---- */
-    async listarTarefas() { const t = armazenamento.ler().tarefas || {}; return Object.values(t).sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0)); },
-    async salvarTarefa(tarefa, email, acao) {
-      const db = armazenamento.ler(); db.tarefas = db.tarefas || {};
-      const nova = !tarefa.id || !db.tarefas[tarefa.id];
-      const t = { ...tarefa, id: tarefa.id || "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        atualizadoEm: agora(), criadoEm: tarefa.criadoEm || agora(), criadoPor: tarefa.criadoPor || email || null };
-      t.historico = (t.historico || []).concat([{ quando: agora(), email: email || null, acao: acao || (nova ? "criou" : "editou") }]).slice(-50);
-      db.tarefas[t.id] = t; armazenamento.gravar(db);
-      if (email) await this.registrarAtividade(email, "tarefa", `${acao || (nova ? "Criou a tarefa" : "Editou a tarefa")}: ${t.titulo}`, { tarefa: t.id });
-      return t;
-    },
-    async salvarOrdem(lista) { // [{id, status, ordem}]
-      const db = armazenamento.ler(); db.tarefas = db.tarefas || {};
-      for (const o of lista) if (db.tarefas[o.id]) { db.tarefas[o.id].status = o.status; db.tarefas[o.id].ordem = o.ordem; }
-      return armazenamento.gravar(db);
-    },
-    async excluirTarefa(id, email) {
-      const db = armazenamento.ler(); const t = db.tarefas && db.tarefas[id]; if (!t) return false;
-      delete db.tarefas[id]; armazenamento.gravar(db);
-      if (email) await this.registrarAtividade(email, "tarefa", `Excluiu a tarefa: ${t.titulo}`);
+    async salvarOrdem(lista) {
+      await Promise.all(lista.map(o => sb.from("tarefas").update({ status: o.status, ordem: o.ordem }).eq("id", o.id)));
       return true;
     },
+    async excluirTarefa(id, _email) {
+      const { data } = await sb.from("tarefas").delete().eq("id", id).select("titulo").maybeSingle();
+      if (data) await this.registrarAtividade(null, "tarefa", `Excluiu a tarefa: ${data.titulo}`);
+      return true;
+    },
+    ouvirTarefas(cb) { return sb.channel("tarefas-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "tarefas" }, () => cb()).subscribe(); },
 
-    /* ---- backup / migração para o banco ---- */
-    async exportarTudo() { return JSON.stringify(armazenamento.ler(), null, 2); },
-    async importarTudo(json) {
-      const d = typeof json === "string" ? JSON.parse(json) : json;
-      if (!d || !d.usuarios || !d.mapas) throw new Error("Arquivo inválido");
-      return armazenamento.gravar(d);
+    /* ---------- meus dados ---------- */
+    async exportarTudo() {
+      return JSON.stringify({ usuario: paraUsuario(perfil), atividades: await this.listarAtividades(null, 1000) }, null, 2);
     },
   };
-
   window.Dados = Dados;
 })();

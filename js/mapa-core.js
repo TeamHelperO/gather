@@ -71,7 +71,15 @@ function layoutBase(r){
         const tx = sx+i*3, ty = y+1+j*3;
         if (tx+2 > x+w+0.01 || ty+1.8 > y+h+0.1) continue;
         P("mesa", tx, ty);
-        P("monitor", tx, ty-0.38, {sort:(ty+1)*T-2}); P("monitor", tx+1, ty-0.38, {sort:(ty+1)*T-2});
+        const tipo = (i + j) % 3, sobre = {sort:(ty+1)*T+1}; // itens em cima da mesa
+        if (tipo === 2){ // mesa de notebook
+          P("notebook", tx+0.5, ty-0.28, sobre); P("mouse", tx+1.45, ty+0.1, sobre);
+        } else {
+          P("monitor", tx, ty-0.38, sobre);
+          if (tipo === 0) P("monitor", tx+1, ty-0.38, sobre);
+          else P("gabinete", tx+1.2, ty-0.42, sobre); // PC gamer em cima da mesa
+          P(tipo === 1 ? "teclado_rgb" : "teclado", tx+0.25, ty+0.05, sobre); P("mouse", tx+1.15, ty+0.1, sobre);
+        }
         if (ty+1.8 <= y+h+0.1) P("cadeira_cima", tx+0.5, ty+0.8);
       }
       break;
@@ -144,7 +152,7 @@ function layout(r){
   const side = r.door ? r.door.side : "nenhuma"; if (side === "nenhuma") return its;
   const dt = doorTile(r), {x, y, w, h} = r;
   const livres = side==="baixo" ? [[dt,y+h-1],[dt,y+h-2]] : side==="cima" ? [[dt,y],[dt,y+1]] : side==="esquerda" ? [[x,dt],[x+1,dt]] : [[x+w-1,dt],[x+w-2,dt]];
-  const SOLTO = /^(cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$)/;
+  const SOLTO = /^(cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$|teclado|mouse$|notebook$|gabinete$)/;
   const pe = (it, dx) => { const a = ASSETS[it.k]; const bx0 = (it.x+dx)*T+4, bx1 = (it.x+dx)*T+a.w-4, bb = it.y*T+a.h-2, bt = bb-Math.min(a.h*0.45,26); return [bx0,bt,bx1,bb]; };
   const bate = (it, dx) => { const [a0,b0,a1,b1] = pe(it, dx); return livres.some(([tx,ty]) => a1 > tx*T-6 && a0 < (tx+1)*T+6 && b1 > ty*T && b0 < (ty+1)*T); };
   const out = [];
@@ -179,7 +187,31 @@ function allItems(){
   for (const it of S.items) if (!(window.OCULTAR_PESSOAS && /^pessoa/.test(it.k))) out.push(it);
   return out;
 }
+/* Itens de mesa (monitor, teclado, mouse, notebook, gabinete, cafeteira, porta-retrato)
+   sempre ficam na camada de cima da mesa onde estão apoiados. */
+const SOBRE_MESA = /^(monitor$|teclado|mouse$|notebook$|gabinete$|porta_retrato$|cafeteira$|tv$|tv_off$)/;
+const E_MESA = /^(mesa|pulpito$)/;
+let MESAS = [];
+function apoiarNasMesas(items){
+  MESAS = items.filter(i => E_MESA.test(i.k) && ASSETS[i.k]);
+  for (const it of items) it._sobre = topoDaMesa(it);
+}
+function topoDaMesa(it){
+  if (!SOBRE_MESA.test(it.k) || !ASSETS[it.k]) return null;
+  const a = ASSETS[it.k], cx = it.x*T + a.w/2, by = it.y*T + a.h;
+  let topo = null;
+  for (const m of MESAS){
+    const b = ASSETS[m.k], mx = m.x*T, my = m.y*T;
+    if (cx > mx && cx < mx + b.w && by > my - 8 && by <= my + b.h + 6){
+      const k = my + b.h; if (topo === null || k > topo) topo = k;
+    }
+  }
+  const frente = /^(teclado|mouse$)/.test(it.k) ? 0.5 : 0; // teclado e mouse na frente dos monitores
+  return topo === null ? null : topo + 1 + frente + by/1000;
+}
 function sortKey(it){
+  if (it._sobre === undefined && SOBRE_MESA.test(it.k)) it._sobre = topoDaMesa(it);
+  if (it._sobre != null) return it._sobre;
   if (it.sort!=null) return it.sort;
   if (it.z==="wall"){ const r=roomById(it.room); return (r? r.y*T : it.y*T) + 0.5; }
   return it.y*T + ASSETS[it.k].h;
@@ -208,6 +240,7 @@ function drawWorld(c, extra){
     }
   }
   for (const it of items) if (it.z!=="floor") D.push(it);
+  apoiarNasMesas(items);
   if (extra) for (const e of extra) D.push(e);
   D.sort((a,b)=>sortKey(a)-sortKey(b));
   for (const it of D){
@@ -238,7 +271,7 @@ function drawCaps(c, r){
 
 /* ---------- colisão (grade de 16 px) ---------- */
 const C16 = 16;
-const SEM_COLISAO = /^(cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$)/;
+const SEM_COLISAO = /^(cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$|teclado|mouse$|notebook$|gabinete$)/;
 function buildBlocked(){
   const cols = S.w*2, rows = S.h*2, g = new Uint8Array(cols*rows);
   const set = (cx, cy) => { if (cx>=0 && cy>=0 && cx<cols && cy<rows) g[cy*cols+cx] = 1; };

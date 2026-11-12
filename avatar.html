@@ -54,13 +54,16 @@ h3{font-size:13px;color:var(--mut);margin:14px 0 8px;text-transform:uppercase;le
     <div id="panel"></div>
   </section>
 </div>
+<script src="js/vendor/supabase.js"></script>
+<script src="js/config.js"></script>
 <script src="js/dados.js"></script>
 <script src="js/avatar.js"></script>
 <script>
-const EMAIL = Dados.exigirSessao("index.html");
+let EMAIL = null;
 let av = null, sheet = null, anim = 0, aba = "pele";
 const ABAS = [["pele","Pele"],["rosto","Rosto"],["cabelo","Cabelo"],["barba","Barba"],["cima","Roupa"],["baixo","Calça/saia"],["calcado","Calçado"],["acess","Acessórios"]];
 (async () => {
+  EMAIL = await Dados.exigirSessao("index.html"); if (!EMAIL) return;
   const u = await Dados.getUsuario(EMAIL);
   document.getElementById("quem").textContent = `${u.nome} · ${u.email}`;
   if (u.avatar) { av = JSON.parse(JSON.stringify(u.avatar)); document.getElementById("titulo").textContent = "Seu personagem"; }
@@ -113,8 +116,8 @@ document.getElementById("rot").onclick = e => { const b = e.target.closest("[dat
 document.getElementById("rand").onclick = () => { av = Avatar.aleatorio(); painel(); refazer(); };
 document.getElementById("save").onclick = async () => {
   const b = document.getElementById("save"); b.disabled = true; b.textContent = "Salvando…";
-  await Dados.salvarAvatar(EMAIL, av);
-  location.href = "escritorio.html";
+  try { await Dados.salvarAvatar(EMAIL, av); location.href = "escritorio.html"; }
+  catch (e) { b.disabled = false; b.textContent = "Salvar e entrar"; document.getElementById("err").textContent = "Não foi possível salvar: " + e.message; }
 };
 const pv = document.getElementById("pv"), px = pv.getContext("2d");
 let t = 0;

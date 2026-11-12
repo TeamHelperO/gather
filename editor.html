@@ -110,10 +110,12 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
   <div class="btns"><button class="btn pri" id="helpOk">Entendi</button></div>
 </div></div>
 <script src="assets.js"></script>
+<script src="js/vendor/supabase.js"></script>
+<script src="js/config.js"></script>
 <script src="js/dados.js"></script>
 <script src="js/mapa-core.js"></script>
 <script>
-const EMAIL = window.claude ? null : Dados.exigirSessao("index.html");
+let EMAIL = null;
 
 function onAssetsReady(){ buildPatterns(ctx); draw(); }
 
@@ -243,8 +245,9 @@ async function save(){
   saving = true; dirty = false;
   S.rev = uid(); lastRev = S.rev; S.updatedAt = Date.now();
   const body = JSON.parse(JSON.stringify(S));
-  Dados.salvarMapaLocal(mapId, body, EMAIL);
-  if (db){
+  const salvo = window.claude ? null : Dados.salvarMapaLocal(mapId, body, EMAIL);
+  if (salvo){ setSaveState((await salvo) ? (mapId === "principal" ? "Salvo ✓ no escritório" : "Salvo ✓") : "Erro ao salvar – tente de novo"); }
+  else if (db){
     try { await db.doc("maps/"+mapId).set(body); setSaveState("Salvo ✓"); }
     catch(e){
       if (e && e.code==="unavailable"){ try { await new Promise(r=>setTimeout(r,800+Math.random()*600)); await db.doc("maps/"+mapId).set(body); setSaveState("Salvo ✓"); } catch(e2){ setSaveState("Salvo só neste aparelho"); } }
@@ -252,7 +255,7 @@ async function save(){
       else if (e && e.code==="quota_exceeded"){ setSaveState("Sem espaço"); toast("O espaço de mapas acabou. Exclua mapas antigos no menu."); }
       else setSaveState("Salvo só neste aparelho");
     }
-  } else setSaveState("Salvo neste aparelho");
+  }
   saving = false;
   if (pending){ pending=false; dirty=true; save(); }
 }
@@ -280,11 +283,12 @@ function subscribe(){
   }, err=>{ clearTimeout(timer); setSaveState("Salvando neste aparelho"); });
 }
 async function openMap(id, fallback){
+  if (!window.claude && !Dados.lerMapaLocal(id)) await Dados.carregarMapa(id);
   mapId = id; dbLoaded = false; lastRev = null; undoStack.length = 0; redoStack.length = 0; sel = null;
   const local = Dados.lerMapaLocal(id);
   S = local ? JSON.parse(JSON.stringify(local)) : (fallback || null);
   if (S) afterLoad(true);
-  if (db) subscribe(); else { if (!S){ S = templateNext(); afterLoad(true); } setSaveState("Salvo neste aparelho"); }
+  if (db) subscribe(); else { if (!S){ S = templateNext(); afterLoad(true); } setSaveState(Dados.lerMapaLocal(id) ? "Salvo ✓" : "Novo – edite para salvar"); }
 }
 
 /* ---------- interaction ---------- */
@@ -569,6 +573,7 @@ async function openMenu(){
     ${downloads?`<button class="mi" data-m="png">🖼️ Baixar imagem do mapa (PNG)</button><button class="mi" data-m="json">📄 Baixar arquivo do mapa (JSON)</button>`:""}
     <button class="mi" data-m="copy">📋 Copiar JSON do mapa</button>
     <label class="mi" style="cursor:pointer">📥 Importar JSON <input type="file" accept=".json,application/json" id="imp" hidden></label>
+    ${mapId !== "principal" ? `<button class="mi" data-m="pub">⭐ Usar este mapa no escritório</button>` : `<div class="note" style="margin:4px 10px">Este é o mapa que a equipe vê no escritório.</div>`}
     <a class="mi" href="escritorio.html">🚶 Voltar ao escritório</a>
     <button class="mi" data-m="help">❓ Como usar</button>
     <div class="sep"></div>
@@ -604,6 +609,8 @@ menu.addEventListener("click", async e=>{
   if (k==="new" || k==="tpl"){ await flush(); const id = "m"+Date.now().toString(36); const fresh = k==="new" ? blankMap("Novo escritório") : templateNext();
     menu.classList.add("hidden"); mapId = id; S = fresh; undoStack.length=0; redoStack.length=0; sel=null; lastRev=null; dbLoaded=true;
     if (db) subscribe(); afterLoad(true); dirty=true; save(); if (k==="new"){ setMode("room"); toast("Arraste no mapa para criar a primeira sala"); } return; }
+  if (k==="pub"){ const b = JSON.parse(JSON.stringify(S)); b.updatedAt = Date.now(); const ok = await Dados.salvarMapaLocal("principal", b, EMAIL);
+    menu.classList.add("hidden"); toast(ok ? "Pronto: este mapa agora é o do escritório" : "Não foi possível publicar"); if (ok) Dados.registrarAtividade(EMAIL, "editor", `Publicou o mapa "${S.name}" no escritório`); return; }
   if (k==="help"){ menu.classList.add("hidden"); document.getElementById("help").classList.remove("hidden"); return; }
   if (k==="copy"){ try { await navigator.clipboard.writeText(JSON.stringify(S)); toast("JSON copiado"); } catch(_) { toast("Não foi possível copiar aqui"); } return; }
   if (k==="json"){ try { await downloads.save({filename:(S.name||"mapa")+".json", data:JSON.stringify(S,null,1)}); } catch(err){ if (err && err.code!=="declined") toast("Download indisponível"); } return; }
@@ -653,16 +660,20 @@ info("");
 /* ---------- boot ---------- */
 resize();
 if (imgsLeft === 0) { buildPatterns(ctx); }
-const startId = Dados.mapaAtualId();
-openMap(startId, null);
-if (!S){ S = templateNext(); afterLoad(true); setSaveState("Carregando…"); }
+const startId = "principal";
+S = templateNext(); afterLoad(true); setSaveState("Carregando…");
+if (!window.claude) (async () => {
+  EMAIL = await Dados.exigirSessao("index.html"); if (!EMAIL) return;
+  await openMap(startId, null);
+  Dados.registrarAtividade(EMAIL, "editor", "Abriu o editor de salas");
+})();
 if (!LS.get("nextco_help_seen")) document.getElementById("help").classList.remove("hidden");
 const browserDownloads = { save: async ({filename, data}) => {
   const blob = data instanceof Blob ? data : new Blob([data], {type: filename.endsWith(".json") ? "application/json" : "application/octet-stream"});
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); return {status:"saved"};
 }};
-if (!window.claude) { downloads = browserDownloads; setSaveState(Dados.lerMapaLocal(mapId) ? "Salvo neste aparelho" : "Edite para salvar"); if (EMAIL) Dados.registrarAtividade(EMAIL, "editor", "Abriu o editor de salas"); }
+if (!window.claude) { downloads = browserDownloads; }
 else (async () => {
   try {
     const [d, dl] = await Promise.all([window.claude ? window.claude.use("db") : null, window.claude ? window.claude.use("downloads") : null]);

@@ -10,7 +10,7 @@ html,body{height:100%;overflow:hidden}
 #cv{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block}
 .top{position:fixed;top:8px;left:8px;right:8px;display:flex;gap:6px;align-items:center;z-index:10;pointer-events:none}
 .top>*{pointer-events:auto}
-#sala{padding:9px 13px;font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:50vw}
+#sala{padding:9px 13px;font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60vw}
 #eu{margin-left:auto;display:flex;align-items:center;gap:8px;padding:5px 10px 5px 5px;font-weight:650;font-size:14px}
 #eu canvas{width:30px;height:30px;border-radius:8px;background:#cfc7b6}
 .zoom{position:fixed;right:8px;top:62px;display:flex;flex-direction:column;z-index:10;overflow:hidden}
@@ -18,6 +18,8 @@ html,body{height:100%;overflow:hidden}
 .emotes{position:fixed;left:50%;transform:translateX(-50%);bottom:max(12px,env(safe-area-inset-bottom));display:flex;gap:4px;padding:5px;z-index:10}
 .emotes button{padding:9px 12px;border-radius:9px;font-weight:650;font-size:13px;white-space:nowrap}
 .emotes button:active{background:var(--chip)}
+#btnAudio.mudo{background:#e5484d!important}
+@media (max-width:760px){.emotes button{padding:8px 9px;font-size:12px}}
 #hint{position:fixed;left:8px;top:62px;z-index:9;font-size:12px;color:#fff;background:rgba(20,16,32,.7);padding:6px 10px;border-radius:9px;pointer-events:none}
 #joy{position:fixed;left:22px;bottom:84px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.3);z-index:11;display:none;touch-action:none}
 #knob{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.75);box-shadow:0 2px 8px rgba(0,0,0,.3)}
@@ -45,7 +47,7 @@ html,body{height:100%;overflow:hidden}
 </div>
 <div class="zoom pill"><button id="zin" aria-label="Aproximar">+</button><button id="zout" aria-label="Afastar">−</button></div>
 <div class="emotes pill">
-  <button data-emote="5">👋 Acenar</button><button data-emote="6">💃 Dançar</button><button data-emote="4">🪑 Sentar/levantar</button>
+  <button id="btnAudio" style="background:#3d5afe;color:#fff">🎧 Ligar áudio</button><button data-emote="5">👋 Acenar</button><button data-emote="6">💃 Dançar</button><button data-emote="4">🪑 Sentar/levantar</button>
 </div>
 <button class="pill" id="btnTelao" style="display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:70px;z-index:12;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe">📊 Abrir telão</button>
 <div id="hint">Setas/WASD ou clique para andar · pare perto de uma cadeira para sentar</div>
@@ -54,16 +56,20 @@ html,body{height:100%;overflow:hidden}
 <div id="toast"></div>
 <div id="load">Entrando no escritório…</div>
 <script src="assets.js"></script>
+<script src="js/vendor/supabase.js"></script>
+<script src="js/config.js"></script>
 <script src="js/dados.js"></script>
 <script src="js/mapa-core.js"></script>
 <script src="js/avatar.js"></script>
 <script src="js/vida.js"></script>
 <script src="js/telao.js"></script>
+<script src="js/sala.js"></script>
+<script src="js/voz.js"></script>
 <script>
-const EMAIL = Dados.exigirSessao("index.html");
+let EMAIL = null;
 window.OCULTAR_PESSOAS = true; // no escritório só aparecem pessoas de verdade
 let S = null, grid = null, user = null, assentos = [];
-const mapaId = Dados.mapaAtualId();
+const mapaId = "principal";
 const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
 let DPR = 1, VW = 0, VH = 0, zoom = innerWidth <= 760 ? 1.6 : 2;
 let P = null, tarefas = [], teloes = [], monitores = []; const outros = []; // outras pessoas (entram aqui quando houver modo com várias pessoas)
@@ -76,20 +82,23 @@ function onAssetsReady(){ buildPatterns(ctx); boot(); }
 if (imgsLeft === 0) onAssetsReady();
 
 async function boot(){
-  if (!EMAIL) return;
+  EMAIL = await Dados.exigirSessao("index.html"); if (!EMAIL) return;
   user = await Dados.getUsuario(EMAIL);
   if (!user.avatar) { location.href = "avatar.html"; return; }
   document.getElementById("nome").textContent = user.nome;
-  S = Dados.lerMapaLocal(mapaId) || templateNext();
+  S = await Dados.carregarMapa(mapaId);
+  if (!S) { S = templateNext(); Dados.salvarMapaLocal(mapaId, S); }
   grid = buildBlocked();
   assentos = construirAssentos();
   teloes = allItems().filter(i => i.k === "telao");
-  monitores = allItems().filter(i => i.k === "monitor");
-  await atualizarTarefas(); setInterval(atualizarTarefas, 10000);
+  monitores = allItems().filter(i => i.k === "monitor" || i.k === "notebook");
+  await atualizarTarefas(); setInterval(atualizarTarefas, 30000); Dados.ouvirTarefas(atualizarTarefas);
+  Dados.ouvirMapa(mapaId, novoMapa => recarregarMapa(novoMapa));
   const sheet = await Avatar.montar(user.avatar);
-  P = new Ator({ id: "eu", nome: user.nome, sheet, x: 0, y: 0 });
+  P = new Ator({ id: Dados.meuId(), nome: user.nome, sheet, x: 0, y: 0 });
   const m = document.getElementById("mini").getContext("2d"); m.imageSmoothingEnabled = false; m.drawImage(sheet, 8, 4, 16, 16, 0, 0, 32, 32);
   spawn();
+  conectarSala();
   document.getElementById("load").remove();
   if (matchMedia("(pointer:coarse)").matches) { document.getElementById("joy").style.display = "block"; document.getElementById("hint").textContent = "Use o controle ou toque no chão para andar"; }
   setTimeout(() => document.getElementById("hint").style.opacity = 0, 8000);
@@ -97,6 +106,71 @@ async function boot(){
   last = performance.now(); requestAnimationFrame(loop);
 }
 async function atualizarTarefas(){ tarefas = await Dados.listarTarefas(); }
+/* ---------- outras pessoas em tempo real ---------- */
+const sheets = {};
+function montarSheet(av){ const k = JSON.stringify(av || {}); return sheets[k] || (sheets[k] = Avatar.montar(av)); }
+function conectarSala(){
+  Sala.entrar({
+    id: P.id,
+    presenca: () => ({ id: P.id, nome: user.nome, avatar: user.avatar }),
+    aoEntrar(id, m){ const a = new Ator({ id, nome: m.nome, sheet: null, x: 0, y: 0, visto: false }); outros.push(a);
+      montarSheet(m.avatar).then(sh => a.sheet = sh); toast(`${m.nome} entrou no escritório`); },
+    aoMudar(id, m){ const a = outros.find(o => o.id === id); if (!a) return; a.nome = m.nome; montarSheet(m.avatar).then(sh => a.sheet = sh); },
+    aoSair(id){ const i = outros.findIndex(o => o.id === id); if (i < 0) return; const a = outros[i];
+      if (a.assento) { a.assento.ocupante = null; a.assento = null; } outros.splice(i, 1); toast(`${a.nome} saiu`); },
+    aoMover(id, st){
+      const a = outros.find(o => o.id === id); if (!a) return;
+      if (!a.visto){ a.x = st.x; a.y = st.y; a.visto = true; }
+      a.alvo = { x: st.x, y: st.y }; a.dir = st.dir; a.remotoAndando = !!st.mov; a.mic = !!st.mic;
+      if (st.emote !== a.emote){ a.emote = st.emote; a.emoteT = 0; }
+      const atual = a.assento ? a.assento.id : null;
+      if (st.assento !== atual){
+        if (a.assento){ a.assento.ocupante = null; a.assento = null; }
+        const s = st.assento && assentos.find(s => s.id === st.assento);
+        if (s && (!s.ocupante || s.ocupante === a)){ s.ocupante = a; a.assento = s; }
+      }
+    },
+    aoSinal: msg => Voz.aoSinal(msg),
+    aoDesconectar(){ toast("Conexão instável… tentando de novo"); },
+  });
+}
+function moverOutros(dt){
+  for (const a of outros){
+    if (!a.visto || !a.alvo) continue;
+    if (a.emote != null) a.emoteT += dt;
+    if (a.assento){ a.moving = false; continue; }
+    const dx = a.alvo.x - a.x, dy = a.alvo.y - a.y, d = Math.hypot(dx, dy);
+    if (d > 200){ a.x = a.alvo.x; a.y = a.alvo.y; }
+    else { const k = Math.min(1, dt*10); a.x += dx*k; a.y += dy*k; }
+    a.moving = a.remotoAndando || d > 1.5;
+    if (a.moving){ a.anim += dt*8; a.frame = 1 + (Math.floor(a.anim) % 4); } else a.frame = 0;
+  }
+}
+function recarregarMapa(novo){
+  for (const a of [P, ...outros]) if (a.assento){ a.assento.ocupante = null; a.assento = null; }
+  S = novo; grid = buildBlocked(); assentos = construirAssentos();
+  teloes = allItems().filter(i => i.k === "telao"); monitores = allItems().filter(i => i.k === "monitor" || i.k === "notebook");
+  if (!livre(P.x, P.y)) spawn();
+  toast("O mapa do escritório foi atualizado");
+}
+/* ---------- áudio ---------- */
+async function ligarAudio(){
+  const b = document.getElementById("btnAudio");
+  if (!Voz.ligado){
+    b.textContent = "⏳ Ligando…";
+    const r = await Voz.ativar(P.id);
+    if (!r.comMicrofone) toast("Sem permissão do microfone: você ouve, mas não fala");
+    Dados.registrarAtividade(EMAIL, "audio", r.comMicrofone ? "Ligou o áudio com microfone" : "Ligou o áudio só para ouvir");
+  } else Voz.alternarMic();
+  atualizarBotaoAudio();
+}
+function atualizarBotaoAudio(){
+  const b = document.getElementById("btnAudio");
+  if (!Voz.ligado) b.textContent = "🎧 Ligar áudio";
+  else if (!Voz.temMic) b.textContent = "🔈 Só ouvindo";
+  else b.textContent = Voz.micAberto ? "🎙️ Microfone ligado" : "🔇 Microfone mudo";
+  b.classList.toggle("mudo", Voz.ligado && !Voz.micAberto);
+}
 function abrirTelao(){
   if (Telao.aberto) return; keys.clear(); joyV = null; if (P) P.path = null;
   Dados.registrarAtividade(EMAIL, "telao", "Abriu o telão da equipe");
@@ -167,6 +241,7 @@ function joyMove(e){
   knob.style.transform = `translate(${dx}px,${dy}px)`;
   joyV = d > 8 ? [dx/max, dy/max] : null; if (joyV && P){ P.path = null; P.emote = null; }
 }
+document.getElementById("btnAudio").onclick = e => { e.stopPropagation(); ligarAudio(); };
 document.querySelector(".emotes").onclick = e => { const b = e.target.closest("[data-emote]"); if (!b) return; const r = +b.dataset.emote; r === 4 ? sentarPerto() : emote(r); };
 function emote(row){
   if (!P) return; if (P.assento) P.levantar();
@@ -204,7 +279,11 @@ function loop(now){
       Dados.registrarAtividade(EMAIL, "acao", s.trabalho ? `Sentou para trabalhar${P.sala ? " em " + P.sala : ""}` : `Sentou${s.sala ? " em " + s.sala : ""}`, {sala: s.sala});
     }
   }
-  atualizarConversas([P, ...outros], dt, (a, o) => {
+  moverOutros(dt);
+  const visiveis = outros.filter(o => o.visto && o.sheet);
+  Voz.atualizar(P, visiveis, now);
+  Sala.enviarPosicao({ x: Math.round(P.x), y: Math.round(P.y), dir: P.dir, mov: P.moving, assento: P.assento ? P.assento.id : null, emote: P.emote, mic: Voz.micAberto }, now);
+  atualizarConversas([P, ...visiveis], dt, (a, o) => {
     if (a !== P) return;
     const agora = Date.now(); if (conversasLog[o.nome] && agora - conversasLog[o.nome] < 60000) return;
     conversasLog[o.nome] = agora;
@@ -212,6 +291,7 @@ function loop(now){
   });
   const perto = teloes.some(it => Math.hypot(it.x*T + 96 - P.px, it.y*T + 96 - P.py) < 120);
   const bt = document.getElementById("btnTelao"); const mostra = perto && !Telao.aberto ? "block" : "none"; if (bt.style.display !== mostra) bt.style.display = mostra;
+  for (const a of [P, ...visiveis]){ a.vozReal = now - (a.vozAtiva || -1e9) < 350; if (Voz.ligado) a.falando = a.vozReal; else if (a.vozReal) a.falando = true; }
   checarSala(false);
   if (sujo && now - ultimoSave > 4000){ salvarPos(); ultimoSave = now; }
   if (marca){ marca.t -= dt*1.5; if (marca.t <= 0) marca = null; }
@@ -226,7 +306,9 @@ function checarSala(first){
   const r = roomAt(P.px, P.py - 4);
   const nome = r ? r.name : "Área externa";
   if (nome === P.sala && !first) return;
-  P.sala = nome; document.getElementById("sala").textContent = "📍 " + nome;
+  P.sala = nome;
+  const z = Voz.zona(P), regra = z.tipo === "fechada" ? " · 🔒 só quem está aqui ouve" : z.tipo === "silencio" ? " · 🤫 sem áudio" : " · 🗣 ouve quem está perto";
+  document.getElementById("sala").textContent = "📍 " + nome + regra;
   if (!first) Dados.registrarAtividade(EMAIL, "sala", `Entrou em ${nome}`, {sala: nome});
 }
 function cam(){
@@ -238,7 +320,7 @@ function cam(){
 }
 function draw(){
   ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle = "#16141f"; ctx.fillRect(0, 0, cv.width, cv.height);
-  const c = cam(), atores = [P, ...outros];
+  const c = cam(), atores = [P, ...outros.filter(o => o.visto && o.sheet)];
   const ligados = new Set(); for (const a of atores) if (a.assento && a.assento.trabalho) for (const m of a.assento.monitores) ligados.add(m.x + "," + m.y);
   ctx.imageSmoothingEnabled = false;
   ctx.setTransform(zoom*DPR, 0, 0, zoom*DPR, c.ox*DPR, c.oy*DPR);
@@ -252,7 +334,7 @@ function draw(){
     const naMesa = a.assento && a.assento.trabalho;
     const sx = a.px*zoom + c.ox, top = a.assento ? a.assento.sy - 40 : a.y - 45, sy = naMesa ? (a.assento.sy + 14)*zoom + c.oy + 19 : (top - 2)*zoom + c.oy;
     if (sx < -60 || sx > VW + 60 || sy < -40 || sy > VH + 40) continue;
-    const txt = a.nome;
+    const txt = a.nome + (a !== P && a.ouvindo ? " 🔊" : "") + (a.vozReal ? " 🗣" : "");
     ctx.font = "700 12px system-ui,sans-serif"; const w = ctx.measureText(txt).width + 12;
     ctx.fillStyle = a === P ? "rgba(61,90,254,.92)" : "rgba(20,16,32,.72)"; ctx.beginPath(); ctx.roundRect(sx - w/2, sy - 19, w, 17, 6); ctx.fill();
     ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(txt, sx, sy - 10.5); ctx.textAlign = "left";
@@ -266,7 +348,7 @@ document.getElementById("eu").onclick = async () => {
   const acts = await Dados.listarAtividades(EMAIL, 40);
   const ico = {cadastro:"✨", entrou:"🚪", saiu:"👋", avatar:"🧍", sala:"📍", acao:"🎉", editor:"🛠️", conversa:"💬", tarefa:"✅", telao:"📊"};
   menu.innerHTML = `<h3>${esc(user.nome)} <button class="x" data-close aria-label="Fechar">×</button></h3>
-    <div style="color:var(--mut);font-size:13px;margin:-6px 0 8px">${esc(user.email)}</div>
+    <div style="color:var(--mut);font-size:13px;margin:-6px 0 8px">${esc(user.email)} · ${Sala.online} online agora</div>
     <a class="mi" href="avatar.html">🧍 Editar meu personagem</a>
     <button class="mi" data-telao>📊 Telão da equipe</button>
     <a class="mi" href="editor.html">🛠️ Editor de salas</a>

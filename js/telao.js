@@ -126,16 +126,20 @@ window.Telao = (function () {
     raiz.addEventListener("pointerdown", inicioArraste);
     if (!estado.cheia) raiz.addEventListener("pointerdown", e => { if (e.target === raiz) fechar(); });
     addEventListener("keydown", tecla);
+    if (Dados.ouvirTarefas) estado.canal = Dados.ouvirTarefas(() => { if (!estado) return; if (arr && arr.ativo) estado.pendente = true; else recarregar(); });
     recarregar();
     return { fechar };
   }
   function tecla(e) { if (e.key === "Escape" && estado) { const m = estado.raiz.querySelector("#tlModal"); if (!m.classList.contains("hidden")) m.classList.add("hidden"); else if (!estado.cheia) fechar(); } }
   function fechar() {
     if (!estado) return; removeEventListener("keydown", tecla);
+    if (estado.canal && Dados.cliente) Dados.cliente.removeChannel(estado.canal);
     estado.raiz.remove(); const cb = estado.aoFechar; estado = null; if (cb) cb();
   }
   async function recarregar() {
+    if (!estado) return; estado.pendente = false;
     estado.tarefas = await Dados.listarTarefas();
+    if (!estado) return;
     estado.usuarios = await Dados.listarUsuarios();
     desenhar();
   }

@@ -565,3 +565,58 @@ def zona(color, icon):
 ZONES = {"M46": ("ponto_de_entrada", P["ok"], "spawn"), "M47": ("mesa_pessoal", P["brand"], "pessoa"),
          "M48": ("sala_privada", P["meet"], "cadeado"), "M49": ("palco", P["orange"], "mic"),
          "M50": ("area_silenciosa", P["gray"], "mudo"), "M51": ("colisao", P["bad"], "x")}
+
+
+# ---------------- periféricos da mesa (pedido extra) ----------------
+def teclado(rgb=False):
+    """32x16 – fica sobre a mesa."""
+    f = new(T, 16); px = Px(f)
+    px.r(3, 5, 28, 12, OUTLINE); px.r(4, 6, 27, 11, "#3a3a44"); px.r(4, 6, 27, 6, "#4a4a58")
+    for row, y in enumerate((7, 9)):
+        for x in range(5 + row, 27, 2):
+            px.p(x, y, "#9aa0ad")
+    px.r(10, 10, 21, 10, "#9aa0ad")  # barra de espaço
+    if rgb:
+        cols = [P["bad"], P["orange"], P["yellow"], P["ok"], P["sky"], P["brand"], P["purple"], P["pink"]]
+        for i, x in enumerate(range(4, 28, 3)):
+            px.r(x, 12, x + 2, 12, cols[i % len(cols)])
+    return f
+
+
+def mouse():
+    """16x16 – fica sobre a mesa."""
+    f = new(16, 16); px = Px(f)
+    px.r(3, 9, 12, 13, "#2f2f38")  # mousepad
+    px.ell(6, 6, 10, 12, OUTLINE); px.ell(7, 7, 9, 11, "#4a4a58"); px.p(8, 7, P["brand_l"])
+    px.line([(8, 6), (8, 3), (11, 2)], "#2a2a33")  # fio
+    return f
+
+
+def notebook():
+    """32x32 – notebook aberto sobre a mesa (tela em x 8..23, y 6..17)."""
+    f = new(T, T); px = Px(f)
+    px.r(6, 4, 25, 19, OUTLINE); px.r(7, 5, 24, 18, "#2a2a33")
+    px.r(8, 6, 23, 17, P["screen"])
+    for i, (w, c) in enumerate([(9, P["brand_l"]), (6, P["ok"]), (11, "#ffffff"), (5, P["warn"])]):
+        px.r(9, 8 + i * 2, 9 + w, 8 + i * 2, alpha(c, 200))
+    px.poly([(4, 20), (27, 20), (29, 26), (2, 26)], "#b9bcc4", OUTLINE)  # base
+    for x in range(6, 26, 2):
+        px.p(x, 22, "#6c707a"); px.p(x + 1, 23, "#6c707a")
+    px.r(13, 25, 18, 25, "#8f949e")  # touchpad
+    px.p(15, 4, "#5c606a")
+    return f
+
+
+def gabinete_gamer():
+    """32x32 – PC gamer com lateral de vidro e fans RGB (fica sobre a mesa ou no chão)."""
+    f = new(T, T); px = Px(f)
+    shadow(f, 7, 27, 26, 31, 50)
+    px.r(8, 4, 24, 29, OUTLINE); px.r(9, 5, 23, 28, "#22222b")
+    px.r(10, 6, 22, 27, "#141420")  # vidro
+    for (cy, c) in [(11, P["pink"]), (19, P["sky"])]:
+        px.ell(12, cy - 3, 18, cy + 3, c); px.ell(13, cy - 2, 17, cy + 2, "#141420"); px.p(15, cy, c)
+    px.r(19, 8, 21, 25, alpha(P["purple"], 200))  # fita de led
+    px.r(10, 24, 22, 26, "#2f2f3a"); px.r(11, 25, 14, 25, P["ok"])
+    px.r(9, 5, 9, 28, alpha("#ffffff", 40))
+    px.r(8, 29, 10, 30, OUTLINE); px.r(22, 29, 24, 30, OUTLINE)
+    return f

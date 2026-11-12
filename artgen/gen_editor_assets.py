@@ -23,7 +23,7 @@ add("porta_privada",porta(False),"Porta da sala","x",False)
 I=[("tapete",tapete(),"Tapete","Decoração"),("mesa",mesa_trabalho(),"Mesa de trabalho","Móveis"),
 ("cadeira_baixo",cadeira("baixo"),"Cadeira ↓","Móveis"),("cadeira_cima",cadeira("cima"),"Cadeira ↑","Móveis"),
 ("cadeira_esq",cadeira("esquerda"),"Cadeira ←","Móveis"),("cadeira_dir",cadeira("direita"),"Cadeira →","Móveis"),
-("monitor",monitor(),"Monitor","Móveis"),("mesa_reuniao6",mesa_reuniao(96),"Mesa reunião 6","Móveis"),
+("monitor",monitor(),"Monitor","Móveis"),("teclado",teclado(),"Teclado","Móveis"),("teclado_rgb",teclado(True),"Teclado gamer RGB","Móveis"),("mouse",mouse(),"Mouse","Móveis"),("notebook",notebook(),"Notebook","Móveis"),("gabinete",gabinete_gamer(),"Gabinete gamer","Móveis"),("mesa_reuniao6",mesa_reuniao(96),"Mesa reunião 6","Móveis"),
 ("mesa_reuniao10",mesa_reuniao(160),"Mesa reunião 10","Móveis"),("sofa",sofa(),"Sofá","Móveis"),("poltrona",poltrona(),"Poltrona","Móveis"),
 ("pufe",pufe(),"Pufe","Móveis"),("estante",estante(),"Estante","Móveis"),("arquivo",arquivo(),"Arquivo","Móveis"),
 ("planta",planta(),"Planta","Decoração"),("planta_grande",planta(True),"Planta grande","Decoração"),
@@ -42,5 +42,11 @@ add("npc_mascote",fr(npc_mascote(),0,0),"Mascote Nexo","Personagens")
 add("npc_robo",fr(npc_robo(),0,0),"Robô do telão","Personagens")
 add("pet",fr(npc_pet(),0,4,32,32),"Gato","Personagens")
 for i,c in enumerate(prev_chars.chars): add(f"pessoa{i+1}",fr(c,0,0),f"Pessoa {i+1}","Personagens")
-json.dump(A,open("/home/claude/editor/assets.json","w"))
+import base64 as _b, io as _io
+from PIL import Image as _I
+for k,v in A.items():
+    raw=_b.b64decode(v["src"].split(",")[1]); im=_I.open(_io.BytesIO(raw)).convert("RGBA"); b=_io.BytesIO(); im.save(b,"PNG",optimize=True)
+    if len(b.getvalue())<len(raw): v["src"]="data:image/png;base64,"+_b.b64encode(b.getvalue()).decode()
+json.dump(A,open("/home/claude/editor/assets.json","w"),separators=(",",":"))
+open("/home/claude/vercel-site/assets.js","w").write("window.ASSETS="+json.dumps(A,separators=(",",":"))+";\n")
 print(len(A), sum(len(v["src"]) for v in A.values())/1e3,"KB")

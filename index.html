@@ -16,38 +16,56 @@ p.sub{margin:0 0 8px;color:var(--mut)}
 .logo span{width:40px;height:40px;border-radius:10px;background:var(--brand);display:grid;place-items:center;color:#fff;font-weight:900;font-size:20px}
 .row{display:flex;gap:8px;margin-top:10px}.row .btn{flex:1}
 .small{font-size:12px;color:var(--mut);margin-top:14px}
-#nomeBox{display:none}
+#enviado{display:none;text-align:center}
+#enviado .ic{font-size:44px}
 </style>
 </head>
 <body>
 <form class="card" id="f" novalidate>
   <div class="logo"><span>N</span><div><b>Next Co.</b><div style="font-size:12px;color:var(--mut)">Escritório virtual</div></div></div>
-  <h1>Entrar</h1>
-  <p class="sub">Use seu e-mail. Tudo o que você faz fica salvo nele.</p>
-  <div class="field"><label for="email">E-mail</label><input id="email" type="email" autocomplete="email" inputmode="email" placeholder="voce@nextco.com.br" required></div>
-  <div class="field" id="nomeBox"><label for="nome">Como quer ser chamado?</label><input id="nome" type="text" autocomplete="name" maxlength="30" placeholder="Seu nome"></div>
-  <div class="err" id="err"></div>
-  <div class="row"><button class="btn pri" id="go" type="submit">Continuar</button></div>
-  <p class="small">Primeiro acesso? Você vai criar seu personagem em seguida.</p>
+  <div id="pedir">
+    <h1>Entrar</h1>
+    <p class="sub">Digite seu e-mail. Vamos mandar um link para você entrar, sem senha.</p>
+    <div class="field"><label for="email">E-mail</label><input id="email" type="email" autocomplete="email" inputmode="email" placeholder="voce@nextco.com.br" required></div>
+    <div class="field"><label for="nome">Seu nome <span style="font-weight:400">(só no primeiro acesso)</span></label><input id="nome" type="text" autocomplete="name" maxlength="30" placeholder="Como quer ser chamado"></div>
+    <div class="err" id="err"></div>
+    <div class="row"><button class="btn pri" id="go" type="submit">Enviar link de acesso</button></div>
+    <p class="small">Tudo o que você faz no escritório fica salvo no seu e-mail.</p>
+  </div>
+  <div id="enviado">
+    <div class="ic">📬</div>
+    <h1>Confira seu e-mail</h1>
+    <p class="sub">Enviamos um link para <b id="emailEnviado"></b>. Abra o link <b>neste mesmo aparelho</b> para entrar.</p>
+    <p class="small">Não chegou? Veja o spam ou <a href="#" id="denovo">tente de novo</a>.</p>
+  </div>
 </form>
+<script src="js/vendor/supabase.js"></script>
+<script src="js/config.js"></script>
 <script src="js/dados.js"></script>
 <script>
-const f = document.getElementById("f"), email = document.getElementById("email"), nome = document.getElementById("nome"),
-      nomeBox = document.getElementById("nomeBox"), err = document.getElementById("err");
-const atual = Dados.sessao();
-if (atual) email.value = atual;
-let pedindoNome = false;
+const f = document.getElementById("f"), email = document.getElementById("email"), nome = document.getElementById("nome"), err = document.getElementById("err");
+(async () => {
+  // voltou pelo link do e-mail (ou já tinha entrado)?
+  const u = await Dados.pronto;
+  if (u) { try { const p = await Dados.garantirPerfil(); location.replace(p.avatar ? "escritorio.html" : "avatar.html"); return; } catch (e) { err.textContent = "Erro ao abrir seu perfil: " + e.message; } }
+  const ult = localStorage.getItem("nextco_ultimo_email"); if (ult) email.value = ult;
+  const hashErr = new URLSearchParams(location.hash.slice(1)).get("error_description"); if (hashErr) err.textContent = "O link expirou ou já foi usado. Peça outro.";
+})();
 f.onsubmit = async e => {
   e.preventDefault(); err.textContent = "";
   const em = email.value.trim().toLowerCase();
   if (!Dados.emailValido(em)) { err.textContent = "Digite um e-mail válido."; email.focus(); return; }
-  const existe = await Dados.usuarioExiste(em);
-  if (!existe && !pedindoNome) { pedindoNome = true; nomeBox.style.display = "flex"; nome.focus(); return; }
-  if (!existe && !nome.value.trim()) { err.textContent = "Diga como quer ser chamado."; nome.focus(); return; }
-  const u = await Dados.entrar(em, existe ? "" : nome.value);
-  location.href = u.avatar ? "escritorio.html" : "avatar.html";
+  const b = document.getElementById("go"); b.disabled = true; b.textContent = "Enviando…";
+  try {
+    await Dados.enviarLink(em, nome.value);
+    localStorage.setItem("nextco_ultimo_email", em);
+    document.getElementById("emailEnviado").textContent = em;
+    document.getElementById("pedir").style.display = "none"; document.getElementById("enviado").style.display = "block";
+  } catch (x) {
+    err.textContent = /rate|seconds|limit/i.test(x.message || "") ? "Muitos pedidos seguidos. Espere um minuto e tente de novo." : "Não foi possível enviar: " + (x.message || x);
+  } finally { b.disabled = false; b.textContent = "Enviar link de acesso"; }
 };
-email.oninput = () => { if (pedindoNome) { pedindoNome = false; nomeBox.style.display = "none"; } };
+document.getElementById("denovo").onclick = e => { e.preventDefault(); document.getElementById("pedir").style.display = "block"; document.getElementById("enviado").style.display = "none"; };
 </script>
 </body>
 </html>
