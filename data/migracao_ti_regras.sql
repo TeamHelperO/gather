@@ -201,3 +201,8 @@ do $$ begin
   begin alter publication supabase_realtime add table public.agentes; exception when duplicate_object then null; end;
   begin alter publication supabase_realtime add table public.regras_salas; exception when duplicate_object then null; end;
 end $$;
+
+-- funções internas: só quem entrou (e os gatilhos, nem isso)
+revoke execute on function public.definir_papel(uuid,text), public.definir_regra_sala(text,text,boolean,uuid[],text,boolean), public.conferir_senha_sala(text,text,text), public.mexer_tendencia(uuid,text), public.e_admin(), public.papel_inicial(), public.protege_papel() from public, anon;
+grant execute on function public.definir_papel(uuid,text), public.definir_regra_sala(text,text,boolean,uuid[],text,boolean), public.conferir_senha_sala(text,text,text), public.mexer_tendencia(uuid,text), public.e_admin() to authenticated;
+revoke execute on function public.papel_inicial(), public.protege_papel() from authenticated;
