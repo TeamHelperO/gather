@@ -66,7 +66,7 @@ let S = null, grid = null, user = null, assentos = [];
 const mapaId = Dados.mapaAtualId();
 const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
 let DPR = 1, VW = 0, VH = 0, zoom = innerWidth <= 760 ? 1.6 : 2;
-let P = null, tarefas = [], teloes = []; const outros = []; // outras pessoas (entram aqui quando houver modo com várias pessoas)
+let P = null, tarefas = [], teloes = [], monitores = []; const outros = []; // outras pessoas (entram aqui quando houver modo com várias pessoas)
 const keys = new Set(); let joyV = null;
 
 function resize(){ DPR = Math.min(devicePixelRatio || 1, 2); VW = innerWidth; VH = innerHeight; cv.width = VW*DPR; cv.height = VH*DPR; }
@@ -84,6 +84,7 @@ async function boot(){
   grid = buildBlocked();
   assentos = construirAssentos();
   teloes = allItems().filter(i => i.k === "telao");
+  monitores = allItems().filter(i => i.k === "monitor");
   await atualizarTarefas(); setInterval(atualizarTarefas, 10000);
   const sheet = await Avatar.montar(user.avatar);
   P = new Ator({ id: "eu", nome: user.nome, sheet, x: 0, y: 0 });
@@ -238,15 +239,18 @@ function cam(){
 function draw(){
   ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle = "#16141f"; ctx.fillRect(0, 0, cv.width, cv.height);
   const c = cam(), atores = [P, ...outros];
+  const ligados = new Set(); for (const a of atores) if (a.assento && a.assento.trabalho) for (const m of a.assento.monitores) ligados.add(m.x + "," + m.y);
   ctx.imageSmoothingEnabled = false;
   ctx.setTransform(zoom*DPR, 0, 0, zoom*DPR, c.ox*DPR, c.oy*DPR);
-  drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => Telao.desenharTela(g, it.x*T, it.y*T, tarefas) }))));
+  drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => Telao.desenharTela(g, it.x*T, it.y*T, tarefas) })))
+    .concat(monitores.map(it => ({ sort: sortKey(it) + 0.01, draw: g => desenharMonitor(g, it, ligados.has(it.x + "," + it.y), t) }))));
   for (const a of atores) a.balao(ctx, t);
   if (marca){ ctx.strokeStyle = `rgba(61,90,254,${marca.t})`; ctx.lineWidth = 2/zoom*1.5; ctx.beginPath(); ctx.ellipse(marca.x, marca.y, 10*(1.6-marca.t*.6), 5*(1.6-marca.t*.6), 0, 0, Math.PI*2); ctx.stroke(); }
   // nomes (tela)
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   for (const a of atores){
-    const sx = a.px*zoom + c.ox, top = a.assento ? a.assento.sy - 40 : a.y - 45, sy = (top - 2)*zoom + c.oy;
+    const naMesa = a.assento && a.assento.trabalho;
+    const sx = a.px*zoom + c.ox, top = a.assento ? a.assento.sy - 40 : a.y - 45, sy = naMesa ? (a.assento.sy + 14)*zoom + c.oy + 19 : (top - 2)*zoom + c.oy;
     if (sx < -60 || sx > VW + 60 || sy < -40 || sy > VH + 40) continue;
     const txt = a.nome;
     ctx.font = "700 12px system-ui,sans-serif"; const w = ctx.measureText(txt).width + 12;

@@ -18,10 +18,12 @@ function construirAssentos(){
   for (const it of itens){
     const d = ASSENTOS_DEF[it.k]; if (!d) continue;
     const a = ASSETS[it.k], base = it.y*T + a.h;
-    const trabalho = it.k === "cadeira_cima" && mesas.some(m => it.x + 0.5 >= m.x - 0.1 && it.x + 0.5 <= m.x + 2.1 && it.y - m.y > 0.3 && it.y - m.y < 1.3);
+    const mesa = it.k === "cadeira_cima" ? mesas.find(m => it.x + 0.5 >= m.x - 0.1 && it.x + 0.5 <= m.x + 2.1 && it.y - m.y > 0.3 && it.y - m.y < 1.3) : null;
+    const trabalho = !!mesa;
+    const monitores = mesa ? itens.filter(o => o.k === "monitor" && o.x >= mesa.x - 0.1 && o.x <= mesa.x + 1.1 && o.y >= mesa.y - 1 && o.y <= mesa.y + 0.2) : [];
     d.pts.forEach(([px, py], i) => {
       const sx = it.x*T + px, sy = it.y*T + py, sala = roomAt(sx, sy);
-      out.push({ id: `${it.id || it.k + "_" + it.x + "_" + it.y}_${i}`, k: it.k, sx, sy, face: d.face, r: d.r, trabalho,
+      out.push({ id: `${it.id || it.k + "_" + it.x + "_" + it.y}_${i}`, k: it.k, sx, sy, face: d.face, r: d.r, trabalho, monitores,
         sort: d.face === "costas" ? base - 1 : base + 1, sala: sala ? sala.name : null, ocupante: null });
     });
   }
@@ -65,7 +67,6 @@ class Ator {
   balao(g, t){
     const bx = Math.round(this.px), by = Math.round((this.assento ? this.assento.sy - 40 : this.y - 45) - 14);
     if (this.conversa && this.falando) return desenhaBalao(g, bx - 10, by, "#ffffff", "#2a2333", t, "fala");
-    if (this.assento && this.assento.trabalho) return desenhaBalao(g, bx - 10, by, "#e7f1fb", "#2438b8", t, "pc");
   }
 }
 function desenhaBalao(g, x, y, fundo, tinta, t, tipo){
@@ -125,4 +126,34 @@ function seguirCaminho(a){
   const [tx, ty] = a.path[0]; const dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy);
   if (d < 3){ a.path.shift(); if (!a.path.length) a.path = null; return [0, 0]; }
   return [dx/d, dy/d];
+}
+
+/* ---------- telas dos monitores ----------
+   Monitor (sprite 32x32): tela em x 5..26, y 6..20. Desligado = descanso escuro; com alguém trabalhando = código sendo digitado. */
+const CORES_CODIGO = ["#8fa0ff", "#3fbf5f", "#ffffff", "#f2a33a", "#e07aa8", "#8fd0f0"];
+function desenharMonitor(g, it, ativo, t){
+  const x = Math.round(it.x*T) + 5, y = Math.round(it.y*T) + 6, w = 22, h = 15;
+  let semente = 0; for (const c of String(it.id || it.x + "," + it.y)) semente = (semente*31 + c.charCodeAt(0)) >>> 0;
+  if (!ativo){
+    g.fillStyle = "#141c2c"; g.fillRect(x, y, w, h);
+    g.fillStyle = "rgba(143,160,255,.25)"; const bx = x + 3 + Math.floor((Math.sin(t*0.6 + semente) + 1)*7), by = y + 4 + Math.floor((Math.cos(t*0.5 + semente) + 1)*3);
+    g.fillRect(bx, by, 3, 2); // descanso de tela
+    return;
+  }
+  g.fillStyle = "#1f2f4a"; g.fillRect(x, y, w, h);
+  const linhasVisiveis = 6, vel = 7 + (semente % 4); // caracteres por segundo
+  const total = Math.floor(t*vel + (semente % 50));
+  const larg = i => 4 + ((semente >>> (i % 16)) + i*7) % 13;      // largura de cada linha
+  const recuo = i => ((semente >>> ((i + 3) % 16)) + i) % 3 * 2;    // indentação
+  // descobre em que linha está digitando
+  let resto = total, linha = 0; while (resto >= larg(linha)){ resto -= larg(linha); linha++; }
+  const primeira = Math.max(0, linha - linhasVisiveis + 1);
+  for (let i = primeira; i <= linha; i++){
+    const yy = y + 1 + (i - primeira)*2 + Math.floor((i - primeira)/1)*0.3;
+    const comp = i < linha ? larg(i) : resto, cor = CORES_CODIGO[((semente >>> (i % 12)) + i) % CORES_CODIGO.length];
+    g.fillStyle = cor; g.fillRect(x + 1 + recuo(i), Math.round(yy), Math.min(comp, w - 2 - recuo(i)), 1);
+    if (i === linha && Math.floor(t*2.5) % 2 === 0){ g.fillStyle = "#ffffff"; g.fillRect(x + 1 + recuo(i) + Math.min(comp, w - 3 - recuo(i)), Math.round(yy) - 1, 1, 2); }
+  }
+  g.fillStyle = "rgba(143,160,255,.12)"; g.fillRect(x, y, w, h); // brilho
+  g.fillStyle = "#3fbf5f"; g.fillRect(x + 10, y + h + 1, 1, 1);    // luz de ligado
 }
