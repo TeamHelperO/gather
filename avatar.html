@@ -58,6 +58,7 @@ h3{font-size:13px;color:var(--mut);margin:14px 0 8px;text-transform:uppercase;le
 <script src="js/config.js"></script>
 <script src="js/dados.js"></script>
 <script src="js/avatar.js"></script>
+<script src="js/avatar-pixel.js"></script>
 <script>
 let EMAIL = null;
 let av = null, sheet = null, anim = 0, aba = "pele";
@@ -89,7 +90,7 @@ function painel(){
   if (aba === "pele") h = `<h3>Tom de pele</h3>` + swatches(Avatar.CAT.pele.cores, av.pele, `data-pele data-v`);
   if (aba === "rosto") h = `<h3>Olhos</h3>` + chips(Object.entries(Avatar.CAT.olhos.estilos), av.olhos, `data-olhos data-v`) + `<h3>Sobrancelha</h3>` + chips(Object.entries(Avatar.CAT.sobrancelha.estilos), av.sobrancelha, `data-sob data-v`);
   if (["cabelo","barba","cima","baixo","calcado"].includes(aba)) h = blocoEstilo(aba);
-  if (aba === "acess") h = blocoEstilo("oculos") + blocoEstilo("chapeu") + blocoEstilo("fone");
+  if (aba === "acess") h = blocoEstilo("oculos") + blocoEstilo("chapeu") + blocoEstilo("joia") + blocoEstilo("fone");
   p.innerHTML = h;
 }
 document.getElementById("panel").onclick = e => {

@@ -21,6 +21,8 @@
   const cores = [["#2f6fd8", "#1d4a99"], ["#7b4fd8", "#52309a"], ["#1f9e6e", "#13704d"], ["#d8682f", "#9a4419"], ["#c23a5a", "#86223c"],
     /* sala de Edição: Pena (roteirista), Claquete (cenas), Corte (editor) */ ["#e0b030", "#a07a14"], ["#3a3f4a", "#22262e"], ["#e04fa0", "#9c2a6c"]];
   cores.forEach(([c1, c2], i) => {
+    // com o gerador de personagens carregado, os agentes ficam no mesmo estilo das pessoas
+    if (window.AvatarPixel) { ASSETS["agente_" + (i + 1)] = { src: AvatarPixel.agente(c1, ["#2b2626", "#4a3022", "#7a4b2a", "#e0b860", "#d9772e", "#2b2626", "#8e2f2a", "#d96aa7"][i]).toDataURL(), w: 32, h: 40, label: "Agente de IA " + (i + 1), cat: "TI", pal: true }; return; }
     ASSETS["agente_" + (i + 1)] = { src: nova(32, 40, R => {
       R(9, 31, 14, 3, "#2b2f39"); R(15, 34, 2, 4, "#2b2f39"); R(10, 38, 12, 2, "#1d2028");          // cadeira
       R(7, 20, 18, 12, c2); R(8, 19, 16, 12, c1); R(6, 22, 3, 8, c2); R(23, 22, 3, 8, c2);              // corpo/braços

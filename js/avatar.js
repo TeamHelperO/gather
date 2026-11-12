@@ -62,6 +62,7 @@
       chapeu: { nome: "Chapéu", cores: pick(CLOTH, 6), arq: c => `P17_bone_chapeu/P17_chapeu_${c}.png` },
       gorro: { nome: "Gorro", cores: pick(CLOTH, 6), arq: c => `P17_bone_chapeu/P17_gorro_${c}.png` },
     } },
+    joia: { label: "Joias e bolsa", estilos: { nenhum: { nome: "Nenhum", cores: null, arq: null }, brincos: { nome: "Brincos", cores: null, arq: null }, colar: { nome: "Colar", cores: null, arq: null }, brincos_colar: { nome: "Brincos + colar", cores: null, arq: null }, bolsa: { nome: "Bolsa", cores: null, arq: null } } },
     fone: { label: "Fone de ouvido", estilos: { nao: { nome: "Sem fone", cores: null, arq: null }, sim: { nome: "Com fone", cores: null, arq: () => "P18_fone_de_ouvido/P18_fone.png" } } },
   };
 
@@ -69,14 +70,14 @@
     pele: "3", olhos: "1", sobrancelha: "1",
     cabelo: { estilo: "curto", cor: "castanho" }, barba: { estilo: "nenhuma", cor: "castanho" },
     cima: { estilo: "next", cor: "preta" }, baixo: { estilo: "calca", cor: "jeans" }, calcado: { estilo: "tenis", cor: "branco" },
-    oculos: { estilo: "nenhum" }, chapeu: { estilo: "nenhum", cor: "preto" }, fone: { estilo: "nao" },
+    oculos: { estilo: "nenhum" }, chapeu: { estilo: "nenhum", cor: "preto" }, fone: { estilo: "nao" }, joia: { estilo: "nenhum" },
   };
   const ORDEM = ["pele", "olhos", "sobrancelha", "barba", "baixo", "calcado", "cima", "cabelo", "oculos", "chapeu", "fone"];
 
   function aleatorio() {
     const r = o => { const k = Object.keys(o); return k[Math.floor(Math.random() * k.length)]; };
     const a = { pele: r(CAT.pele.cores), olhos: r(CAT.olhos.estilos), sobrancelha: r(CAT.sobrancelha.estilos) };
-    for (const p of ["cabelo", "barba", "cima", "baixo", "calcado", "oculos", "chapeu", "fone"]) {
+    for (const p of ["cabelo", "barba", "cima", "baixo", "calcado", "oculos", "chapeu", "fone", "joia"]) {
       let est = r(CAT[p].estilos);
       if (p === "barba" && Math.random() < 0.6) est = "nenhuma";
       if ((p === "oculos" || p === "chapeu") && Math.random() < 0.6) est = "nenhum";
@@ -111,6 +112,8 @@
   }
   /* Monta o spritesheet completo (canvas 192x336) a partir das camadas. */
   async function montar(av) {
+    // estilo novo: personagem desenhado em pixel art pelo gerador (js/avatar-pixel.js), com contorno, volume e expressões
+    if (window.AvatarPixel) return AvatarPixel.folha(av);
     const ims = await Promise.all(arquivos(av).map(carregar));
     const c = document.createElement("canvas"); c.width = 192; c.height = 336;
     const x = c.getContext("2d"); x.imageSmoothingEnabled = false;
