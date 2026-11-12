@@ -56,7 +56,7 @@ async function chamar(modelo, chave, n, mensagens, sinal) {
     method: "POST",
     headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json", Accept: "application/json" },
     // desliga o "raciocínio" (senão o modelo gasta os tokens pensando e não escreve a resposta)
-    body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.6, max_tokens: 4096, ...(semKw.has(modelo) ? {} : { chat_template_kwargs: { enable_thinking: false, thinking: false } }) }),
+    body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.75, max_tokens: 4096, ...(semKw.has(modelo) ? {} : { chat_template_kwargs: { enable_thinking: false, thinking: false } }) }),
     signal: AbortSignal.any([sinal, AbortSignal.timeout(Math.max(5000, restante() - 3000))]),
   }).catch(e => ({ ok: false, status: 0, text: async () => String(e) }));
   const reg = `${modelo} · chave ${n} · ${r.status} · ${((Date.now() - t0) / 1000).toFixed(1)}s`;
@@ -194,13 +194,14 @@ async function usuarioLogado(req) {
 }
 const texto = (v, n) => (v == null ? "" : String(v)).slice(0, n);
 
-async function roteirizar(t, formato, pedidoPor) {
+async function roteirizar(t, formato, pedidoPor, anterior) {
   await status("agente6", "escrevendo", `Roteiro sobre: ${texto(t.titulo, 120)}`);
   await status("agente7", "planejando cenas", "Esperando o roteiro do Pena");
   const { texto: resp, modelo, chave } = await perguntar([
     { role: "system", content: "/no_think\nVocê é uma dupla de criação de vídeos curtos para redes sociais: um roteirista e um diretor de cenas. Responda só com JSON válido, em português do Brasil." },
     { role: "user", content: `Crie um vídeo no formato "${formato}" sobre esta tendência de mercado, para uma agência/empresa digital brasileira:\n` +
       `Título: ${texto(t.titulo, 200)}\nResumo: ${texto(t.resumo, 800)}\nCategoria: ${texto(t.categoria, 60)}\n\n` +
+      (anterior ? `IMPORTANTE: é uma NOVA versão. A anterior foi recusada; faça outro ângulo, outro gancho e outras cenas. Não repita: título "${texto(anterior.titulo, 150)}", gancho "${texto(anterior.gancho, 200)}".\n\n` : "") +
       `Devolva: {"titulo": "título do vídeo", "gancho": "frase dos 3 primeiros segundos", "roteiro": "texto completo da narração", ` +
       `"cenas": [{"n": 1, "duracao": "0-3s", "visual": "o que aparece e como gravar (enquadramento, movimento, cenário, quem aparece)", "fala": "o que é dito", "texto_tela": "frase curta de impacto (até 6 palavras)", "audio": "música/efeito", ` +
       `"animacao": "uma destas: chat, grafico, dashboard, cadeado, celular, relogio, dinheiro, robo, integracao, pessoa, numero, alvo"}], ` +
@@ -227,6 +228,7 @@ async function roteirizar(t, formato, pedidoPor) {
   const r = await rpc("agente_roteiro", {
     p_chave: process.env.AGENTES_CHAVE, p_agente: "agente6", p_tendencia: t.id || null, p_titulo: texto(j.titulo || t.titulo, 200),
     p_gancho: texto(j.gancho, 500), p_roteiro: roteiro, p_formato: texto(formato, 60), p_cenas: cenas, p_pedido_por: pedidoPor,
+    ...(anterior && anterior.id ? { p_substitui: anterior.id } : {}),
   });
   if (!r.ok) throw new Error("Não consegui salvar o roteiro (" + r.status + "): " + (await r.text()).slice(0, 120));
   const id = await r.json();
@@ -245,7 +247,7 @@ module.exports = async (req, res) => {
     if (!chaves().length || !process.env.AGENTES_CHAVE) return res.status(200).json({ ok: false, erro: "Configure NVIDIA_API_KEYS e AGENTES_CHAVE na Vercel" });
     if (!corpo.tendencia || !corpo.tendencia.titulo) return res.status(400).json({ erro: "Escolha uma tendência" });
     INICIO.t = Date.now(); tentativas.length = 0; puladosNaRodada.clear();
-    try { return res.status(200).json({ ok: true, ...(await roteirizar(corpo.tendencia, texto(corpo.formato || "Reels/TikTok de 30 a 60 segundos", 60), uid)), tentativas }); }
+    try { return res.status(200).json({ ok: true, ...(await roteirizar(corpo.tendencia, texto(corpo.formato || "Reels/TikTok de 30 a 60 segundos", 60), uid, corpo.anterior || null)), tentativas }); }
     catch (e) { await status("agente6", "erro", e.message.slice(0, 140)); return res.status(200).json({ ok: false, erro: e.message, tentativas }); }
   }
   if (!(await autorizado(req))) return res.status(401).json({ erro: "Só administradores (ou o cron) podem rodar os agentes" });

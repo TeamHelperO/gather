@@ -28,8 +28,10 @@
 
 window.Edicao = (function () {
   let opt = null, roteiros = [], tend = [], painel = null, aba = "roteiros", aberto = null, pedindo = null, formato = "Reels/TikTok de 30 a 60 segundos";
+  let verDescartados = false, renderPendente = false;
+  const urls = new Map(); // caminho do vídeo → { url, ate }
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const STATUS = { rascunho: "📝 Rascunho", aprovado: "✅ Aprovado", gravando: "🎥 Gravando", publicado: "🚀 Publicado", descartado: "🗑️ Descartado" };
+  const STATUS = { rascunho: "📝 Rascunho", aguardando: "⏳ Aguardando aprovação", aprovado: "✅ Aprovado", gravando: "🎥 Gravando", publicado: "🚀 Publicado", descartado: "🗑️ Descartado" };
   const fmtQuando = d => { const dt = new Date(d), min = Math.round((Date.now() - dt) / 60000); return min < 1 ? "agora" : min < 60 ? `há ${min} min` : min < 1440 ? `há ${Math.round(min / 60)} h` : dt.toLocaleDateString("pt-BR"); };
 
   async function iniciar(o) {
@@ -40,7 +42,7 @@ window.Edicao = (function () {
   async function recarregar() {
     const [r, t] = await Promise.all([Dados.listarRoteiros ? Dados.listarRoteiros(100) : [], Dados.listarTendencias(150)]);
     roteiros = r || []; tend = t || [];
-    if (painel) render();
+    if (painel) render(false);
   }
 
   /* ---------------- sala ---------------- */
@@ -67,13 +69,13 @@ window.Edicao = (function () {
     }
     const pega = tend.filter(t => t.decisao === "pega").length;
     g.textAlign = "right"; g.fillText(pega ? `${pega} p/ roteirizar` : "", x + 182, y + 10.5); g.textAlign = "left";
-    const lista = roteiros.slice(0, 5);
+    const lista = roteiros.filter(r => r.status !== "descartado").slice(0, 5);
     if (!lista.length) {
       g.fillStyle = "#c9b4c8"; g.font = "6px system-ui,sans-serif"; g.textAlign = "center";
       g.fillText("Nenhum roteiro ainda", x + 96, y + 42); g.fillText("Toque para pedir um ao Pena ✍️", x + 96, y + 52);
     } else lista.forEach((r, i) => {
       const yy = y + 22 + i * 12;
-      g.fillStyle = { aprovado: "#3fbf5f", gravando: "#f2a33a", publicado: "#2fd4e8", descartado: "#6b6577" }[r.status] || "#e04fa0"; g.fillRect(x + 10, yy - 3, 3, 7);
+      g.fillStyle = { aguardando: "#f2a33a", aprovado: "#3fbf5f", gravando: "#8b6cff", publicado: "#2fd4e8", descartado: "#6b6577" }[r.status] || "#e04fa0"; g.fillRect(x + 10, yy - 3, 3, 7);
       g.fillStyle = "#fff"; g.font = "6px system-ui,sans-serif";
       let t = r.titulo || ""; while (t && g.measureText(t).width > 140) t = t.slice(0, -2);
       g.fillText(t + (t !== r.titulo ? "…" : ""), x + 17, yy);
@@ -109,8 +111,11 @@ window.Edicao = (function () {
   function escFechar(e) { if (e.key === "Escape") fecharPainel(); }
   function atualizar() { if (painel && opt && opt.eu && !dentroDaEdicao()) { fecharPainel(); opt.toast("Você saiu da Edição: os roteiros foram fechados"); } }
 
-  function render() {
+  const tocando = () => painel && [...painel.querySelectorAll("video")].some(v => !v.paused && !v.ended);
+  function render(forcar) {
     if (!painel) return;
+    if (!forcar && (gravacao || tocando())) { renderPendente = true; return; }
+    renderPendente = false;
     const win = painel.querySelector(".ed-win"), rol = (win.querySelector(".tend-lista") || {}).scrollTop || 0;
     const pegas = tend.filter(t => t.decisao === "pega"), feitas = new Set(roteiros.map(r => r.tendencia_id));
     win.innerHTML = `
@@ -118,12 +123,14 @@ window.Edicao = (function () {
         <div class="tend-agentes"><span class="ag on">✍️ Pena <small>roteiros</small></span><span class="ag on">🎥 Claquete <small>cenas</small></span><span class="ag on">✂️ Corte <small>vídeo</small></span></div>
         <button class="tend-x" data-fechar aria-label="Fechar">✕</button></div>
       <div class="tend-barra">
-        <button class="tab ${aba === "roteiros" ? "on" : ""}" data-aba="roteiros">🎬 Roteiros <i>${roteiros.length}</i></button>
+        <button class="tab ${aba === "roteiros" ? "on" : ""}" data-aba="roteiros">🎬 Roteiros <i>${roteiros.filter(r => r.status !== "descartado").length}</i></button>
+        ${roteiros.some(r => r.status === "aguardando") ? `<span class="chip ed-aguarda">⏳ ${roteiros.filter(r => r.status === "aguardando").length} vídeo(s) para aprovar</span>` : ""}
         <button class="tab ${aba === "pedir" ? "on" : ""}" data-aba="pedir">✍️ Pedir roteiro <i>${pegas.filter(t => !feitas.has(t.id)).length}</i></button>
         <select data-formato title="Formato do vídeo">${["Reels/TikTok de 30 a 60 segundos", "Shorts de até 30 segundos", "Carrossel narrado de 60 a 90 segundos", "Vídeo para YouTube de 3 a 5 minutos", "Anúncio (Meta Ads) de 15 a 30 segundos"].map(f => `<option ${f === formato ? "selected" : ""}>${f}</option>`).join("")}</select>
       </div>
       <div class="tend-lista">${aba === "pedir" ? listaPedir(pegas, feitas) : listaRoteiros()}</div>`;
     const l = win.querySelector(".tend-lista"); if (l) l.scrollTop = rol;
+    carregarPlayers();
   }
   function listaPedir(pegas, feitas) {
     const outras = tend.filter(t => t.decisao === "pendente").slice(0, 10);
@@ -137,20 +144,34 @@ window.Edicao = (function () {
       + (outras.length ? `<p class="ed-dica">Ou escolha uma ainda não avaliada:</p>` + outras.map(t => item(t, false)).join("") : "");
   }
   function listaRoteiros() {
-    if (!roteiros.length) return `<p class="tend-vazio">Ainda não há roteiros. Vá em <b>✍️ Pedir roteiro</b> e escolha uma tendência.</p>`;
-    const adm = Dados.ehAdmin();
-    return roteiros.map(r => {
-      const exp = aberto === r.id, cenas = r.cenas || [];
+    const visiveis = roteiros.filter(r => verDescartados || r.status !== "descartado");
+    const ndesc = roteiros.length - roteiros.filter(r => r.status !== "descartado").length;
+    const extra = ndesc ? `<p class="ed-dica"><label class="ed-voz"><input type="checkbox" data-ver-desc ${verDescartados ? "checked" : ""}> mostrar ${ndesc} versão(ões) descartada(s)</label></p>` : "";
+    if (!visiveis.length) return extra + `<p class="tend-vazio">Ainda não há roteiros. Vá em <b>✍️ Pedir roteiro</b> e escolha uma tendência.</p>`;
+    const adm = Dados.ehAdmin(), ocupado = !!(gravacao || pedindo);
+    // os que esperam aprovação primeiro
+    const ordem = { aguardando: 0, rascunho: 1, aprovado: 2, gravando: 3, publicado: 4, descartado: 5 };
+    return extra + visiveis.slice().sort((a, b) => (ordem[a.status] ?? 9) - (ordem[b.status] ?? 9) || new Date(b.criado_em) - new Date(a.criado_em)).map(r => {
+      const exp = aberto === r.id, cenas = r.cenas || [], temVideo = !!r.video_path;
+      const versao = r.substitui ? `<span class="chip">🔁 nova versão</span>` : "";
       return `<article class="tc ed-rot ${r.status}" data-id="${r.id}">
-        <div class="tc-top"><b>${esc(r.titulo)}</b><span class="chip">${esc(r.formato || "")}</span></div>
-        <div class="tc-meta"><span>✍️ Pena</span><span>${cenas.length} cenas</span><span>${fmtQuando(r.criado_em)}</span>
-          <select data-status="${r.id}">${Object.entries(STATUS).map(([k, l]) => `<option value="${k}" ${r.status === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div class="tc-top"><b>${esc(r.titulo)}</b></div>
+        <div class="tc-meta"><span class="ed-st ${r.status}">${STATUS[r.status] || r.status}</span>${versao}<span class="chip">${esc((r.formato || "").split(" de ")[0])}</span><span>${cenas.length} cenas</span><span>${fmtQuando(r.criado_em)}</span>
+          <select data-status="${r.id}" title="Mudar status">${Object.entries(STATUS).map(([k, l]) => `<option value="${k}" ${r.status === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
         ${r.gancho ? `<p class="ed-gancho">🪝 ${esc(r.gancho)}</p>` : ""}
+        ${temVideo ? `<div class="ed-salvo"><video class="ed-canvas" data-player="${esc(r.video_path)}" controls playsinline preload="metadata"></video>
+          <div class="ed-salvo-acoes"><small>💾 Vídeo salvo ${r.video_em ? fmtQuando(r.video_em) : ""}</small>
+            ${r.status === "aguardando" ? `<button class="btn ok" data-aprovar="${r.id}">✅ Aprovar vídeo</button>` : ""}
+            ${r.status !== "descartado" ? `<button class="btn" data-recriar="${r.id}" ${ocupado ? "disabled" : ""} title="O Pena escreve um roteiro novo, o Claquete refaz as cenas e o Corte gera outro vídeo">🔁 Recriar (novo roteiro e cenas)</button>` : ""}
+            <a class="btn" data-baixar="${esc(r.video_path)}" href="#" download>⬇️ Baixar</a></div></div>` : ""}
         <div class="tc-acoes"><button class="btn" data-abrir="${r.id}">${exp ? "▲ Fechar" : "▼ Roteiro e cenas"}</button>
-          <button class="btn pri" data-video="${r.id}">🎞️ Gerar vídeo animado</button>
+          ${!temVideo && r.status !== "descartado" ? `<button class="btn pri" data-video="${r.id}" ${ocupado ? "disabled" : ""}>🎞️ Gerar vídeo</button>
+          <button class="btn" data-recriar="${r.id}" ${ocupado ? "disabled" : ""}>🔁 Recriar</button>` : ""}
+          ${temVideo && r.status !== "descartado" ? `<button class="btn" data-video="${r.id}" ${ocupado ? "disabled" : ""} title="Gera de novo o vídeo deste mesmo roteiro">🎞️ Refazer só o vídeo</button>` : ""}
           <label class="ed-voz" title="Narração em português gerada no seu navegador"><input type="checkbox" data-voz ${comVoz ? "checked" : ""}> 🎙️ com voz</label>
           <button class="btn" data-copiar="${r.id}">📋 Copiar</button>
           ${adm ? `<button class="btn" data-excluir="${r.id}" title="Excluir">🗑️</button>` : ""}</div>
+        <div class="ed-video" data-video-area="${r.id}"></div>
         ${exp ? `<div class="ed-detalhe">
           ${r.roteiro ? `<h4>Narração</h4><p class="ed-texto">${esc(r.roteiro)}</p>` : ""}
           <h4>Cenas</h4>
@@ -159,10 +180,19 @@ window.Edicao = (function () {
             ${c.fala ? `<div><span>🗣️ Fala</span>${esc(c.fala)}</div>` : ""}
             ${c.texto_tela ? `<div><span>🔤 Na tela</span>${esc(c.texto_tela)}</div>` : ""}
             ${c.audio ? `<div><span>🎵 Áudio</span>${esc(c.audio)}</div>` : ""}
-            <div><span>✨ Animação</span>${esc(window.Video ? Video.escolherTipo(c, c.n - 1) : c.animacao || "")}</div></div>`).join("")}</div>
-          <div class="ed-video" data-video-area="${r.id}"></div></div>` : ""}
+            <div><span>✨ Animação</span>${esc(window.Video ? Video.escolherTipo(c, c.n - 1) : c.animacao || "")}</div></div>`).join("")}</div></div>` : ""}
       </article>`;
     }).join("");
+  }
+  // links temporários (1 h) dos vídeos salvos
+  async function urlDe(caminho) {
+    const c = urls.get(caminho); if (c && c.ate > Date.now()) return c.url;
+    const url = await Dados.urlVideo(caminho); urls.set(caminho, { url, ate: Date.now() + 50 * 60000 }); return url;
+  }
+  async function carregarPlayers() {
+    if (!painel) return;
+    for (const v of painel.querySelectorAll("video[data-player]")) if (!v.src) urlDe(v.dataset.player).then(u => { v.src = u; }).catch(() => {});
+    for (const a of painel.querySelectorAll("a[data-baixar]")) urlDe(a.dataset.baixar).then(u => { a.href = u; }).catch(() => {});
   }
   const textoRoteiro = r => `${r.titulo}\n${r.formato || ""}\n\nGANCHO: ${r.gancho || ""}\n\nNARRAÇÃO:\n${r.roteiro || ""}\n\nCENAS:\n` +
     (r.cenas || []).map(c => `Cena ${c.n} (${c.duracao})\n  Como gravar: ${c.visual}\n  Fala: ${c.fala || "-"}\n  Na tela: ${c.texto_tela || "-"}\n  Áudio: ${c.audio || "-"}`).join("\n\n");
@@ -171,9 +201,11 @@ window.Edicao = (function () {
     const b = e.target;
     if (b === painel || b.closest("[data-fechar]")) return fecharPainel();
     const q = sel => b.closest(sel);
-    if (q("[data-aba]")) { aba = q("[data-aba]").dataset.aba; return render(); }
-    if (q("[data-abrir]")) { const id = q("[data-abrir]").dataset.abrir; aberto = aberto === id ? null : id; pararVideo(); return render(); }
-    if (q("[data-pedir]")) return pedir(q("[data-pedir]").dataset.pedir);
+    if (q("[data-aba]")) { aba = q("[data-aba]").dataset.aba; return render(true); }
+    if (q("[data-abrir]")) { const id = q("[data-abrir]").dataset.abrir; aberto = aberto === id ? null : id; return render(true); }
+    if (q("[data-pedir]")) { const t = tend.find(x => x.id === q("[data-pedir]").dataset.pedir); return t && produzir(t, null); }
+    if (q("[data-aprovar]")) { const id = q("[data-aprovar]").dataset.aprovar; try { await Dados.mexerRoteiro(id, "aprovado"); opt.toast("✅ Vídeo aprovado"); Dados.registrarAtividade(null, "acao", "Aprovou vídeo: " + (roteiros.find(x => x.id === id) || {}).titulo, { sala: "Edição" }); } catch (er) { opt.toast("Não consegui aprovar"); } await recarregar(); return render(true); }
+    if (q("[data-recriar]")) return recriar(roteiros.find(x => x.id === q("[data-recriar]").dataset.recriar));
     if (q("[data-copiar]")) { const r = roteiros.find(x => x.id === q("[data-copiar]").dataset.copiar); try { await navigator.clipboard.writeText(textoRoteiro(r)); opt.toast("📋 Roteiro copiado"); } catch (er) { opt.toast("Não consegui copiar"); } return; }
     if (q("[data-excluir]")) { const id = q("[data-excluir]").dataset.excluir; try { await Dados.excluirRoteiro(id); opt.toast("Roteiro excluído"); await recarregar(); } catch (er) { opt.toast("Não consegui excluir"); } return; }
     if (q("[data-video]")) { const id = q("[data-video]").dataset.video; if (aberto !== id) { aberto = id; render(); } return gerarVideo(roteiros.find(x => x.id === id)); }
@@ -181,27 +213,40 @@ window.Edicao = (function () {
   async function aoMudar(e) {
     if (e.target.matches("[data-formato]")) { formato = e.target.value; return; }
     if (e.target.matches("[data-voz]")) { comVoz = e.target.checked; return; }
+    if (e.target.matches("[data-ver-desc]")) { verDescartados = e.target.checked; return render(true); }
     if (e.target.matches("[data-status]")) {
       try { await Dados.mexerRoteiro(e.target.dataset.status, e.target.value); opt.toast("Status: " + STATUS[e.target.value]); }
       catch (er) { opt.toast("Não consegui mudar o status"); }
       recarregar();
     }
   }
-  async function pedir(id) {
-    if (pedindo) return;
-    const t = tend.find(x => x.id === id); if (!t) return;
-    pedindo = id; render();
-    opt.toast("✍️ Pena está escrevendo o roteiro e Claquete detalhando as cenas (até 1 min)…");
+  // Pena (roteiro) → Claquete (cenas) → Corte (vídeo salvo para aprovação)
+  async function produzir(t, anterior) {
+    if (pedindo || gravacao) { opt.toast("Espere o vídeo atual terminar"); return; }
+    pedindo = t.id || "x"; render(true);
+    opt.toast(anterior ? "🔁 Recriando: novo roteiro, novas cenas e novo vídeo…" : "✍️ Pena está escrevendo o roteiro e Claquete detalhando as cenas (até 1 min)…");
+    let novoId = null;
     try {
       const token = await Dados.token();
       const r = await fetch("/api/agentes", { method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
-        body: JSON.stringify({ acao: "roteiro", formato, tendencia: { id: t.id, titulo: t.titulo, resumo: t.resumo, categoria: t.categoria } }) });
+        body: JSON.stringify({ acao: "roteiro", formato, tendencia: { id: t.id || null, titulo: t.titulo, resumo: t.resumo, categoria: t.categoria },
+          anterior: anterior ? { id: anterior.id, titulo: anterior.titulo, gancho: anterior.gancho } : null }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.ok) opt.toast("✍️ " + (j.erro || "Não consegui gerar o roteiro (" + r.status + ")"));
-      else { opt.toast(`🎬 Roteiro pronto com ${j.cenas} cenas`); aba = "roteiros"; aberto = j.id; }
-      Dados.registrarAtividade(null, "acao", `Pediu roteiro: ${t.titulo}`, { sala: "Edição" });
+      else { novoId = j.id; opt.toast(`🎬 Roteiro pronto com ${j.cenas} cenas. Corte vai gerar o vídeo…`); aba = "roteiros"; aberto = null; }
+      Dados.registrarAtividade(null, "acao", `${anterior ? "Recriou" : "Pediu"} roteiro: ${t.titulo}`, { sala: "Edição" });
     } catch (er) { opt.toast("✍️ Falha ao chamar o roteirista"); }
-    pedindo = null; await recarregar(); render();
+    pedindo = null; await recarregar();
+    if (anterior && novoId && anterior.status !== "descartado") { await Dados.mexerRoteiro(anterior.id, "descartado").catch(() => {}); await recarregar(); }
+    render(true);
+    // já gera e salva o vídeo do roteiro novo
+    const novo = novoId && roteiros.find(x => x.id === novoId);
+    if (novo) gerarVideo(novo);
+  }
+  function recriar(r) {
+    if (!r) return;
+    const t = tend.find(x => x.id === r.tendencia_id) || { id: r.tendencia_id, titulo: r.titulo, resumo: r.gancho || r.roteiro, categoria: "" };
+    return produzir(t, r);
   }
 
   /* ---------------- vídeo animado (js/video.js) ---------------- */
@@ -222,15 +267,26 @@ window.Edicao = (function () {
         cancelado: () => eu.cancelado,
       });
       if (!res || eu.cancelado) return;
-      gravacao = null;
       const url = URL.createObjectURL(res.blob);
       const nome = (r.titulo || "roteiro").normalize("NFD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").toLowerCase().slice(0, 50);
       area.innerHTML = `<p class="ed-dica">✂️ Vídeo animado pronto (${Math.round(res.duracao)} s, ${res.comVoz ? "com narração e trilha sonora" : "com trilha sonora"}).</p>
         ${res.aviso ? `<p class="ed-dica">⚠️ ${esc(res.aviso)}</p>` : ""}
         <video class="ed-canvas" src="${url}" controls playsinline></video>
-        <a class="btn pri" href="${url}" download="${nome}.${res.ext}">⬇️ Baixar vídeo (.${res.ext})</a>`;
+        <a class="btn pri" href="${url}" download="${nome}.${res.ext}">⬇️ Baixar vídeo (.${res.ext})</a>
+        <p class="ed-dica" data-salvando>💾 Salvando para aprovação…</p>`;
       Dados.registrarAtividade(null, "acao", `Gerou vídeo animado: ${r.titulo}`, { sala: "Edição" });
+      // sempre fica salvo, aguardando aprovação
+      try {
+        await Dados.salvarVideo(r.id, res.blob, res.ext);
+        opt.toast("💾 Vídeo salvo — aguardando aprovação");
+        gravacao = null; URL.revokeObjectURL(url); await recarregar(); render(true);
+      } catch (er) {
+        console.warn("salvar vídeo:", er);
+        const e2 = area.querySelector("[data-salvando]"); if (e2) e2.textContent = "⚠️ Não consegui salvar o vídeo (" + (er.message || er) + "). Baixe agora para não perder.";
+        gravacao = null;
+      }
     } catch (e) { area.innerHTML = `<p class="ed-dica">⚠️ ${esc(e.message || "Não consegui gerar o vídeo")}</p>`; gravacao = null; }
+    if (renderPendente) render(false);
   }
 
   return { iniciar, recarregar, desenhaveis, clicou, abrirPainel, fecharPainel, atualizar, get aberto() { return !!painel; } };

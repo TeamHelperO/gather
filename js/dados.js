@@ -185,6 +185,15 @@
     async listarRoteiros(limite = 100) { const { data } = await sb.from("roteiros").select("*").order("criado_em", { ascending: false }).limit(limite); return data || []; },
     ouvirRoteiros(cb) { return sb.channel("rot-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "roteiros" }, () => cb()).subscribe(); },
     async mexerRoteiro(id, status) { const { data, error } = await sb.rpc("mexer_roteiro", { p_id: id, p_status: status }); if (error) throw error; return data; },
+    // vídeo do roteiro: sobe para o Storage (bucket "videos") e deixa o roteiro "aguardando aprovação"
+    async salvarVideo(id, blob, ext) {
+      const caminho = `${id}/${Date.now()}.${ext}`;
+      const { error } = await sb.storage.from("videos").upload(caminho, blob, { contentType: blob.type || ("video/" + ext), upsert: false });
+      if (error) throw error;
+      const { data, error: e2 } = await sb.rpc("salvar_video", { p_id: id, p_path: caminho, p_tipo: blob.type || ext });
+      if (e2) throw e2; return data;
+    },
+    async urlVideo(caminho) { const { data, error } = await sb.storage.from("videos").createSignedUrl(caminho, 3600); if (error) throw error; return data.signedUrl; },
     async excluirRoteiro(id) { const { error } = await sb.from("roteiros").delete().eq("id", id); if (error) throw error; },
     async listarAgentes() { const { data } = await sb.from("agentes").select("*").order("id"); return data || []; },
     ouvirAgentes(cb) { return sb.channel("agentes-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "agentes" }, () => cb()).subscribe(); },
