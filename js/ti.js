@@ -59,7 +59,7 @@ window.TI = (function () {
     const out = [];
     for (const it of allItems()) {
       if (it.k === "rack_servidor") out.push({ sort: sortKey(it) + 0.01, draw: g => leds(g, it, t) });
-      else if (it.k === "telao_tend") out.push({ sort: sortKey(it) + 0.01, draw: g => tela(g, Math.round(it.x * T), Math.round(it.y * T), t) });
+      else if (it.k === "telao_tend") out.push({ sort: sortKey(it) + 0.01, draw: g => tela(g, Math.round(it.x * T), Math.round(it.y * T), t, it) });
     }
     return out;
   }
@@ -73,7 +73,22 @@ window.TI = (function () {
       if (Math.sin(t * 9 + i + s) > 0.85) { g.fillStyle = "#ffb04a"; g.fillRect(x + 26, yy, 1, 1); }
     }
   }
-  function tela(g, x, y, t) {
+  /* recursos da TI só para quem está dentro da sala */
+  const salaDoIt = it => (it.room && roomById(it.room)) || roomAt(it.x * T + 16, it.y * T + 40);
+  const minhaSala = () => { const e = opt && opt.eu && opt.eu(); const r = e && roomAt(e.px, e.py - 4); return r ? r.id : null; };
+  const dentro = it => { const r = salaDoIt(it); return !r || r.id === minhaSala(); };
+  const dentroDaTI = () => { const id = minhaSala(), r = id && roomById(id); return !!(r && r.type === "ti"); };
+  function tela(g, x, y, t, it) {
+    if (it && !dentro(it)) {
+      g.save();
+      g.fillStyle = "#0f1622"; g.fillRect(x + 6, y + 6, 180, 77);
+      g.fillStyle = "#13a6b8"; g.fillRect(x + 6, y + 6, 180, 9);
+      g.fillStyle = "#fff"; g.font = "bold 7px system-ui,sans-serif"; g.textBaseline = "middle";
+      g.fillText("TENDÊNCIAS DE MERCADO", x + 10, y + 10.5);
+      g.textAlign = "center"; g.fillStyle = "#9fb3c8"; g.font = "bold 8px system-ui,sans-serif";
+      g.fillText("🔒 Só para quem está na sala", x + 96, y + 46);
+      g.restore(); return;
+    }
     g.save();
     g.fillStyle = "#0f1622"; g.fillRect(x + 6, y + 6, 180, 77);
     g.fillStyle = "#13a6b8"; g.fillRect(x + 6, y + 6, 180, 9);
@@ -118,8 +133,13 @@ window.TI = (function () {
   /* clique no mapa (coordenadas do mundo) */
   function clicou(wx, wy) {
     for (const it of allItems()) {
-      if (it.k === "telao_tend" && wx >= it.x * T && wx <= it.x * T + 192 && wy >= it.y * T && wy <= it.y * T + 90) { abrirPainel(); return true; }
+      if (it.k === "telao_tend" && wx >= it.x * T && wx <= it.x * T + 192 && wy >= it.y * T && wy <= it.y * T + 90) {
+        const r = salaDoIt(it);
+        if (!dentro(it)) { opt.toast(`🔒 Entre em ${r ? r.name : "TI"} para usar o painel de tendências`); return true; }
+        abrirPainel(); return true;
+      }
       if (/^agente_\d$/.test(it.k) && it.agente && wx >= it.x * T && wx <= it.x * T + 32 && wy >= it.y * T - 8 && wy <= it.y * T + 40) {
+        if (!dentro(it)) { opt.toast("🔒 Entre na sala de TI para falar com os agentes"); return true; }
         const a = agenteInfo(it.agente);
         opt.toast(`🤖 ${a.nome}: ${online(a) ? (a.detalhe || a.status) : "parado (sem sinal há mais de 15 min)"}`);
         return true;
@@ -131,6 +151,7 @@ window.TI = (function () {
   /* ---------------- painel ---------------- */
   function abrirPainel() {
     if (painel) return;
+    if (opt && opt.eu && !dentroDaTI()) { opt.toast("🔒 O painel de tendências só abre dentro da sala de TI"); return; }
     painel = document.createElement("div");
     painel.className = "tend-bg";
     painel.innerHTML = `<div class="tend-win" role="dialog" aria-label="Tendências de mercado"></div>`;
@@ -217,5 +238,7 @@ window.TI = (function () {
   const seguro = u => /^https?:\/\//i.test(u) ? u : "https://" + u.replace(/^[a-z]+:/i, "");
   function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); }
 
-  return { iniciar, desenhaveis, nomes, clicou, abrirPainel, fecharPainel, get aberto() { return !!painel; } };
+  // fecha o painel se a pessoa sair da sala de TI
+  function atualizar() { if (painel && opt && opt.eu && !dentroDaTI()) { fecharPainel(); opt.toast("Você saiu da TI: o painel de tendências foi fechado"); } }
+  return { iniciar, desenhaveis, nomes, clicou, abrirPainel, fecharPainel, atualizar, get aberto() { return !!painel; } };
 })();

@@ -222,7 +222,7 @@ async function boot(){
   spawn();
   Projecao.iniciar({ eu: () => P, outros: () => outros, toast, registrar: (d, sala) => Dados.registrarAtividade(EMAIL, "acao", d, {sala}) });
   Palco.iniciar({ eu: () => P, outros: () => outros, toast, aoMudarAudio: () => atualizarBotaoAudio() });
-  TI.iniciar({ toast, aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
+  TI.iniciar({ eu: () => P, toast, aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
   conectarSala();
   document.getElementById("load").remove();
   ligarAudioAuto();
@@ -315,6 +315,14 @@ function atualizarBotaoAudio(){
   else b.textContent = Voz.micAberto ? "🎙️ Microfone ligado" : "🔇 Microfone mudo";
   b.classList.toggle("mudo", Voz.ligado && !Voz.micAberto);
 }
+function telaoTrancado(g, x, y, r){
+  g.save(); g.fillStyle = "#1d1b26"; g.fillRect(x + 6, y + 6, 180, 77);
+  g.fillStyle = "#3d5afe"; g.fillRect(x + 6, y + 6, 180, 9);
+  g.fillStyle = "#fff"; g.font = "bold 7px system-ui,sans-serif"; g.textBaseline = "middle";
+  g.fillText(r ? "TELÃO · " + r.name.toUpperCase() : "TELÃO DA EQUIPE", x + 10, y + 10.5);
+  g.textAlign = "center"; g.fillStyle = "#b9b4c8"; g.font = "bold 8px system-ui,sans-serif";
+  g.fillText("🔒 Só para quem está na sala", x + 96, y + 46); g.restore();
+}
 function verTelaDe(pessoa){
   if (Math.hypot(pessoa.px - P.px, pessoa.py - P.py) > 170){ toast(`Chegue perto de ${pessoa.nome} para ver a tela`); return; }
   Projecao.abrirTelaDe(pessoa);
@@ -323,11 +331,18 @@ function verTelaDe(pessoa){
 /* cada sala tem o seu telão de tarefas */
 const salaPadrao = () => { const r = S && S.rooms.find(r => r.type === "trabalho"); return r ? r.id : null; };
 const salaDoTelao = it => (it.room && roomById(it.room)) || roomAt(it.x*T + 96, it.y*T + 110) || roomAt(it.x*T + 96, it.y*T + 140);
-let telaoPerto = null;
+let telaoPerto = null, telaoSalaAberta = null;
+/* recursos de cada sala só para quem está dentro dela */
+const salaAtualId = () => { const r = P && roomAt(P.px, P.py - 4); return r ? r.id : null; };
+const dentroDoTelao = it => { const r = salaDoTelao(it); return !r || r.id === salaAtualId(); };
 function abrirTelao(it){
-  if (Telao.aberto) return; keys.clear(); joyV = null; if (P) P.path = null;
-  if (!it || !it.k) it = telaoPerto || teloes.find(t => { const r = salaDoTelao(t); return r && r.name === P.sala; }) || teloes[0];
-  const r = it && salaDoTelao(it);
+  if (Telao.aberto) return;
+  if (!it || !it.k) it = telaoPerto || teloes.find(t => { const r = salaDoTelao(t); return r && r.id === salaAtualId(); });
+  if (!it){ toast("🔒 Esta sala não tem telão — entre numa sala com telão para usá-lo"); return; }
+  const r = salaDoTelao(it);
+  if (!dentroDoTelao(it)){ toast(`🔒 Entre em ${r ? r.name : "na sala"} para usar o telão dela`); return; }
+  keys.clear(); joyV = null; if (P) P.path = null;
+  telaoSalaAberta = r ? r.id : null;
   Dados.registrarAtividade(EMAIL, "telao", `Abriu o telão${r ? " de " + r.name : ""}`, {sala: r ? r.name : null});
   Telao.abrir({ email: EMAIL, nome: user.nome, aoFechar: atualizarTarefas, sala: r ? r.id : null, nomeSala: r ? r.name : "", salaPadrao: salaPadrao() });
 }
@@ -470,7 +485,9 @@ function loop(now){
     conversasLog[o.nome] = agora;
     Dados.registrarAtividade(EMAIL, "conversa", `Conversou com ${o.nome}${P.sala ? " em " + P.sala : ""}`, {sala: P.sala, com: o.nome});
   });
-  telaoPerto = teloes.find(it => Math.hypot(it.x*T + 96 - P.px, it.y*T + 96 - P.py) < 120) || null;
+  telaoPerto = teloes.find(it => dentroDoTelao(it) && Math.hypot(it.x*T + 96 - P.px, it.y*T + 96 - P.py) < 120) || null;
+  if (Telao.aberto && telaoSalaAberta && salaAtualId() !== telaoSalaAberta){ telaoSalaAberta = null; Telao.fechar(); toast("Você saiu da sala: o telão foi fechado"); }
+  TI.atualizar();
   const perto = !!telaoPerto;
   const bt = document.getElementById("btnTelao"); const mostra = perto && !Telao.aberto ? "block" : "none"; if (bt.style.display !== mostra) bt.style.display = mostra;
   for (const a of [P, ...visiveis]){ a.vozReal = now - (a.vozAtiva || -1e9) < 350; if (Voz.ligado) a.falando = a.vozReal; else if (a.vozReal) a.falando = true; }
@@ -506,7 +523,7 @@ function draw(){
   const ligados = new Set(monitoresTI); for (const a of atores) if (a.assento && a.assento.trabalho) for (const m of a.assento.monitores) ligados.add(m.x + "," + m.y);
   ctx.imageSmoothingEnabled = false;
   ctx.setTransform(zoom*DPR, 0, 0, zoom*DPR, c.ox*DPR, c.oy*DPR);
-  drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => { const r = salaDoTelao(it); Telao.desenharTela(g, it.x*T, it.y*T, r ? Telao.filtrarSala(tarefas, r.id, salaPadrao()) : tarefas, r ? "TELÃO · " + r.name.toUpperCase() : "TELÃO DA EQUIPE"); } })))
+  drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => { const r = salaDoTelao(it); if (!dentroDoTelao(it)){ telaoTrancado(g, it.x*T, it.y*T, r); return; } Telao.desenharTela(g, it.x*T, it.y*T, r ? Telao.filtrarSala(tarefas, r.id, salaPadrao()) : tarefas, r ? "TELÃO · " + r.name.toUpperCase() : "TELÃO DA EQUIPE"); } })))
     .concat(monitores.map(it => ({ sort: sortKey(it) + 0.01, draw: g => desenharMonitor(g, it, ligados.has(it.x + "," + it.y), t) })))
     .concat(Projecao.desenhaveis()).concat(TI.desenhaveis(t)));
   for (const a of atores) a.balao(ctx, t);

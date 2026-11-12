@@ -57,6 +57,16 @@ window.Projecao = (function () {
     ? opt.outros().find(o => o.visto && o.id === chave.slice(5) && o.tela)
     : opt.outros().find(o => o.visto && o.proj === chave && podePalestrar(o, chave))) || null;
   const naMesa = a => !!(a && a.assento && a.assento.trabalho);
+  /* recursos da sala só para quem está dentro dela */
+  const salaDe = a => { const r = a && roomAt(a.px, a.py - 4); return r ? r.id : null; };
+  // sala onde a transmissão acontece: a do telão, ou a sala onde está quem mostra a tela da mesa
+  function salaDaChave(chave) {
+    if (!String(chave).startsWith("mesa:")) return chave;
+    const id = chave.slice(5), eu = opt.eu();
+    if (eu && eu.id === id) return salaDe(eu);
+    const o = opt.outros().find(o => o.id === id); return o ? salaDe(o) : null;
+  }
+  const podeVer = (a, chave) => { const s = salaDaChave(chave); return !!s && salaDe(a) === s; };
   const ice = () => (window.Voz && Voz.iceServers) || CONFIG.ICE || [];
   const podeCompartilhar = () => !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
 
@@ -100,6 +110,8 @@ window.Projecao = (function () {
   }
   async function aoPedido(msg) { // alguém quer assistir
     if (!share || msg.sala !== share.sala) { Sala.sinal(msg.from, { canal: "proj", tipo: "fim", sala: msg.sala }); return; }
+    const quem = opt.outros().find(o => o.id === msg.from);
+    if (!quem || !podeVer(quem, share.sala)) { Sala.sinal(msg.from, { canal: "proj", tipo: "fim", sala: msg.sala }); return; }
     const velho = share.viewers.get(msg.from); if (velho) { try { velho.close(); } catch (e) {} }
     const pc = new RTCPeerConnection({ iceServers: ice() });
     share.viewers.set(msg.from, pc);
@@ -183,7 +195,14 @@ window.Projecao = (function () {
       else if (!foraDoPalcoDesde) foraDoPalcoDesde = agora;
       else if (agora - foraDoPalcoDesde > 2000) { const m = share.tipo === "mesa"; parar(false); opt.toast(m ? "Você levantou da mesa: sua tela foi fechada" : "Você saiu do palco: a apresentação foi encerrada"); }
     }
-    // assistir: quem está na sala do telão, ou com a janela aberta
+    // quem saiu da sala deixa de receber a transmissão
+    if (share) for (const [id, pc] of [...share.viewers]) {
+      const o = opt.outros().find(o => o.id === id);
+      if (!o || !podeVer(o, share.sala)) { try { pc.close(); } catch (e) {} share.viewers.delete(id); Sala.sinal(id, { canal: "proj", tipo: "fim", sala: share.sala }); }
+    }
+    // a janela fecha se eu sair da sala
+    if (popup && !podeVer(eu, popup.sala)) { const m = String(popup.sala).startsWith("mesa:"); fecharPopup(); opt.toast(m ? "Você saiu da sala: a tela do colega foi fechada" : "Você saiu da sala: a projeção foi fechada"); }
+    // assistir: só quem está na sala do telão
     const minhaSala = roomAt(eu.px, eu.py - 4);
     const queroVer = new Map();
     for (const salaId of salasComTelao()) {
@@ -241,7 +260,11 @@ window.Projecao = (function () {
       return;
     }
     g.save(); g.textAlign = "center"; g.textBaseline = "middle";
-    if (ap) {
+    if (ap && !(sala && podeVer(opt.eu(), sala))) {
+      g.fillStyle = "#1d1b26"; g.fillRect(x, y, w, h);
+      g.fillStyle = "#fff"; g.font = "bold 9px system-ui,sans-serif"; g.fillText("🔒 Apresentação em andamento", x + w / 2, y + h / 2 - 8);
+      g.fillStyle = "#b9b4c8"; g.font = "7px system-ui,sans-serif"; g.fillText("Só para quem está na sala", x + w / 2, y + h / 2 + 8);
+    } else if (ap) {
       g.fillStyle = "#1d1b26"; g.fillRect(x, y, w, h);
       g.fillStyle = "#fff"; g.font = "bold 9px system-ui,sans-serif"; g.fillText(`🎬 ${ap.nome} está apresentando`, x + w / 2, y + h / 2 - 8);
       g.fillStyle = "#b9b4c8"; g.font = "7px system-ui,sans-serif";
@@ -261,7 +284,11 @@ window.Projecao = (function () {
   /* clique no mapa (coordenadas do mundo) */
   function clicou(wx, wy) {
     for (const it of itens) {
-      if (wx >= it.x * T && wx <= it.x * T + 192 && wy >= it.y * T && wy <= it.y * T + 120) { const r = salaDoItem(it); abrirPopup(r ? r.id : null, r ? r.name : "Auditório"); return true; }
+      if (wx >= it.x * T && wx <= it.x * T + 192 && wy >= it.y * T && wy <= it.y * T + 120) {
+        const r = salaDoItem(it);
+        if (r && !podeVer(opt.eu(), r.id)) { opt.toast(`🔒 Entre em ${r.name} para ver o telão`); return true; }
+        abrirPopup(r ? r.id : null, r ? r.name : "Auditório"); return true;
+      }
     }
     return false;
   }
@@ -269,7 +296,10 @@ window.Projecao = (function () {
 
   /* ---------------- janela (popup) ---------------- */
   /* tela do computador de um colega (ele precisa estar perto) */
-  function abrirTelaDe(pessoa) { abrirPopup("mesa:" + pessoa.id, "Tela de " + pessoa.nome, true); }
+  function abrirTelaDe(pessoa) {
+    if (!podeVer(opt.eu(), "mesa:" + pessoa.id)) { opt.toast(`🔒 Entre na sala de ${pessoa.nome} para ver a tela`); return; }
+    abrirPopup("mesa:" + pessoa.id, "Tela de " + pessoa.nome, true);
+  }
   function abrirPopup(sala, nome, mesa) {
     fecharPopup();
     const el = document.createElement("div");
@@ -319,7 +349,7 @@ window.Projecao = (function () {
     const temAudio = !!(ms && ms.getAudioTracks().length) && !meu;
     popup.video.muted = !temAudio || !popup.comSom;
     if (v && v.audio) v.audio.muted = true;
-    if (ms) popup.video.play().catch(() => { popup.video.muted = true; popup.video.play().catch(() => {}); });
+    if (ms) { const pv = popup.video; pv.play().catch(() => { pv.muted = true; pv.play().catch(() => {}); }); }
     const b = popup.el.querySelector("[data-som]"); b.style.display = temAudio ? "" : "none"; b.textContent = popup.comSom ? "🔊" : "🔇";
     atualizarPopupStatus();
   }
