@@ -290,7 +290,6 @@ window.Video = (function () {
       const entrada = ease(seg(p, 0, 0.12)), saida = seg(p, 0.92, 1);
       g.save(); g.translate(W / 2, H / 2); g.scale(1 + saida * 0.08, 1 + saida * 0.08); g.translate(-W / 2 + (1 - entrada) * W * 0.35, -H / 2); g.globalAlpha = Math.min(1, entrada * 1.5) * (1 - saida * 0.9);
       if (x.capa) {
-        g.fillStyle = pal[1]; g.font = "800 26px system-ui"; g.textAlign = "center"; g.globalAlpha *= ease(seg(p, 0, 0.2)); g.fillText("NEXT CO. APRESENTA", W / 2, 300); g.globalAlpha = Math.min(1, entrada * 1.5) * (1 - saida * 0.9);
         titulo(g, r.titulo, W / 2, 470, W - 110, p, "#fff", null, 72);
         g.font = "600 34px system-ui"; g.fillStyle = "rgba(255,255,255,.85)"; g.textAlign = "center";
         quebrar(g, r.gancho, W - 140).slice(0, 4).forEach((l, k) => { g.globalAlpha = ease(seg(p, 0.45 + k * 0.08, 0.6 + k * 0.08)); g.fillText(l, W / 2, 850 + k * 46); });
