@@ -29,6 +29,8 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 #eu.hud canvas{background:#2a2540;border-radius:10px}
 .zoom.hud{border-radius:14px}
 .zoom.hud button{display:grid;place-items:center}
+#b3d{font-weight:900;font-size:12px}
+#b3d.on{background:#3d5afe}
 .zoom.hud button:hover{background:rgba(255,255,255,.08)}
 #hint.hud{font-weight:600;font-size:12.5px;padding:8px 12px;transition:opacity .6s}
 #btnTelao.hud,#btnProj.hud{display:flex;align-items:center;gap:8px}
@@ -211,12 +213,13 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 </style>
 </head>
 <body>
+<canvas id="cv3d" style="position:fixed;inset:0;width:100%;height:100%;display:none;pointer-events:none"></canvas>
 <canvas id="cv"></canvas>
 <div class="top">
   <div class="pill hud" id="sala">Carregando…</div>
   <button class="pill hud" id="eu" aria-label="Menu"><canvas id="mini" class="px" width="32" height="32"></canvas><span id="nome"></span></button>
 </div>
-<div class="zoom pill hud"><button id="zin" aria-label="Aproximar"></button><button id="zout" aria-label="Afastar"></button></div>
+<div class="zoom pill hud"><button id="zin" aria-label="Aproximar"></button><button id="zout" aria-label="Afastar"></button><button id="b3d" title="Alternar 2D / 3D isométrico" aria-label="Alternar 2D e 3D"></button><button id="gEsq" title="Girar câmera (Q)" style="display:none"></button><button id="gDir" title="Girar câmera (E)" style="display:none"></button></div>
 <div class="emotes pill hud">
   <button id="btnAudio">Ligar áudio</button><button id="btnCfgAudio" title="Microfone, saída de áudio e volume de cada pessoa" aria-label="Configurar áudio"></button><i class="div"></i><button id="btnMont">Patinete</button><button id="btnMao" style="display:none">Levantar a mão</button><button data-emote="5" title="Acenar"></button><button data-emote="6" title="Dançar"></button><button data-emote="4" title="Sentar ou levantar"></button>
 </div>
@@ -254,6 +257,7 @@ ROTULO(document.querySelector('[data-emote="5"]'), "hand", "Acenar");
 ROTULO(document.querySelector('[data-emote="6"]'), "music", "Dançar");
 ROTULO(document.querySelector('[data-emote="4"]'), "armchair", "Sentar");
 ROTULO(document.getElementById("zin"), "plus", ""); ROTULO(document.getElementById("zout"), "minus", "");
+ROTULO(document.getElementById("gEsq"), "rotate-ccw", ""); ROTULO(document.getElementById("gDir"), "rotate-cw", "");
 ROTULO(document.getElementById("btnTelao"), "layout-dashboard", "Abrir telão");
 let EMAIL = null;
 window.OCULTAR_PESSOAS = true; // no escritório só aparecem pessoas de verdade
@@ -281,6 +285,7 @@ async function boot(){
   if (!S) { S = templateNext(); Dados.salvarMapaLocal(mapaId, S); }
   grid = buildBlocked();
   assentos = construirAssentos();
+  aplicarModo3d();
   teloes = allItems().filter(i => i.k === "telao");
   monitores = allItems().filter(i => EQUIP.test(i.k)); marcarMonitoresTI();
   await atualizarTarefas(); setInterval(atualizarTarefas, 30000); Dados.ouvirTarefas(atualizarTarefas);
@@ -347,6 +352,7 @@ function recarregarMapa(novo){
   S = novo; grid = buildBlocked(); assentos = construirAssentos(); Projecao.recalcular();
   teloes = allItems().filter(i => i.k === "telao"); monitores = allItems().filter(i => EQUIP.test(i.k)); marcarMonitoresTI();
   if (!livre(P.x, P.y)) spawn();
+  aplicarModo3d();
   toast("O mapa do escritório foi atualizado");
 }
 /* ---------- áudio ---------- */
@@ -451,7 +457,8 @@ addEventListener("keydown", e => { if (e.target.matches("input,select,textarea")
   if (e.key === "1") emote(5); if (e.key === "2") emote(6); if (e.key === "3") sentarPerto(); });
 addEventListener("keyup", e => keys.delete(e.key));
 addEventListener("blur", () => keys.clear());
-const toWorld = (sx, sy) => { const c = cam(); return [(sx - c.ox)/zoom, (sy - c.oy)/zoom]; };
+const em3d = () => !!(window.Iso3D && Iso3D.ativo);
+const toWorld = (sx, sy) => { if (em3d()) return Iso3D.mundo(sx, sy); const c = cam(); return [(sx - c.ox)/zoom, (sy - c.oy)/zoom]; };
 const ptrs = new Map(); let pinch = null, pularUp = 0;
 cv.addEventListener("pointerdown", e => {
   ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY});
@@ -487,6 +494,19 @@ const up = e => {
 };
 cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", e => { ptrs.delete(e.pointerId); pinch = null; });
 cv.addEventListener("wheel", e => { e.preventDefault(); zoom = Math.max(0.6, Math.min(4, zoom * Math.exp(-e.deltaY*0.0015))); }, {passive:false});
+/* modo 3D isométrico (mesma lógica, outro desenho) */
+let quer3d = (() => { try { return localStorage.getItem("nextco_modo3d") === "1" || /[?&]3d=1/.test(location.search); } catch (e) { return false; } })();
+function aplicarModo3d(){
+  const ok = quer3d && window.Iso3D && S;
+  if (window.Iso3D && S) Iso3D.ligar(!!ok, S);
+  document.getElementById("b3d").classList.toggle("on", !!ok); document.getElementById("b3d").textContent = ok ? "2D" : "3D";
+  for (const id of ["gEsq", "gDir"]) document.getElementById(id).style.display = ok ? "" : "none";
+}
+document.getElementById("b3d").onclick = () => { quer3d = !quer3d; try { localStorage.setItem("nextco_modo3d", quer3d ? "1" : "0"); } catch (e) {} if (quer3d && !window.Iso3D){ toast("Carregando o 3D…"); window.carregar3D && carregar3D(); } aplicarModo3d(); };
+document.getElementById("gEsq").onclick = () => window.Iso3D && Iso3D.girar(-1);
+document.getElementById("gDir").onclick = () => window.Iso3D && Iso3D.girar(1);
+addEventListener("keydown", e => { if (!em3d() || e.target.matches("input,select,textarea")) return; if (e.key === "q" || e.key === "Q") Iso3D.girar(-1); if (e.key === "e" || e.key === "E") Iso3D.girar(1); });
+addEventListener("iso3d-pronto", aplicarModo3d);
 document.getElementById("zin").onclick = () => zoom = Math.min(4, zoom*1.25);
 document.getElementById("zout").onclick = () => zoom = Math.max(0.6, zoom/1.25);
 // joystick
@@ -524,12 +544,14 @@ function sentarPerto(){
 /* ---------- loop ---------- */
 let last = 0, marca = null, sujo = false, ultimoSave = 0, t = 0;
 const VEL = 120, conversasLog = {};
+let dtQuadro = 0.016;
 function loop(now){
-  const dt = Math.min(0.05, (now - last)/1000); last = now; t += dt;
+  const dt = Math.min(0.05, (now - last)/1000); last = now; t += dt; dtQuadro = dt;
   // você
   let vx = 0, vy = 0;
   for (const k of keys){ const d = DIRKEYS[k]; if (d){ vx += d[0]; vy += d[1]; } }
   if (joyV){ vx = joyV[0]; vy = joyV[1]; }
+  if ((vx || vy) && em3d()) [vx, vy] = Iso3D.direcaoTeclas(vx, vy); // no 3D, "cima" é para dentro da tela
   if ((vx || vy) && P.assento) P.levantar();
   if (!vx && !vy && !P.assento && P.path) [vx, vy] = seguirCaminho(P);
   Montaria.atualizar(P);
@@ -638,23 +660,35 @@ function vinheta(){
   ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
 }
 function draw(){
-  ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle = "#16141f"; ctx.fillRect(0, 0, cv.width, cv.height);
+  const tres = em3d();
+  ctx.setTransform(1,0,0,1,0,0);
+  if (tres) ctx.clearRect(0, 0, cv.width, cv.height); else { ctx.fillStyle = "#16141f"; ctx.fillRect(0, 0, cv.width, cv.height); }
   const c = cam(), atores = [P, ...outros.filter(o => o.visto && o.sheet)];
   const ligados = new Set(monitoresTI); for (const a of atores) if (a.assento && a.assento.trabalho) for (const m of a.assento.monitores) ligados.add(m.x + "," + m.y);
-  ctx.imageSmoothingEnabled = false;
-  ctx.setTransform(zoom*DPR, 0, 0, zoom*DPR, c.ox*DPR, c.oy*DPR);
-  drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => { const r = salaDoTelao(it); if (!dentroDoTelao(it)){ telaoTrancado(g, it.x*T, it.y*T, r); return; } Telao.desenharTela(g, it.x*T, it.y*T, r ? Telao.filtrarSala(tarefas, r.id, salaPadrao()) : tarefas, r ? "TELÃO · " + r.name.toUpperCase() : "TELÃO DA EQUIPE"); } })))
+  // telas vivas (telões, monitores, projeção, tendências, roteiros): as mesmas no 2D e no 3D
+  const telasVivas = teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => { const r = salaDoTelao(it); if (!dentroDoTelao(it)){ telaoTrancado(g, it.x*T, it.y*T, r); return; } Telao.desenharTela(g, it.x*T, it.y*T, r ? Telao.filtrarSala(tarefas, r.id, salaPadrao()) : tarefas, r ? "TELÃO · " + r.name.toUpperCase() : "TELÃO DA EQUIPE"); } }))
     .concat(monitores.map(it => ({ sort: sortKey(it) + 0.01, draw: g => desenharMonitor(g, it, ligados.has(it.x + "," + it.y), t) })))
-    .concat(Projecao.desenhaveis()).concat(TI.desenhaveis(t)).concat(Edicao.desenhaveis()));
-  desenharLuz(ligados);
-  for (const a of atores) a.balao(ctx, t);
-  if (marca){ ctx.strokeStyle = `rgba(61,90,254,${marca.t})`; ctx.lineWidth = 2/zoom*1.5; ctx.beginPath(); ctx.ellipse(marca.x, marca.y, 10*(1.6-marca.t*.6), 5*(1.6-marca.t*.6), 0, 0, Math.PI*2); ctx.stroke(); }
+    .concat(Projecao.desenhaveis()).concat(TI.desenhaveis(t)).concat(Edicao.desenhaveis());
+  ctx.imageSmoothingEnabled = false;
+  if (tres){
+    Iso3D.render(atores, telasVivas, t, zoom, P, dtQuadro);
+    const k = Iso3D.escala();
+    for (const a of atores){ const [fx, fy] = Iso3D.tela(a.px, a.py, 0); ctx.setTransform(DPR*k, 0, 0, DPR*k, DPR*(fx - a.px*k), DPR*(fy - a.py*k)); a.balao(ctx, t); }
+  } else {
+    ctx.setTransform(zoom*DPR, 0, 0, zoom*DPR, c.ox*DPR, c.oy*DPR);
+    drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(telasVivas));
+    desenharLuz(ligados);
+    for (const a of atores) a.balao(ctx, t);
+    if (marca){ ctx.strokeStyle = `rgba(61,90,254,${marca.t})`; ctx.lineWidth = 2/zoom*1.5; ctx.beginPath(); ctx.ellipse(marca.x, marca.y, 10*(1.6-marca.t*.6), 5*(1.6-marca.t*.6), 0, 0, Math.PI*2); ctx.stroke(); }
+  }
   // nomes (tela)
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  vinheta();
+  if (!tres) vinheta();
   for (const a of atores){
     const naMesa = a.assento && a.assento.trabalho;
-    const sx = a.px*zoom + c.ox, top = a.assento ? a.assento.sy - 40 : a.y - 45, sy = naMesa ? (a.assento.sy + 14)*zoom + c.oy + 19 : (top - 2)*zoom + c.oy;
+    let sx, sy;
+    if (tres) [sx, sy] = Iso3D.tela(a.px, a.py, a.assento ? 46 : 54);
+    else { sx = a.px*zoom + c.ox; const top = a.assento ? a.assento.sy - 40 : a.y - 45; sy = naMesa ? (a.assento.sy + 14)*zoom + c.oy + 19 : (top - 2)*zoom + c.oy; }
     if (sx < -60 || sx > VW + 60 || sy < -40 || sy > VH + 40) continue;
     const vp = a !== P ? (a.volPessoal ?? Voz.volumePessoa(a.id)) : 1;
     const est = a !== P && Voz.ligado && !a.ouvindo && a.estadoAudio === "conectando" ? " ⏳" : "";
@@ -681,11 +715,11 @@ function draw(){
     ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(txt, sx - w/2 + 8, sy - 10);
     icones.forEach(([nm, cor], i) => iconeCanvas(ctx, nm, sx - w/2 + 8 + wt + 9 + i*15, sy - 10.5, 12, cor));
   }
-  TI.nomes(ctx, c, zoom, t);
+  if (!tres) TI.nomes(ctx, c, zoom, t);
   // selo de sala com senha/restrita
   for (const r of S.rooms){
     const selo = Acesso.selo(r); if (!selo) continue;
-    const sx = (r.x*T + 6)*zoom + c.ox, sy = (r.y*T + 6)*zoom + c.oy;
+    const [sx, sy] = tres ? Iso3D.tela(r.x*T + 6, r.y*T + 6, 80) : [(r.x*T + 6)*zoom + c.ox, (r.y*T + 6)*zoom + c.oy];
     if (sx < -200 || sx > VW + 20 || sy < -20 || sy > VH + 20) continue;
     const ok = Acesso.podeEntrar(r), txt = `${r.name}${ok ? " · liberada para você" : ""}`;
     ctx.font = "800 11px Inter,system-ui,sans-serif"; const w = ctx.measureText(txt).width + 30;
@@ -709,7 +743,7 @@ document.getElementById("eu").onclick = async () => {
     <button class="mi" data-cfgaudio>🎚️ Áudio: microfone, saída e volumes</button>
     <button class="mi" data-tend>📈 Tendências de mercado</button>
     <button class="mi" data-edicao>🎬 Roteiros (Edição)</button>
-    <a class="mi" href="iso.html">🧊 Ver em 3D isométrico (protótipo)</a>
+    <button class="mi" data-modo3d>🧊 Alternar 2D / 3D isométrico</button>
     ${Dados.ehAdmin() ? `<button class="mi" data-admin>🛡️ Administração: salas, senhas e papéis</button>` : ""}
     <a class="mi" href="editor.html">🛠️ Editor de salas</a>
     <button class="mi" data-exp>💾 Baixar meus dados (JSON)</button>
@@ -725,6 +759,7 @@ menu.onclick = async e => {
   if (e.target.closest("[data-cfgaudio]")) { menu.classList.add("hidden"); abrirConfigAudio(); }
   if (e.target.closest("[data-tend]")) { menu.classList.add("hidden"); TI.abrirPainel(); }
   if (e.target.closest("[data-edicao]")) { menu.classList.add("hidden"); Edicao.abrirPainel(); }
+  if (e.target.closest("[data-modo3d]")) { menu.classList.add("hidden"); document.getElementById("b3d").click(); }
   if (e.target.closest("[data-admin]")) { menu.classList.add("hidden"); Acesso.abrirAdmin(); }
   if (e.target.closest("[data-sair]")) { salvarPos(); await Dados.sair(); location.href = "index.html"; }
   if (e.target.closest("[data-exp]")) {
@@ -829,5 +864,6 @@ function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&l
 let toastT = null;
 function toast(t){ const el = document.getElementById("toast"); el.textContent = t; el.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("show"), 1800); }
 </script>
+<script src="js/iso3d-loader.js"></script>
 </body>
 </html>
