@@ -51,15 +51,19 @@ window.Projecao = (function () {
     const r = roomAt(a.px, a.py - 2);
     return r && salasComTelao().has(r.id) ? r : null;
   }
-  const apresentador = sala => (opt.outros().find(o => o.visto && o.proj === sala) || null);
+  // chave da transmissão: id da sala (telão do auditório) ou "mesa:<id da pessoa>" (tela do computador da mesa)
+  const apresentador = chave => (String(chave).startsWith("mesa:")
+    ? opt.outros().find(o => o.visto && o.id === chave.slice(5) && o.tela)
+    : opt.outros().find(o => o.visto && o.proj === chave)) || null;
+  const naMesa = a => !!(a && a.assento && a.assento.trabalho);
   const ice = () => (window.Voz && Voz.iceServers) || CONFIG.ICE || [];
   const podeCompartilhar = () => !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
 
   /* ---------------- quem apresenta ---------------- */
   async function compartilhar() {
-    const eu = opt.eu(), r = salaNoPalco(eu);
-    if (!r) { opt.toast("Suba no palco do auditório para compartilhar a tela"); return; }
-    const outro = apresentador(r.id);
+    const eu = opt.eu(), r = salaNoPalco(eu), mesa = !r && naMesa(eu);
+    if (!r && !mesa) { opt.toast("Suba no palco do auditório, ou sente numa mesa de trabalho, para compartilhar a tela"); return; }
+    const outro = r && apresentador(r.id);
     if (outro) { opt.toast(`${outro.nome} já está apresentando`); return; }
     if (!podeCompartilhar()) { opt.toast("Compartilhar tela só funciona no computador (Chrome, Edge, Firefox ou Safari)"); return; }
     let stream;
@@ -68,10 +72,11 @@ window.Projecao = (function () {
     const v = stream.getVideoTracks()[0];
     if (v && "contentHint" in v) v.contentHint = "detail";
     v.addEventListener("ended", () => parar(true));
-    share = { stream, sala: r.id, nomeSala: r.name, video: videoOculto(stream, true), viewers: new Map() };
+    const chave = r ? r.id : "mesa:" + eu.id;
+    share = { stream, sala: chave, tipo: r ? "palco" : "mesa", nomeSala: r ? r.name : "mesa", video: videoOculto(stream, true), viewers: new Map() };
     foraDoPalcoDesde = 0;
-    opt.toast("Você está apresentando no telão 🎬");
-    opt.registrar && opt.registrar(`Começou a apresentar no telão de ${r.name}`, r.name);
+    if (r) { opt.toast("Você está apresentando no telão 🎬"); opt.registrar && opt.registrar(`Começou a apresentar no telão de ${r.name}`, r.name); }
+    else { opt.toast("Sua tela está aberta: quem chegar perto e clicar no seu computador consegue ver 🖥️"); opt.registrar && opt.registrar("Abriu a tela do computador para os colegas", eu.sala); }
   }
   function parar(avisar) {
     if (!share) return;
@@ -162,9 +167,10 @@ window.Projecao = (function () {
     // quem apresenta precisa continuar no palco (2 s de tolerância)
     if (share) {
       const r = salaNoPalco(eu);
-      if (r && r.id === share.sala) foraDoPalcoDesde = 0;
+      const ok = share.tipo === "mesa" ? naMesa(eu) : (r && r.id === share.sala);
+      if (ok) foraDoPalcoDesde = 0;
       else if (!foraDoPalcoDesde) foraDoPalcoDesde = agora;
-      else if (agora - foraDoPalcoDesde > 2000) { parar(false); opt.toast("Você saiu do palco: a apresentação foi encerrada"); }
+      else if (agora - foraDoPalcoDesde > 2000) { const m = share.tipo === "mesa"; parar(false); opt.toast(m ? "Você levantou da mesa: sua tela foi fechada" : "Você saiu do palco: a apresentação foi encerrada"); }
     }
     // assistir: quem está na sala do telão, ou com a janela aberta
     const minhaSala = roomAt(eu.px, eu.py - 4);
@@ -173,6 +179,8 @@ window.Projecao = (function () {
       const ap = apresentador(salaId); if (!ap) continue;
       if ((minhaSala && minhaSala.id === salaId) || (popup && popup.sala === salaId)) queroVer.set(salaId, ap.id);
     }
+    // tela de um colega na mesa: só enquanto a janela estiver aberta
+    if (popup && String(popup.sala).startsWith("mesa:")) { const ap = apresentador(popup.sala); if (ap) queroVer.set(popup.sala, ap.id); }
     for (const [sala, de] of queroVer) {
       const v = vendo.get(sala);
       if (!v || v.de !== de) { if (v) largar(sala); pedir(sala, de); continue; }
@@ -189,7 +197,8 @@ window.Projecao = (function () {
     const b = document.getElementById("btnProj"); if (!b) return;
     const r = salaNoPalco(eu);
     let mostra = false, txt = "", ativo = true;
-    if (share) { mostra = true; txt = "⏹ Parar de compartilhar"; }
+    if (share) { mostra = true; txt = share.tipo === "mesa" ? `⏹ Fechar minha tela${share.viewers.size ? ` (${share.viewers.size} vendo)` : ""}` : `⏹ Parar de compartilhar${share.viewers.size ? ` (${share.viewers.size} vendo)` : ""}`; }
+    else if (!r && naMesa(eu)) { mostra = true; txt = podeCompartilhar() ? "🖥️ Deixar colegas verem minha tela" : "🖥️ Mostrar tela (só no computador)"; }
     else if (r) {
       mostra = true;
       const ap = apresentador(r.id);
@@ -247,12 +256,14 @@ window.Projecao = (function () {
   const desenhaveis = () => itens.map(it => ({ sort: (it.room && roomById(it.room) ? roomById(it.room).y * T : it.y * T) + 0.6, draw: g => desenhar(g, it, performance.now() / 1000) }));
 
   /* ---------------- janela (popup) ---------------- */
-  function abrirPopup(sala, nome) {
+  /* tela do computador de um colega (ele precisa estar perto) */
+  function abrirTelaDe(pessoa) { abrirPopup("mesa:" + pessoa.id, "Tela de " + pessoa.nome, true); }
+  function abrirPopup(sala, nome, mesa) {
     fecharPopup();
     const el = document.createElement("div");
     el.className = "proj-bg";
     el.innerHTML = `<div class="proj-win" role="dialog" aria-label="Telão de projeção">
-      <div class="proj-top"><b>🎬 Telão · ${esc(nome || "Auditório")}</b><span class="proj-status"></span>
+      <div class="proj-top"><b>${mesa ? "🖥️ " + esc(nome) : "🎬 Telão · " + esc(nome || "Auditório")}</b><span class="proj-status"></span>
         <button class="proj-btn" data-som title="Som da apresentação">🔊</button>
         <button class="proj-btn" data-cheia title="Tela cheia">⛶ Tela cheia</button>
         <button class="proj-btn" data-fechar aria-label="Fechar">✕</button></div>
@@ -307,7 +318,8 @@ window.Projecao = (function () {
     const st = meu ? "● Você está apresentando" : ap ? (tem ? `● Ao vivo · ${ap.nome}` : `Conectando à tela de ${ap.nome}…`) : "";
     const s = popup.el.querySelector(".proj-status"); if (s.textContent !== st) s.textContent = st;
     const vazio = popup.el.querySelector(".proj-vazio");
-    const msg = tem ? "" : ap ? "Conectando…" : "Ninguém está apresentando agora.<br><small>Quem subir no palco pode compartilhar a tela.</small>";
+    const mesa = String(popup.sala).startsWith("mesa:");
+    const msg = tem ? "" : ap ? "Conectando…" : mesa ? "Essa pessoa fechou a tela." : "Ninguém está apresentando agora.<br><small>Quem subir no palco pode compartilhar a tela.</small>";
     if (vazio.innerHTML !== msg) vazio.innerHTML = msg;
     vazio.style.display = tem ? "none" : "grid";
     if (tem && popup.video.srcObject !== (meu ? share.stream : v.stream)) atualizarPopup();
@@ -325,7 +337,9 @@ window.Projecao = (function () {
 
   return {
     iniciar, recalcular, aoSinal, atualizar, desenhaveis, clicou, clicarBotao, abrirPopup, fecharPopup, parar,
-    get minhaSala() { return share ? share.sala : null; },
+    get minhaSala() { return share && share.tipo === "palco" ? share.sala : null; },
+    get minhaTela() { return !!(share && share.tipo === "mesa"); },
+    abrirTelaDe,
     get apresentando() { return !!share; },
     get estado() { return { apresentando: share && share.sala, assistindo: [...vendo.entries()].map(([s, v]) => ({ sala: s, de: v.de, video: !!v.stream, conectado: !!v.conectado })), salas: [...salasComTelao()], popup: popup && popup.sala }; },
   };

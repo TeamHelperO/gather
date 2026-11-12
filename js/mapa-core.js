@@ -10,11 +10,12 @@ const TYPES = {
   telao:{label:"Área do telão",floor:"f_carpete_azul",d:"Telão de gestão e cadeiras"},
   silenciosa:{label:"Área silenciosa",floor:"f_carpete_verde",d:"Pufes, poltronas, estante"},
   auditorio:{label:"Auditório",floor:"f_madeira",d:"Palco, púlpito e plateia"},
+  ti:{label:"Sala de TI",floor:"f_ti",d:"Servidores, 5 computadores com agentes de IA e telão de tendências"},
   copa:{label:"Copa e lazer",floor:"f_ceramica",d:"Café, mesas, jogos"},
   corredor:{label:"Corredor",floor:"f_madeira",d:"Passagem, sem paredes",noWalls:true},
   livre:{label:"Sala vazia",floor:"f_madeira",d:"Sem móveis, você monta"}
 };
-const FLOORS = ["f_madeira","f_carpete_azul","f_carpete_verde","f_carpete_cinza","f_ceramica","f_grama","f_palco"];
+const FLOORS = ["f_madeira","f_carpete_azul","f_carpete_verde","f_carpete_cinza","f_ceramica","f_grama","f_palco"].concat(ASSETS.f_ti ? ["f_ti"] : []);
 const SIDES = {baixo:"Embaixo",cima:"Em cima",esquerda:"Esquerda",direita:"Direita",nenhuma:"Sem porta"};
 
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -132,6 +133,26 @@ function layoutBase(r){
       const aisle = w >= 7 ? Math.floor(cx) : null;
       for (let ty=y+sh+1.5; ty+1<=y+h+0.05; ty+=1.5) for (let tx=x+1; tx<=x+w-2; tx++) { if (tx===aisle) continue; P("cadeira_plateia", tx, ty); }
       if (h > sh+2) P("megafone", x+0.05, y+sh+0.9);
+      break;
+    }
+    case "ti": {
+      // racks de servidor na parede de cima e telão de tendências
+      const temTelao = w >= 10 && ASSETS.telao_tend;
+      const nr = Math.max(0, Math.min(8, Math.floor((w - (temTelao ? 7.5 : 0.6)) / 1.05)));
+      for (let i=0;i<nr;i++) P("rack_servidor", x+0.25+i*1.05, y-1.3);
+      if (temTelao) P("telao_tend", x+w-6.4, y-1.85);
+      // 5 computadores, cada um com um agente de IA
+      const n = Math.max(1, Math.min(5, Math.floor((w+1)/4))), span = n*4-1, sx = x + (w-span)/2;
+      for (let k=0;k<5;k++){
+        const i = k % n, j = Math.floor(k / n), tx = sx+i*4, ty = y+2.6+j*3.6;
+        if (tx+3 > x+w+0.01 || ty+2.5 > y+h+0.1) continue;
+        P("mesa_pc", tx, ty);
+        P("monitor", tx+0.5, ty-0.47); P("monitor", tx+1.5, ty-0.47);
+        P("teclado_rgb", tx+1, ty+0.34); P("mouse", tx+2.05, ty+0.22);
+        if (ASSETS["agente_"+(k+1)]) P("agente_"+(k+1), tx+1, ty+1.05, {agente:"agente"+(k+1)});
+      }
+      // fileira de racks embaixo (os que tampam a porta saem sozinhos)
+      if (h >= 11) { const nb = Math.min(16, Math.floor((w-0.5)/1.05)); for (let i=0;i<nb;i++) P("rack_servidor", x+0.25+i*1.05, y+h-2.05); }
       break;
     }
     case "copa": {

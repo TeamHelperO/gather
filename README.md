@@ -31,6 +31,8 @@ ficam em `js/config.js`. As tabelas têm regras de acesso (RLS): só quem entrou
 - `js/vida.js` – assentos, sentar sozinho, trabalhar no PC e conversas
 - `js/projecao.js` – telão de projeção do auditório: quem está em cima do palco compartilha a tela; aparece no telão do mapa
   para quem está na sala; clicar no telão abre a janela maior com tela cheia (também registra a arte do item)
+- `js/ti.js` – sala de TI (racks, 5 computadores com agentes de IA) e painel de tendências de mercado (travar/destravar, pega/não pega e por quem)
+- `js/acesso.js` – papéis (admin/usuário), senha e salas restritas; painel de administração no menu (só admin)
 - `js/telao.js` – telão de tarefas (quadro, formulário, arrastar, escalonamento e a tela do telão no mapa)
 - `api/turn.js` – entrega servidores TURN da Cloudflare para o áudio funcionar no 4G/redes fechadas
   (variáveis `CF_TURN_KEY_ID` e `CF_TURN_API_TOKEN` na Vercel; sem elas usa só STUN)
@@ -38,3 +40,24 @@ ficam em `js/config.js`. As tabelas têm regras de acesso (RLS): só quem entrou
 - `js/avatar.js` – catálogo das camadas do personagem e montagem do spritesheet
 - `assets/` – artes (personagens em camadas, piso, splash); `assets.js` – itens do mapa
 - `artgen/` – código Python que gera todas as artes
+
+
+## Agentes da sala de TI
+
+Os 5 agentes (`agente1` Radar, `agente2` Faro, `agente3` Lupa, `agente4` Pulso, `agente5` Bússola) publicam no banco
+por duas funções, usando a **chave publicável** do Supabase (em `js/config.js`) + a **chave dos agentes** (guardada fora do repositório).
+
+```bash
+# publicar uma tendência (se o mesmo título já entrou nas últimas 24 h, não duplica)
+curl -X POST "$SUPABASE_URL/rest/v1/rpc/agente_publicar" \
+  -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" \
+  -d '{"p_chave":"<CHAVE_DOS_AGENTES>","p_agente":"agente1","p_titulo":"…","p_resumo":"…","p_fonte_url":"https://…","p_categoria":"Social","p_relevancia":4}'
+
+# avisar o que o agente está fazendo (aparece em cima dele no mapa; some depois de 15 min sem sinal)
+curl -X POST "$SUPABASE_URL/rest/v1/rpc/agente_status" \
+  -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" \
+  -d '{"p_chave":"<CHAVE_DOS_AGENTES>","p_agente":"agente1","p_status":"pesquisando","p_detalhe":"Lendo notícias de Meta Ads"}'
+```
+
+Tabelas: `tendencias`, `agentes`, `regras_salas` (+ `senhas_salas` e `chaves_agentes`, que não são lidas pela API).
+Script do banco: `data/migracao_ti_regras.sql`.

@@ -35,7 +35,7 @@
     perfil = data || null;
     return perfil;
   }
-  const paraUsuario = (p) => p && ({ id: p.id, email: p.email, nome: p.nome, avatar: p.avatar, posicao: p.posicao, prefs: p.prefs || {}, criadoEm: p.criado_em, ultimoAcesso: p.ultimo_acesso });
+  const paraUsuario = (p) => p && ({ id: p.id, email: p.email, nome: p.nome, papel: p.papel || "usuario", avatar: p.avatar, posicao: p.posicao, prefs: p.prefs || {}, criadoEm: p.criado_em, ultimoAcesso: p.ultimo_acesso });
   const paraTarefa = (r) => ({ id: r.id, titulo: r.titulo, descricao: r.descricao || "", responsavel: r.responsavel || "", prazo: r.prazo || "", status: r.status,
     etapas: r.etapas || [], progressoManual: r.progresso_manual ?? 0, ordem: r.ordem, historico: r.historico || [], criadoPor: r.criado_por, criadoEm: r.criado_em, atualizadoEm: r.atualizado_em });
   const daTarefa = (t) => ({ id: t.id, titulo: t.titulo, descricao: t.descricao || null, responsavel: t.responsavel || null, prazo: t.prazo || null, status: t.status || "a_fazer",
@@ -88,7 +88,9 @@
 
     /* ---------- pessoas ---------- */
     async getUsuario(_email) { if (!perfil && usuarioAuth) await carregarPerfil(); return paraUsuario(perfil); },
-    async listarUsuarios() { const { data } = await sb.from("perfis").select("id,email,nome,avatar").order("nome"); return (data || []).map(paraUsuario); },
+    async listarUsuarios() { const { data } = await sb.from("perfis").select("id,email,nome,avatar,papel").order("nome"); return (data || []).map(paraUsuario); },
+    ehAdmin() { return !!perfil && perfil.papel === "admin"; },
+    async definirPapel(id, papel) { const { error } = await sb.rpc("definir_papel", { p_usuario: id, p_papel: papel }); if (error) throw error; },
     async salvarNome(nome) { const { data } = await sb.from("perfis").update({ nome }).eq("id", usuarioAuth.id).select().single(); if (data) perfil = data; },
     async salvarAvatar(_email, avatar) {
       const primeiro = !perfil.avatar;
@@ -158,6 +160,25 @@
       return true;
     },
     ouvirTarefas(cb) { return sb.channel("tarefas-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "tarefas" }, () => cb()).subscribe(); },
+
+    /* ---------- regras de acesso das salas (só admin altera) ---------- */
+    async listarRegras(mapaId = "principal") { const { data } = await sb.from("regras_salas").select("*").eq("mapa_id", mapaId); return data || []; },
+    ouvirRegras(cb) { return sb.channel("regras-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "regras_salas" }, () => cb()).subscribe(); },
+    async definirRegraSala({ mapaId = "principal", salaId, restrita, permitidos, senha, trocarSenha }) {
+      const { error } = await sb.rpc("definir_regra_sala", { p_mapa: mapaId, p_sala: salaId, p_restrita: !!restrita, p_permitidos: permitidos || [], p_senha: senha || null, p_trocar_senha: !!trocarSenha });
+      if (error) throw error;
+      await this.registrarAtividade(null, "admin", `Mudou as regras de acesso de uma sala`, { sala: salaId });
+    },
+    async conferirSenhaSala(salaId, senha, mapaId = "principal") { const { data, error } = await sb.rpc("conferir_senha_sala", { p_mapa: mapaId, p_sala: salaId, p_senha: senha }); return !error && data === true; },
+
+    /* ---------- tendências de mercado (sala de TI) ---------- */
+    async listarTendencias(limite = 100) { const { data } = await sb.from("tendencias").select("*").order("criado_em", { ascending: false }).limit(limite); return data || []; },
+    ouvirTendencias(cb) { return sb.channel("tend-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "tendencias" }, () => cb()).subscribe(); },
+    async mexerTendencia(id, acao) { const { data, error } = await sb.rpc("mexer_tendencia", { p_id: id, p_acao: acao }); if (error) throw error; return data; },
+    async criarTendencia(t) { const { error } = await sb.from("tendencias").insert({ titulo: t.titulo, resumo: t.resumo || null, fonte_url: t.fonte_url || null, categoria: t.categoria || null, relevancia: t.relevancia || null, agente: "manual" }); if (error) throw error; },
+    async excluirTendencia(id) { const { error } = await sb.from("tendencias").delete().eq("id", id); if (error) throw error; },
+    async listarAgentes() { const { data } = await sb.from("agentes").select("*").order("id"); return data || []; },
+    ouvirAgentes(cb) { return sb.channel("agentes-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "agentes" }, () => cb()).subscribe(); },
 
     /* ---------- meus dados ---------- */
     async exportarTudo() {

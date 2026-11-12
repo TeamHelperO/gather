@@ -36,6 +36,63 @@ html,body{height:100%;overflow:hidden}
 .ico{width:28px;height:28px;border-radius:8px;background:var(--chip);display:grid;place-items:center;flex:none}
 #toast{position:fixed;left:50%;top:64px;transform:translateX(-50%);background:#1d1d1f;color:#fff;padding:9px 14px;border-radius:10px;font-size:13px;z-index:40;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
 #toast.show{opacity:1}
+/* ---- painel de tendências (TI) ---- */
+.tend-bg{position:fixed;inset:0;z-index:60;background:rgba(8,6,14,.78);display:grid;place-items:center;padding:14px}
+.tend-win{width:min(1100px,100%);height:min(88vh,900px);background:var(--panel);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.tend-top{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);background:linear-gradient(90deg,#0f3a44,#13a6b8);color:#fff}
+.tend-top>b{font-size:16px;white-space:nowrap}
+.tend-agentes{display:flex;gap:6px;overflow-x:auto;flex:1}
+.tend-agentes .ag{font-size:12px;background:rgba(0,0,0,.25);border-radius:999px;padding:3px 9px;white-space:nowrap}
+.tend-agentes .ag small{opacity:.75}
+.tend-agentes .ag.on{background:rgba(92,255,122,.25)}
+.tend-x{color:#fff;font-size:18px;width:34px;height:34px;border-radius:8px;background:rgba(0,0,0,.2)}
+.tend-barra{display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
+.tend-barra .tab{padding:7px 12px;border-radius:999px;border:1px solid var(--line);font-weight:650;font-size:13px}
+.tend-barra .tab.on{background:#13a6b8;color:#fff;border-color:#13a6b8}
+.tend-barra .tab i{font-style:normal;opacity:.7;margin-left:3px}
+.tend-barra input{margin-left:auto;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--chip);padding:0 10px;min-width:160px}
+.tend-form{display:grid;gap:6px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--chip)}
+.tend-form input,.tend-form textarea,.tend-form select{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--panel)}
+.tend-form .row2{display:flex;gap:6px;flex-wrap:wrap}.tend-form .row2 input{flex:1;min-width:140px}
+.tend-lista{flex:1;overflow:auto;padding:12px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:10px;align-content:start}
+.tend-vazio{color:var(--mut);grid-column:1/-1;text-align:center;padding:40px 10px}
+.tc{border:1px solid var(--line);border-left:4px solid #f2a33a;border-radius:11px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:var(--panel)}
+.tc.pega{border-left-color:#3fbf5f}.tc.nao_pega{border-left-color:#e5484d;opacity:.85}
+.tc-top{display:flex;gap:8px;align-items:flex-start}.tc-top b{flex:1;font-size:15px;line-height:1.3}
+.estrelas{color:#f2a33a;font-size:12px;white-space:nowrap}
+.tc-meta{display:flex;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--mut);align-items:center}
+.tc-meta .chip{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--ink)}
+.tc-meta a{color:var(--brand);font-weight:650}
+.tc p{margin:0;font-size:13.5px}
+.tc-acoes{display:flex;gap:6px;flex-wrap:wrap}
+.tc-acoes button{padding:6px 10px;border-radius:8px;border:1px solid var(--line);font-weight:650;font-size:13px;background:var(--chip)}
+.tc-acoes .dec.pega.on{background:#3fbf5f;color:#fff;border-color:#3fbf5f}
+.tc-acoes .dec.nao.on{background:#e5484d;color:#fff;border-color:#e5484d}
+.tc-acoes .trava.on{background:#1d1d1f;color:#fff;border-color:#1d1d1f}
+.tc-acoes .del{margin-left:auto}
+.tc-acoes button:disabled{opacity:.45;cursor:not-allowed}
+.tc-quem{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--mut)}
+/* ---- acesso / administração ---- */
+.acc-bg{position:fixed;inset:0;z-index:70;background:rgba(8,6,14,.7);display:grid;place-items:center;padding:14px}
+.acc-win{width:min(380px,100%);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px;max-height:90vh;overflow:auto}
+.acc-win.larga{width:min(640px,100%)}
+.acc-win h3{margin:0;display:flex;align-items:center;font-size:17px}
+.acc-win h3 .x{margin-left:auto;font-size:22px;width:34px;height:34px;border-radius:8px}
+.acc-win input[type=password]{height:42px;border-radius:10px;border:1px solid var(--line);background:var(--chip);padding:0 12px}
+.acc-mut{color:var(--mut);font-size:12.5px;margin:0}
+.acc-err{color:var(--bad);font-size:13px;min-height:16px}
+.acc-row{display:flex;gap:8px;justify-content:flex-end}
+.acc-sec{font-weight:800;margin:10px 0 2px}.acc-sec small{color:var(--mut);font-weight:500}
+.acc-sec2{font-weight:700;font-size:13px;margin-top:6px;display:flex;gap:6px;align-items:center}
+.acc-sala{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:10px;flex-wrap:wrap}
+.acc-sala b{min-width:120px}.acc-sala small{color:var(--mut);flex:1}
+.acc-sala select{height:34px;border-radius:8px;border:1px solid var(--line);background:var(--chip);padding:0 8px}
+.acc-sala .btn{padding:6px 12px}
+.st{font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;white-space:nowrap}
+.st.livre{background:var(--chip);color:var(--mut)}.st.rest{background:#ffe1e1;color:#b42318}.st.senha{background:#fff1d6;color:#9a5b00}
+.acc-form{display:flex;flex-direction:column;gap:6px;padding:10px;border:2px solid var(--brand);border-radius:12px}
+.acc-pessoas{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:4px;padding:6px;background:var(--chip);border-radius:9px}
+.ck{display:flex;gap:6px;align-items:center;font-size:13.5px;cursor:pointer}
 /* ---- telão de projeção ---- */
 #btnProj{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:70px;z-index:12;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe;white-space:nowrap}
 #btnProj.parar{background:#e5484d;border-color:#e5484d}
@@ -96,9 +153,11 @@ html,body{height:100%;overflow:hidden}
 <div id="load">Entrando no escritório…</div>
 <script src="assets.js"></script>
 <script src="js/projecao.js"></script>
+<script src="js/ti.js"></script>
 <script src="js/vendor/supabase.js"></script>
 <script src="js/config.js"></script>
 <script src="js/dados.js"></script>
+<script src="js/acesso.js"></script>
 <script src="js/mapa-core.js"></script>
 <script src="js/avatar.js"></script>
 <script src="js/vida.js"></script>
@@ -127,12 +186,13 @@ async function boot(){
   user = await Dados.getUsuario(EMAIL);
   if (!user.avatar) { location.href = "avatar.html"; return; }
   document.getElementById("nome").textContent = user.nome;
+  await Acesso.iniciar({ mapaId, toast, salas: () => S ? S.rooms : [] });
   S = await Dados.carregarMapa(mapaId);
   if (!S) { S = templateNext(); Dados.salvarMapaLocal(mapaId, S); }
   grid = buildBlocked();
   assentos = construirAssentos();
   teloes = allItems().filter(i => i.k === "telao");
-  monitores = allItems().filter(i => EQUIP.test(i.k));
+  monitores = allItems().filter(i => EQUIP.test(i.k)); marcarMonitoresTI();
   await atualizarTarefas(); setInterval(atualizarTarefas, 30000); Dados.ouvirTarefas(atualizarTarefas);
   Dados.ouvirMapa(mapaId, novoMapa => recarregarMapa(novoMapa));
   const sheet = await Avatar.montar(user.avatar);
@@ -140,6 +200,7 @@ async function boot(){
   const m = document.getElementById("mini").getContext("2d"); m.imageSmoothingEnabled = false; m.drawImage(sheet, 8, 4, 16, 16, 0, 0, 32, 32);
   spawn();
   Projecao.iniciar({ eu: () => P, outros: () => outros, toast, registrar: (d, sala) => Dados.registrarAtividade(EMAIL, "acao", d, {sala}) });
+  TI.iniciar({ toast, aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
   conectarSala();
   document.getElementById("load").remove();
   ligarAudioAuto();
@@ -164,7 +225,7 @@ function conectarSala(){
     aoMover(id, st){
       const a = outros.find(o => o.id === id); if (!a) return;
       if (!a.visto){ a.x = st.x; a.y = st.y; a.visto = true; }
-      a.alvo = { x: st.x, y: st.y }; a.dir = st.dir; a.remotoAndando = !!st.mov; a.mic = !!st.mic; a.audio = st.audio === undefined ? undefined : !!st.audio; a.proj = st.proj || null;
+      a.alvo = { x: st.x, y: st.y }; a.dir = st.dir; a.remotoAndando = !!st.mov; a.mic = !!st.mic; a.audio = st.audio === undefined ? undefined : !!st.audio; a.proj = st.proj || null; a.tela = !!st.tela;
       if (st.emote !== a.emote){ a.emote = st.emote; a.emoteT = 0; }
       const atual = a.assento ? a.assento.id : null;
       if (st.assento !== atual){
@@ -192,7 +253,7 @@ function moverOutros(dt){
 function recarregarMapa(novo){
   for (const a of [P, ...outros]) if (a.assento){ a.assento.ocupante = null; a.assento = null; }
   S = novo; grid = buildBlocked(); assentos = construirAssentos(); Projecao.recalcular();
-  teloes = allItems().filter(i => i.k === "telao"); monitores = allItems().filter(i => EQUIP.test(i.k));
+  teloes = allItems().filter(i => i.k === "telao"); monitores = allItems().filter(i => EQUIP.test(i.k)); marcarMonitoresTI();
   if (!livre(P.x, P.y)) spawn();
   toast("O mapa do escritório foi atualizado");
 }
@@ -229,6 +290,11 @@ function atualizarBotaoAudio(){
   else b.textContent = Voz.micAberto ? "🎙️ Microfone ligado" : "🔇 Microfone mudo";
   b.classList.toggle("mudo", Voz.ligado && !Voz.micAberto);
 }
+function verTelaDe(pessoa){
+  if (Math.hypot(pessoa.px - P.px, pessoa.py - P.py) > 170){ toast(`Chegue perto de ${pessoa.nome} para ver a tela`); return; }
+  Projecao.abrirTelaDe(pessoa);
+  Dados.registrarAtividade(EMAIL, "acao", `Viu a tela de ${pessoa.nome}`, {sala: P.sala, com: pessoa.nome});
+}
 function abrirTelao(){
   if (Telao.aberto) return; keys.clear(); joyV = null; if (P) P.path = null;
   Dados.registrarAtividade(EMAIL, "telao", "Abriu o telão da equipe");
@@ -240,21 +306,32 @@ function livre(x, y){ // caixa dos pés (12x6 px) livre?
   for (const [dx, dy] of [[-6,-3],[6,-3],[-6,3],[6,3]]) if (grid.blocked(Math.floor((x+dx)/C16), Math.floor((y+dy)/C16))) return false;
   return x > 8 && y > 8 && x < S.w*T-8 && y < S.h*T-8;
 }
+/* computadores da sala de TI ficam sempre ligados (os agentes estão trabalhando) */
+let monitoresTI = new Set();
+function marcarMonitoresTI(){ monitoresTI = new Set(monitores.filter(m => { const r = roomAt(m.x*T + 16, m.y*T + 28); return r && r.type === "ti"; }).map(m => m.x + "," + m.y)); }
+/* regras de acesso: não deixa entrar em sala com senha/restrita (abre o pedido de senha) */
+const salaLivreEm = (x, y) => { const r = roomAt(x, y - 4); return !r || Acesso.podeEntrar(r); };
+function livreP(x, y){
+  if (!livre(x, y)) return false;
+  const r = roomAt(x, y - 4);
+  if (r && !Acesso.podeEntrar(r)){ const atual = roomAt(P.px, P.py - 4); if (!atual || atual.id !== r.id){ P.path = null; Acesso.tentou(r); return false; } }
+  return true;
+}
 function spawn(){
   const pos = user.posicao;
-  if (pos && pos.mapa === mapaId && livre(pos.x, pos.y)) { P.x = pos.x; P.y = pos.y; P.dir = pos.direcao || 0; return; }
+  if (pos && pos.mapa === mapaId && livre(pos.x, pos.y) && salaLivreEm(pos.x, pos.y)) { P.x = pos.x; P.y = pos.y; P.dir = pos.direcao || 0; return; }
   const r = S.rooms.find(r => r.type === "recepcao") || S.rooms[0];
   let cx = r ? (r.x + r.w/2)*T : S.w*T/2, cy = r ? (r.y + r.h/2)*T : S.h*T/2;
   for (let rad = 0; rad < 40; rad++) for (let a = 0; a < 16; a++){
     const x = cx + Math.cos(a/16*Math.PI*2)*rad*16, y = cy + Math.sin(a/16*Math.PI*2)*rad*16;
-    if (livre(x, y)) { P.x = x; P.y = y; return; }
+    if (livre(x, y) && salaLivreEm(x, y)) { P.x = x; P.y = y; return; }
   }
   P.x = cx; P.y = cy;
 }
 
 /* ---------- entrada ---------- */
 const DIRKEYS = {ArrowUp:[0,-1],w:[0,-1],W:[0,-1],ArrowDown:[0,1],s:[0,1],S:[0,1],ArrowLeft:[-1,0],a:[-1,0],A:[-1,0],ArrowRight:[1,0],d:[1,0],D:[1,0]};
-addEventListener("keydown", e => { if (e.target.matches("input,select,textarea") || Telao.aberto) return; if (DIRKEYS[e.key]) { keys.add(e.key); if (P) { P.path = null; P.emote = null; } e.preventDefault(); }
+addEventListener("keydown", e => { if (e.target.matches("input,select,textarea") || Telao.aberto || TI.aberto || Acesso.aberto) return; if (DIRKEYS[e.key]) { keys.add(e.key); if (P) { P.path = null; P.emote = null; } e.preventDefault(); }
   if (e.key === "1") emote(5); if (e.key === "2") emote(6); if (e.key === "3") sentarPerto(); });
 addEventListener("keyup", e => keys.delete(e.key));
 addEventListener("blur", () => keys.clear());
@@ -274,7 +351,12 @@ const up = e => {
   if (!had || !grid || !P) return;
   const [wx, wy] = toWorld(e.clientX, e.clientY);
   const pessoa = outros.find(o => o.visto && o.sheet && Math.abs(o.px - wx) < 12 && wy > o.py - 34 && wy < o.py + 4);
-  if (pessoa){ abrirConfigAudio(pessoa.id); return; }
+  if (pessoa){ if (pessoa.tela) verTelaDe(pessoa); else abrirConfigAudio(pessoa.id); return; }
+  // clicou no computador de alguém que abriu a tela?
+  const mon = monitores.find(m => /^(monitor|notebook)$/.test(m.k) && wx >= m.x*T && wx <= m.x*T + 32 && wy >= m.y*T && wy <= m.y*T + 32);
+  if (mon){ const s = assentos.find(s => s.monitores && s.monitores.some(m2 => m2.x === mon.x && m2.y === mon.y)); const dono = s && s.ocupante;
+    if (dono && dono !== P){ if (dono.tela) { verTelaDe(dono); return; } toast(`${dono.nome} não abriu a tela do computador`); return; } }
+  if (TI.clicou(wx, wy)) return;
   if (Projecao.clicou(wx, wy)) return;
   for (const it of teloes){ if (wx >= it.x*T && wx <= it.x*T + 192 && wy >= it.y*T && wy <= it.y*T + 90){ abrirTelao(); return; } }
   // clicou num assento? vai até ele e senta
@@ -331,7 +413,7 @@ function loop(now){
   if (joyV){ vx = joyV[0]; vy = joyV[1]; }
   if ((vx || vy) && P.assento) P.levantar();
   if (!vx && !vy && !P.assento && P.path) [vx, vy] = seguirCaminho(P);
-  if (!P.assento) moverAtor(P, dt, vx, vy, livre, VEL); else { P.moving = false; P.parado += dt; }
+  if (!P.assento) moverAtor(P, dt, vx, vy, livreP, VEL); else { P.moving = false; P.parado += dt; }
   if (P.moving){ P.emote = null; sujo = true; }
   if (P.emote != null){ P.emoteT += dt; if (P.emoteT > 3) P.emote = null; }
   if (P.saiuDe && Math.hypot(P.saiuDe.sx - P.x, P.saiuDe.sy - P.y) > 40) P.saiuDe = null;
@@ -346,7 +428,7 @@ function loop(now){
   const visiveis = outros.filter(o => o.visto && o.sheet);
   Voz.atualizar(P, visiveis, now);
   Projecao.atualizar(now);
-  Sala.enviarPosicao({ x: Math.round(P.x), y: Math.round(P.y), dir: P.dir, mov: P.moving, assento: P.assento ? P.assento.id : null, emote: P.emote, mic: Voz.micAberto, audio: Voz.ligado, proj: Projecao.minhaSala }, now);
+  Sala.enviarPosicao({ x: Math.round(P.x), y: Math.round(P.y), dir: P.dir, mov: P.moving, assento: P.assento ? P.assento.id : null, emote: P.emote, mic: Voz.micAberto, audio: Voz.ligado, proj: Projecao.minhaSala, tela: Projecao.minhaTela }, now);
   atualizarConversas([P, ...visiveis], dt, (a, o) => {
     if (a !== P) return;
     const agora = Date.now(); if (conversasLog[o.nome] && agora - conversasLog[o.nome] < 60000) return;
@@ -385,12 +467,12 @@ function cam(){
 function draw(){
   ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle = "#16141f"; ctx.fillRect(0, 0, cv.width, cv.height);
   const c = cam(), atores = [P, ...outros.filter(o => o.visto && o.sheet)];
-  const ligados = new Set(); for (const a of atores) if (a.assento && a.assento.trabalho) for (const m of a.assento.monitores) ligados.add(m.x + "," + m.y);
+  const ligados = new Set(monitoresTI); for (const a of atores) if (a.assento && a.assento.trabalho) for (const m of a.assento.monitores) ligados.add(m.x + "," + m.y);
   ctx.imageSmoothingEnabled = false;
   ctx.setTransform(zoom*DPR, 0, 0, zoom*DPR, c.ox*DPR, c.oy*DPR);
   drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => Telao.desenharTela(g, it.x*T, it.y*T, tarefas) })))
     .concat(monitores.map(it => ({ sort: sortKey(it) + 0.01, draw: g => desenharMonitor(g, it, ligados.has(it.x + "," + it.y), t) })))
-    .concat(Projecao.desenhaveis()));
+    .concat(Projecao.desenhaveis()).concat(TI.desenhaveis(t)));
   for (const a of atores) a.balao(ctx, t);
   if (marca){ ctx.strokeStyle = `rgba(61,90,254,${marca.t})`; ctx.lineWidth = 2/zoom*1.5; ctx.beginPath(); ctx.ellipse(marca.x, marca.y, 10*(1.6-marca.t*.6), 5*(1.6-marca.t*.6), 0, 0, Math.PI*2); ctx.stroke(); }
   // nomes (tela)
@@ -402,10 +484,22 @@ function draw(){
     const vp = a !== P ? (a.volPessoal ?? Voz.volumePessoa(a.id)) : 1;
     const est = a !== P && Voz.ligado && !a.ouvindo && a.estadoAudio === "conectando" ? " ⏳" : "";
     const semMic = a !== P && a.audio !== false && a.mic === false && a.visto ? " 🎙️✕" : "";
-    const txt = a.nome + (vp === 0 ? " 🔇" : a !== P && a.ouvindo ? " 🔊" : "") + est + semMic + (vp > 0 && vp < 0.99 ? ` ${Math.round(vp*100)}%` : vp > 1.01 ? ` ${Math.round(vp*100)}%` : "") + (a.vozReal ? " 🗣" : "");
+    const tela = a === P ? Projecao.minhaTela : a.tela;
+    const txt = a.nome + (tela ? " 🖥️" : "") + (vp === 0 ? " 🔇" : a !== P && a.ouvindo ? " 🔊" : "") + est + semMic + (vp > 0 && vp < 0.99 ? ` ${Math.round(vp*100)}%` : vp > 1.01 ? ` ${Math.round(vp*100)}%` : "") + (a.vozReal ? " 🗣" : "");
     ctx.font = "700 12px system-ui,sans-serif"; const w = ctx.measureText(txt).width + 12;
     ctx.fillStyle = a === P ? "rgba(61,90,254,.92)" : "rgba(20,16,32,.72)"; ctx.beginPath(); ctx.roundRect(sx - w/2, sy - 19, w, 17, 6); ctx.fill();
     ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(txt, sx, sy - 10.5); ctx.textAlign = "left";
+  }
+  TI.nomes(ctx, c, zoom, t);
+  // selo de sala com senha/restrita
+  for (const r of S.rooms){
+    const selo = Acesso.selo(r); if (!selo) continue;
+    const sx = (r.x*T + 6)*zoom + c.ox, sy = (r.y*T + 6)*zoom + c.oy;
+    if (sx < -200 || sx > VW + 20 || sy < -20 || sy > VH + 20) continue;
+    const ok = Acesso.podeEntrar(r), txt = `${selo === "senha" ? "🔑" : "🔒"} ${r.name}${ok ? " · liberada p/ você" : ""}`;
+    ctx.font = "700 11px system-ui,sans-serif"; const w = ctx.measureText(txt).width + 12;
+    ctx.fillStyle = ok ? "rgba(63,191,95,.9)" : "rgba(229,72,77,.9)"; ctx.beginPath(); ctx.roundRect(sx, sy, w, 17, 6); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.textBaseline = "middle"; ctx.fillText(txt, sx + 6, sy + 9);
   }
 }
 
@@ -421,6 +515,8 @@ document.getElementById("eu").onclick = async () => {
     <a class="mi" href="avatar.html">🧍 Editar meu personagem</a>
     <button class="mi" data-telao>📊 Telão da equipe</button>
     <button class="mi" data-cfgaudio>🎚️ Áudio: microfone, saída e volumes</button>
+    <button class="mi" data-tend>📈 Tendências de mercado</button>
+    ${Dados.ehAdmin() ? `<button class="mi" data-admin>🛡️ Administração: salas, senhas e papéis</button>` : ""}
     <a class="mi" href="editor.html">🛠️ Editor de salas</a>
     <button class="mi" data-exp>💾 Baixar meus dados (JSON)</button>
     <button class="mi" data-sair>🚪 Sair</button>
@@ -433,6 +529,8 @@ menu.onclick = async e => {
   if (e.target.closest("[data-close]")) menu.classList.add("hidden");
   if (e.target.closest("[data-telao]")) { menu.classList.add("hidden"); abrirTelao(); }
   if (e.target.closest("[data-cfgaudio]")) { menu.classList.add("hidden"); abrirConfigAudio(); }
+  if (e.target.closest("[data-tend]")) { menu.classList.add("hidden"); TI.abrirPainel(); }
+  if (e.target.closest("[data-admin]")) { menu.classList.add("hidden"); Acesso.abrirAdmin(); }
   if (e.target.closest("[data-sair]")) { salvarPos(); await Dados.sair(); location.href = "index.html"; }
   if (e.target.closest("[data-exp]")) {
     const dados = { usuario: await Dados.getUsuario(EMAIL), atividades: await Dados.listarAtividades(EMAIL, 1000) };
