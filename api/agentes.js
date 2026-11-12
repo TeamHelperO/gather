@@ -53,7 +53,7 @@ async function chamar(modelo, chave, n, mensagens, sinal) {
   const r = await fetch(NV, {
     method: "POST",
     headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.6, max_tokens: 1200 }),
+    body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.6, max_tokens: 2000 }),
     signal: AbortSignal.any([sinal, AbortSignal.timeout(Math.max(5000, restante() - 3000))]),
   }).catch(e => ({ ok: false, status: 0, text: async () => String(e) }));
   const reg = `${modelo} · chave ${n} · ${r.status} · ${((Date.now() - t0) / 1000).toFixed(1)}s`;
@@ -61,8 +61,10 @@ async function chamar(modelo, chave, n, mensagens, sinal) {
   const erro = (msg, tipo) => { const e = new Error(msg); e[tipo] = true; return e; };
   if (r.status === 0) { if (sinal.aborted) throw erro("cancelado", "cancelado"); throw erro(`${modelo} demorou demais`, "morto"); }
   if (r.ok) {
-    const j = await r.json(), texto = j.choices?.[0]?.message?.content || "";
-    if (!/\{[\s\S]*\}/.test(texto)) throw erro(`${modelo} não devolveu JSON`, "morto");
+    const j = await r.json(), msg = j.choices?.[0]?.message || {};
+    // alguns modelos (com "raciocínio") devolvem a resposta em reasoning_content, ou o JSON dentro de ```json
+    const texto = [msg.content, msg.reasoning_content, msg.reasoning].filter(Boolean).join("\n");
+    if (!Object.keys(lerJSON(texto)).length) { console.log("[agentes] sem JSON:", JSON.stringify(msg).slice(0, 400)); throw erro(`${modelo} não devolveu JSON`, "morto"); }
     return { texto, chave: n, modelo };
   }
   const txt = await r.text(); console.log("[agentes] resposta:", txt.slice(0, 200));
@@ -102,8 +104,16 @@ const rpc = (fn, corpo, token) => fetch(`${SUPA}/rest/v1/rpc/${fn}`, {
 const status = (agente, s, d) => rpc("agente_status", { p_chave: process.env.AGENTES_CHAVE, p_agente: agente, p_status: s, p_detalhe: d }).catch(() => {});
 
 function lerJSON(txt) {
-  const m = txt.match(/\{[\s\S]*\}/); if (!m) return {};
-  try { return JSON.parse(m[0]); } catch (e) { return {}; }
+  txt = String(txt || "").replace(/<think>[\s\S]*?<\/think>/g, "").replace(/```(?:json)?/gi, "");
+  // pega o último bloco {...} que for JSON válido (o raciocínio pode vir antes)
+  const ini = [...txt.matchAll(/\{/g)].map(m => m.index);
+  const fim = txt.lastIndexOf("}");
+  for (const a of ini) {
+    try { const o = JSON.parse(txt.slice(a, fim + 1)); if (o && typeof o === "object" && !Array.isArray(o) && Object.values(o).some(Array.isArray)) return o; } catch (e) {}
+  }
+  const arr = txt.match(/\[[\s\S]*\]/); // veio só uma lista: vira do primeiro agente
+  if (arr) try { const l = JSON.parse(arr[0]); if (Array.isArray(l)) return { agente1: l }; } catch (e) {}
+  return {};
 }
 
 // uma chamada só para os agentes escolhidos (mais rápido e gasta menos cota)
@@ -111,7 +121,7 @@ async function rodada(lista, porAgente) {
   await Promise.all(lista.map(a => status(a.id, "pesquisando", `Pedindo à IA tendências de ${a.cat}`)));
   const hoje = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   const { texto, chave, modelo } = await perguntar([
-    { role: "system", content: "/no_think Você é uma equipe de analistas de tendências de mercado. Responda só com JSON válido, em português do Brasil, sem texto fora do JSON." },
+    { role: "system", content: "Você é uma equipe de analistas de tendências de mercado. Responda só com JSON válido, em português do Brasil, sem texto fora do JSON." },
     { role: "user", content: `Hoje é ${hoje}. Para uma agência/empresa digital brasileira, cada agente lista ${porAgente} tendências atuais e acionáveis da sua área:\n` +
       lista.map(a => `- ${a.id} (${a.nome}): ${a.area}`).join("\n") +
       `\nFormato: {"agente1": [{"titulo": "até 90 caracteres", "resumo": "2 frases: o que é e por que vale (ou não) pegar", "relevancia": 1-5}], ...}. Não invente números nem links.` },
