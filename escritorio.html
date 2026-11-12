@@ -91,7 +91,7 @@ async function boot(){
   grid = buildBlocked();
   assentos = construirAssentos();
   teloes = allItems().filter(i => i.k === "telao");
-  monitores = allItems().filter(i => i.k === "monitor" || i.k === "notebook");
+  monitores = allItems().filter(i => EQUIP.test(i.k));
   await atualizarTarefas(); setInterval(atualizarTarefas, 30000); Dados.ouvirTarefas(atualizarTarefas);
   Dados.ouvirMapa(mapaId, novoMapa => recarregarMapa(novoMapa));
   const sheet = await Avatar.montar(user.avatar);
@@ -149,7 +149,7 @@ function moverOutros(dt){
 function recarregarMapa(novo){
   for (const a of [P, ...outros]) if (a.assento){ a.assento.ocupante = null; a.assento = null; }
   S = novo; grid = buildBlocked(); assentos = construirAssentos();
-  teloes = allItems().filter(i => i.k === "telao"); monitores = allItems().filter(i => i.k === "monitor" || i.k === "notebook");
+  teloes = allItems().filter(i => i.k === "telao"); monitores = allItems().filter(i => EQUIP.test(i.k));
   if (!livre(P.x, P.y)) spawn();
   toast("O mapa do escritório foi atualizado");
 }

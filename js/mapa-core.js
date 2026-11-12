@@ -65,22 +65,24 @@ function layoutBase(r){
       if (w >= 7) P("estante", x+w-2.3, y-1.4);
       if (w >= 4) P("relogio", cx-0.5, y-1.6, {z:"wall"});
       P("planta", x+0.1, y-0.25);
-      const n = Math.max(1, Math.floor((w-1)/3)), m = Math.max(1, Math.floor((h-1)/3));
-      const span = n*3-1, sx = x + (w-span)/2;
+      // mesas grandes (3 x 1,5 tiles) com 1 tile de corredor entre elas
+      const n = Math.max(1, Math.floor((w+1)/4)), m = Math.max(1, Math.floor((h-3.1)/3.5)+1);
+      const span = n*4-1, sx = x + (w-span)/2;
       for (let j=0;j<m;j++) for (let i=0;i<n;i++) {
-        const tx = sx+i*3, ty = y+1+j*3;
-        if (tx+2 > x+w+0.01 || ty+1.8 > y+h+0.1) continue;
-        P("mesa", tx, ty);
-        const tipo = (i + j) % 3, sobre = {sort:(ty+1)*T+1}; // itens em cima da mesa
-        if (tipo === 2){ // mesa de notebook
-          P("notebook", tx+0.5, ty-0.28, sobre); P("mouse", tx+1.45, ty+0.1, sobre);
-        } else {
-          P("monitor", tx, ty-0.38, sobre);
-          if (tipo === 0) P("monitor", tx+1, ty-0.38, sobre);
-          else P("gabinete", tx+1.2, ty-0.42, sobre); // PC gamer em cima da mesa
-          P(tipo === 1 ? "teclado_rgb" : "teclado", tx+0.25, ty+0.05, sobre); P("mouse", tx+1.15, ty+0.1, sobre);
+        const tx = sx+i*4, ty = y+0.9+j*3.5;
+        if (tx+3 > x+w+0.01 || ty+2.3 > y+h+0.1) continue;
+        P("mesa_pc", tx, ty);
+        const tipo = (i + j) % 3;
+        if (tipo === 2){ // notebook
+          P("notebook", tx+0.85, ty-0.2); P("mouse", tx+1.9, ty+0.22);
+        } else if (tipo === 1){ // PC gamer
+          P("monitor", tx+0.55, ty-0.47); P("gabinete", tx+2.0, ty-0.44);
+          P("teclado_rgb", tx+0.55, ty+0.34); P("mouse", tx+1.55, ty+0.22);
+        } else { // dois monitores
+          P("monitor", tx+0.5, ty-0.47); P("monitor", tx+1.5, ty-0.47);
+          P("teclado", tx+1, ty+0.34); P("mouse", tx+2.05, ty+0.22);
         }
-        if (ty+1.8 <= y+h+0.1) P("cadeira_cima", tx+0.5, ty+0.8);
+        P("cadeira_cima", tx+1, ty+1.3);
       }
       break;
     }
@@ -198,6 +200,7 @@ function apoiarNasMesas(items){
 }
 function topoDaMesa(it){
   if (!SOBRE_MESA.test(it.k) || !ASSETS[it.k]) return null;
+  if (!MESAS.length && typeof S !== "undefined" && S) MESAS = allItems().filter(i => E_MESA.test(i.k) && ASSETS[i.k]);
   const a = ASSETS[it.k], cx = it.x*T + a.w/2, by = it.y*T + a.h;
   let topo = null;
   for (const m of MESAS){
@@ -210,8 +213,8 @@ function topoDaMesa(it){
   return topo === null ? null : topo + 1 + frente + by/1000;
 }
 function sortKey(it){
-  if (it._sobre === undefined && SOBRE_MESA.test(it.k)) it._sobre = topoDaMesa(it);
   if (it._sobre != null) return it._sobre;
+  if (it._sobre === undefined && SOBRE_MESA.test(it.k)){ const v = topoDaMesa(it); if (v != null) return v; }
   if (it.sort!=null) return it.sort;
   if (it.z==="wall"){ const r=roomById(it.room); return (r? r.y*T : it.y*T) + 0.5; }
   return it.y*T + ASSETS[it.k].h;

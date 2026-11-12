@@ -14,13 +14,14 @@ const ASSENTOS_DEF = {
 };
 function construirAssentos(){
   const itens = allItems(), out = [];
-  const mesas = itens.filter(i => i.k === "mesa");
+  const mesas = itens.filter(i => i.k === "mesa" || i.k === "mesa_pc");
+  const lw = m => ASSETS[m.k].w / T, lh = m => ASSETS[m.k].h / T;
   for (const it of itens){
     const d = ASSENTOS_DEF[it.k]; if (!d) continue;
     const a = ASSETS[it.k], base = it.y*T + a.h;
-    const mesa = it.k === "cadeira_cima" ? mesas.find(m => it.x + 0.5 >= m.x - 0.1 && it.x + 0.5 <= m.x + 2.1 && it.y - m.y > 0.3 && it.y - m.y < 1.3) : null;
+    const mesa = it.k === "cadeira_cima" ? mesas.find(m => it.x + 0.5 >= m.x - 0.1 && it.x + 0.5 <= m.x + lw(m) + 0.1 && it.y - m.y > lh(m) - 0.7 && it.y - m.y < lh(m) + 0.3) : null;
     const trabalho = !!mesa;
-    const monitores = mesa ? itens.filter(o => (o.k === "monitor" || o.k === "notebook") && o.x >= mesa.x - 0.1 && o.x <= mesa.x + 1.6 && o.y >= mesa.y - 1 && o.y <= mesa.y + 0.2) : [];
+    const monitores = mesa ? itens.filter(o => EQUIP.test(o.k) && o.x >= mesa.x - 0.1 && o.x <= mesa.x + lw(mesa) - 0.4 && o.y >= mesa.y - 1 && o.y <= mesa.y + 0.5) : [];
     d.pts.forEach(([px, py], i) => {
       const sx = it.x*T + px, sy = it.y*T + py, sala = roomAt(sx, sy);
       out.push({ id: `${it.id || it.k + "_" + it.x + "_" + it.y}_${i}`, k: it.k, sx, sy, face: d.face, r: d.r, trabalho, monitores,
@@ -132,30 +133,124 @@ function seguirCaminho(a){
    Monitor (sprite 32x32): tela em x 5..26, y 6..20. Desligado = descanso escuro; com alguém trabalhando = código sendo digitado. */
 const CORES_CODIGO = ["#8fa0ff", "#3fbf5f", "#ffffff", "#f2a33a", "#e07aa8", "#8fd0f0"];
 const TELAS = { monitor: [5, 6, 22, 15], notebook: [8, 6, 16, 12] };
+const EQUIP = /^(monitor|notebook|teclado|teclado_rgb|gabinete)$/; // o que "liga" quando alguém senta na mesa
+const LIGOU = new Map();   // chave do aparelho -> instante em que ligou (animação de ligar)
+const semente = it => { let s = 0; for (const c of String(it.x + "," + it.y)) s = (s*31 + c.charCodeAt(0)) >>> 0; return s; };
+const hsl = (h, l = 60, a = 1) => `hsla(${((h % 360) + 360) % 360},90%,${l}%,${a})`;
+
+/* Desenha a parte animada de um aparelho da mesa (tela, teclado, fans). ativo = tem alguém trabalhando. */
 function desenharMonitor(g, it, ativo, t){
+  if (it.k === "teclado" || it.k === "teclado_rgb") return desenharTeclado(g, it, ativo, t);
+  if (it.k === "gabinete") return desenharGabinete(g, it, ativo, t);
   const [ox, oy, w, h] = TELAS[it.k] || TELAS.monitor;
-  const x = Math.round(it.x*T) + ox, y = Math.round(it.y*T) + oy;
-  let semente = 0; for (const c of String(it.id || it.x + "," + it.y)) semente = (semente*31 + c.charCodeAt(0)) >>> 0;
+  const x = Math.round(it.x*T) + ox, y = Math.round(it.y*T) + oy, sd = semente(it), chave = it.x + "," + it.y;
   if (!ativo){
-    g.fillStyle = "#141c2c"; g.fillRect(x, y, w, h);
-    g.fillStyle = "rgba(143,160,255,.25)"; const bx = x + 3 + Math.floor((Math.sin(t*0.6 + semente) + 1)*7), by = y + 4 + Math.floor((Math.cos(t*0.5 + semente) + 1)*3);
-    g.fillRect(bx, by, 3, 2); // descanso de tela
+    LIGOU.delete(chave);
+    g.fillStyle = "#10141f"; g.fillRect(x, y, w, h);
+    // descanso de tela: logo quicando e mudando de cor
+    const lx = x + 1 + Math.abs(((t*5 + sd) % (2*(w - 5))) - (w - 5)), ly = y + 1 + Math.abs(((t*3.3 + sd/7) % (2*(h - 4))) - (h - 4));
+    g.fillStyle = hsl(t*40 + sd, 62, .55); g.fillRect(Math.round(lx), Math.round(ly), 3, 2); g.fillRect(Math.round(lx) + 1, Math.round(ly) + 2, 1, 1);
+    g.fillStyle = Math.floor(t + sd) % 3 === 0 ? "#f2a33a" : "#7a5418"; g.fillRect(x + Math.floor(w/2), y + h + 1, 1, 1); // luz de espera
     return;
   }
-  g.fillStyle = "#1f2f4a"; g.fillRect(x, y, w, h);
-  const linhasVisiveis = Math.floor((h - 1)/2), vel = 7 + (semente % 4); // caracteres por segundo
-  const total = Math.floor(t*vel + (semente % 50));
-  const larg = i => 4 + ((semente >>> (i % 16)) + i*7) % 13;      // largura de cada linha
-  const recuo = i => ((semente >>> ((i + 3) % 16)) + i) % 3 * 2;    // indentação
-  // descobre em que linha está digitando
-  let resto = total, linha = 0; while (resto >= larg(linha)){ resto -= larg(linha); linha++; }
-  const primeira = Math.max(0, linha - linhasVisiveis + 1);
-  for (let i = primeira; i <= linha; i++){
-    const yy = y + 1 + (i - primeira)*2;
-    const comp = i < linha ? larg(i) : resto, cor = CORES_CODIGO[((semente >>> (i % 12)) + i) % CORES_CODIGO.length];
-    g.fillStyle = cor; g.fillRect(x + 1 + recuo(i), Math.round(yy), Math.min(comp, w - 2 - recuo(i)), 1);
-    if (i === linha && Math.floor(t*2.5) % 2 === 0){ g.fillStyle = "#ffffff"; g.fillRect(x + 1 + recuo(i) + Math.min(comp, w - 3 - recuo(i)), Math.round(yy) - 1, 1, 2); }
+  if (!LIGOU.has(chave)) LIGOU.set(chave, t);
+  const idade = t - LIGOU.get(chave);
+  if (idade < 0.7){ // ligando: linha branca que abre em tela
+    g.fillStyle = "#05070c"; g.fillRect(x, y, w, h);
+    const k = Math.min(1, idade/0.35), hh = Math.max(1, Math.round(h*k));
+    g.fillStyle = idade < 0.35 ? "#e8f0ff" : `rgba(143,160,255,${1 - (idade - 0.35)/0.35})`;
+    g.fillRect(x, y + Math.floor((h - hh)/2), w, hh);
+    return;
   }
-  g.fillStyle = "rgba(143,160,255,.12)"; g.fillRect(x, y, w, h); // brilho
-  g.fillStyle = "#3fbf5f"; g.fillRect(x + Math.floor(w/2) - 1, y + h + 1, 1, 1);    // luz de ligado
+  const mix = (sd ^ (sd >>> 7) ^ (sd >>> 13)) >>> 0, app = it.k === "notebook" ? [0, 2, 3, 1][mix % 4] : mix % 4;
+  [appCodigo, appTerminal, appDashboard, appDesign][app](g, x, y, w, h, t, sd);
+  // reflexo e brilho na mesa
+  g.fillStyle = "rgba(255,255,255,.07)"; g.fillRect(x, y, Math.floor(w/3), 1);
+  const brilho = .09 + .03*Math.sin(t*3 + sd);
+  g.fillStyle = `rgba(143,190,255,${brilho})`; g.fillRect(x - 2, y + h + 4, w + 4, 5);
+  g.fillStyle = "#3fbf5f"; g.fillRect(x + Math.floor(w/2), y + h + 1, 1, 1);
+}
+function appCodigo(g, x, y, w, h, t, sd){
+  g.fillStyle = "#1b2438"; g.fillRect(x, y, w, h);
+  g.fillStyle = "#151c2c"; g.fillRect(x, y, 3, h); // números das linhas
+  const cw = w - 5, nl = Math.floor((h - 1)/2), vel = 8 + sd % 5, total = Math.floor(t*vel + sd % 60);
+  const larg = i => 3 + ((sd >>> (i % 16)) + i*7) % (cw - 4), recuo = i => (((sd >>> ((i + 3) % 16)) + i) % 3)*2;
+  let resto = total, linha = 0; while (resto >= larg(linha)){ resto -= larg(linha); linha++; }
+  const prim = Math.max(0, linha - nl + 1);
+  for (let i = prim; i <= linha; i++){
+    const yy = y + 1 + (i - prim)*2, r = recuo(i), comp = Math.min(i < linha ? larg(i) : resto, cw - r);
+    g.fillStyle = "#3a4560"; g.fillRect(x + 1, yy, 1, 1);
+    let px = x + 4 + r, falta = comp, n = 0;
+    while (falta > 0){ const p = Math.min(falta, 2 + ((sd >>> ((i + n) % 13)) + n) % 5); g.fillStyle = CORES_CODIGO[(i*3 + n + sd) % CORES_CODIGO.length]; g.fillRect(px, yy, p, 1); px += p + 1; falta -= p + 1; n++; }
+    if (i === linha){ g.fillStyle = "rgba(255,255,255,.06)"; g.fillRect(x + 3, yy - 1, w - 3, 2);
+      if (Math.floor(t*2.5) % 2 === 0){ g.fillStyle = "#fff"; g.fillRect(Math.min(px, x + w - 1), yy - 1, 1, 2); } }
+  }
+}
+function appTerminal(g, x, y, w, h, t, sd){
+  g.fillStyle = "#07090d"; g.fillRect(x, y, w, h);
+  const nl = Math.floor((h - 1)/2), passo = Math.floor(t*2.2 + sd % 30);
+  for (let i = 0; i < nl; i++){
+    const n = passo - (nl - 1 - i), comp = 3 + ((sd >>> (n % 14)) + n*5) % (w - 5), yy = y + 1 + i*2;
+    const ok = (n + sd) % 7 === 0;
+    g.fillStyle = i === nl - 1 ? "#3fbf5f" : ok ? "#f2a33a" : "rgba(63,191,95,.75)";
+    if (i === nl - 1){ g.fillRect(x + 1, yy, 2, 1); const dig = Math.min(comp, Math.floor((t*9) % (comp + 8))); g.fillRect(x + 4, yy, dig, 1);
+      if (Math.floor(t*3) % 2 === 0){ g.fillStyle = "#c8ffd6"; g.fillRect(x + 4 + dig, yy - 1, 1, 2); } }
+    else g.fillRect(x + 1, yy, comp, 1);
+  }
+}
+function appDashboard(g, x, y, w, h, t, sd){
+  g.fillStyle = "#141a2a"; g.fillRect(x, y, w, h);
+  g.fillStyle = "#222b44"; g.fillRect(x, y, w, 2); g.fillStyle = "#3fbf5f"; g.fillRect(x + 1, y, 3, 1);
+  const top = y + 3, alt = h - 4, mid = top + Math.floor(alt*0.45);
+  // linha do gráfico andando
+  g.fillStyle = "#e07aa8";
+  for (let i = 0; i < w - 2; i++){ const v = Math.sin((i + t*6 + sd)*0.45) + Math.sin((i*0.23 + t*1.7 + sd)); g.fillRect(x + 1 + i, mid - 1 - Math.round((v + 2)*(alt*0.45 - 2)/4), 1, 1); }
+  // barras subindo e descendo
+  const nb = Math.floor((w - 2)/3);
+  for (let i = 0; i < nb; i++){
+    const v = .35 + .6*Math.abs(Math.sin(t*0.9 + i*1.3 + sd)), bh = Math.max(1, Math.round(v*(alt*0.5)));
+    g.fillStyle = i % 2 ? "#8fa0ff" : "#8fd0f0"; g.fillRect(x + 1 + i*3, y + h - 1 - bh, 2, bh);
+  }
+}
+function appDesign(g, x, y, w, h, t, sd){
+  g.fillStyle = "#e9ecf3"; g.fillRect(x, y, w, h);
+  g.fillStyle = "#2a2f3c"; g.fillRect(x, y, w, 2); g.fillRect(x, y, 2, h);
+  const cw2 = Math.floor((w - 6)/2), cards = [[3, 3, cw2, 5, "#8fa0ff"], [4 + cw2, 3, cw2, 5, "#f2a33a"], [3, 9, w - 5, Math.min(3, h - 10), "#3fbf5f"]];
+  const sel = Math.floor(t/1.4 + sd) % cards.length;
+  cards.forEach(([cx, cy, cw, ch, c], i) => {
+    if (cx + cw > w || cy + ch > h) return;
+    const pulso = i === sel ? Math.round(Math.sin(t*4)*0.6) : 0;
+    g.fillStyle = c; g.fillRect(x + cx - pulso, y + cy - pulso, cw + pulso*2, ch + pulso*2);
+    if (i === sel){ g.strokeStyle = "#1f6fff"; g.lineWidth = 1; g.strokeRect(x + cx - 1.5, y + cy - 1.5, cw + 3, ch + 3); }
+  });
+  const [cx, cy, cw, ch] = cards[sel], f = (t/1.4 + sd) % 1, mx = x + cx + cw - 1 - Math.round((1 - Math.min(1, f*3))*6), my = y + cy + ch - 1;
+  g.fillStyle = "#111"; g.fillRect(mx, my, 1, 3); g.fillRect(mx + 1, my + 1, 1, 1); // cursor
+}
+function desenharTeclado(g, it, ativo, t){
+  const x = Math.round(it.x*T), y = Math.round(it.y*T), sd = semente(it), rgb = it.k === "teclado_rgb";
+  [[7, 5], [9, 6]].forEach(([yy, x0]) => {
+    for (let kx = x0; kx < 27; kx += 2){
+      let cor = null;
+      if (rgb) cor = hsl(kx*14 - t*140 + yy*20, ativo ? 62 : 48, ativo ? 1 : .8);
+      if (ativo && ((Math.floor(t*14) * 7 + kx*3 + yy + sd) % 23) === 0) cor = "#ffffff"; // tecla apertada
+      if (cor){ g.fillStyle = cor; g.fillRect(x + kx, y + yy, 1, 1); }
+    }
+  });
+  if (rgb) for (let lx = 4; lx < 28; lx++){ g.fillStyle = hsl(lx*15 - t*140, 58, .9); g.fillRect(x + lx, y + 12, 1, 1); }
+}
+function desenharGabinete(g, it, ativo, t){
+  const x = Math.round(it.x*T), y = Math.round(it.y*T), sd = semente(it), vel = ativo ? 9 : 4;
+  [[11, 0], [19, 120]].forEach(([cy, h0]) => {
+    const cor = hsl(h0 + t*60 + sd, 60);
+    g.fillStyle = "#141420"; g.fillRect(x + 12, y + cy - 3, 7, 7);
+    g.strokeStyle = cor; g.lineWidth = 1; g.beginPath(); g.arc(x + 15.5, y + cy + 0.5, 3, 0, Math.PI*2); g.stroke();
+    for (let p = 0; p < 3; p++){ // pás girando
+      const a = t*vel + p*Math.PI*2/3 + sd;
+      g.fillStyle = hsl(h0 + t*60 + sd, 75, .85); g.fillRect(x + 15 + Math.round(Math.cos(a)*1.6), y + cy + Math.round(Math.sin(a)*1.6), 1, 1);
+    }
+    g.fillStyle = "#fff"; g.fillRect(x + 15, y + cy, 1, 1);
+  });
+  for (let ly = 8; ly <= 25; ly++){ g.fillStyle = hsl(ly*12 - t*90 + sd, 58, ativo ? .95 : .7); g.fillRect(x + 20, y + ly, 2, 1); }
+  g.fillStyle = ativo && Math.floor(t*6 + sd) % 3 === 0 ? "#ff5a5a" : "#3fbf5f"; g.fillRect(x + 11, y + 25, 3, 1); // led de disco
+  g.fillStyle = hsl(t*60 + sd, 60, .08); g.fillRect(x + 6, y + 30, 20, 3); // reflexo na mesa
 }

@@ -162,6 +162,23 @@ def mesa_trabalho():
     return f
 
 
+def mesa_pc():
+    """96x48 – mesa de trabalho grande (3 x 1,5 tiles) com gaveteiro; tampo em y 3..26."""
+    f = new(96, 48); px = Px(f)
+    shadow(f, 3, 36, 92, 47)
+    for x0 in (5,):
+        px.r(x0, 30, x0 + 3, 45, P["metal_d"]); px.r(x0, 45, x0 + 3, 45, OUTLINE); px.r(x0, 30, x0, 44, shade(P["metal_d"], 1.3))
+    blk(px, 64, 26, 91, 46, 2, shade(P["wood"], 1.08), shade(P["wood"], 0.92))  # gaveteiro
+    for y in (35, 41):
+        px.r(66, y, 89, y, shade(P["wood"], 0.7)); px.r(75, y - 3, 80, y - 3, P["metal_l"])
+    blk(px, 1, 2, 94, 34, 24, P["wood_l"], P["wood"])  # tampo
+    for y, a, b in ((8, 4, 40), (8, 52, 90), (14, 12, 70), (20, 4, 30), (20, 44, 88)):
+        px.r(a, y, b, y, shade(P["wood_l"], 0.95))
+    px.ell(44, 4, 51, 7, shade(P["wood"], 0.7)); px.ell(45, 5, 50, 6, "#2a2333")  # passa-cabo
+    px.r(2, 26, 93, 26, shade(P["wood_l"], 1.12))  # quina
+    return f
+
+
 def cadeira(d):
     f = new(T, T); px = Px(f)
     shadow(f, 7, 24, 24, 31)

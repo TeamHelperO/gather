@@ -20,7 +20,7 @@ add("parede_vidro",wall_piece("frente",True),"Parede de vidro","x",False)
 add("porta",porta(),"Porta","x",False)
 add("porta_privada",porta(False),"Porta da sala","x",False)
 # palette items
-I=[("tapete",tapete(),"Tapete","Decoração"),("mesa",mesa_trabalho(),"Mesa de trabalho","Móveis"),
+I=[("tapete",tapete(),"Tapete","Decoração"),("mesa",mesa_trabalho(),"Mesa pequena","Móveis"),("mesa_pc",mesa_pc(),"Mesa de trabalho","Móveis"),
 ("cadeira_baixo",cadeira("baixo"),"Cadeira ↓","Móveis"),("cadeira_cima",cadeira("cima"),"Cadeira ↑","Móveis"),
 ("cadeira_esq",cadeira("esquerda"),"Cadeira ←","Móveis"),("cadeira_dir",cadeira("direita"),"Cadeira →","Móveis"),
 ("monitor",monitor(),"Monitor","Móveis"),("teclado",teclado(),"Teclado","Móveis"),("teclado_rgb",teclado(True),"Teclado gamer RGB","Móveis"),("mouse",mouse(),"Mouse","Móveis"),("notebook",notebook(),"Notebook","Móveis"),("gabinete",gabinete_gamer(),"Gabinete gamer","Móveis"),("mesa_reuniao6",mesa_reuniao(96),"Mesa reunião 6","Móveis"),
