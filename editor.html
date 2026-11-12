@@ -106,6 +106,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
     <li><b>Redimensionar:</b> toque na sala e puxe as alças azuis, ou use + e − no painel.</li>
     <li><b>Móveis:</b> se reorganizam sozinhos quando a sala muda de tamanho. Arraste qualquer móvel para passar a mover tudo à mão.</li>
     <li><b>Itens:</b> adicione qualquer item da planilha em 🪑 Itens.</li>
+    <li><b>Girar:</b> toque em qualquer móvel e use ↻ Girar 90° ou ⇋ Espelhar (atalhos G e F).</li>
   </ul>
   <div class="btns"><button class="btn pri" id="helpOk">Entendi</button></div>
 </div></div>
@@ -199,10 +200,11 @@ function render(c, v, ui){
   }
   // selection
   if (sel && sel.kind==="room"){ const r = roomById(sel.id); if (r) drawRoomSel(c, r, v); }
-  if (sel && sel.kind==="item"){ const it = itemById(sel.id); if (it){
-    const a = ASSETS[it.k]; const sx = it.x*T*v.s+v.ox, sy = it.y*T*v.s+v.oy;
-    c.strokeStyle = "#3d5afe"; c.lineWidth = 2; c.setLineDash([5,3]); c.strokeRect(sx-2, sy-2, a.w*v.s+4, a.h*v.s+4); c.setLineDash([]);
-  }}
+  const itSel = sel && sel.kind==="item" ? itemById(sel.id) : sel && sel.kind==="auto" ? autoSel() : null;
+  if (itSel){
+    const b = caixa(itSel); const sx = b.x*v.s+v.ox, sy = b.y*v.s+v.oy;
+    c.strokeStyle = "#3d5afe"; c.lineWidth = 2; c.setLineDash([5,3]); c.strokeRect(sx-2, sy-2, b.w*v.s+4, b.h*v.s+4); c.setLineDash([]);
+  }
   if (drag && drag.type==="create" && drag.rect){
     const q = drag.rect; const sx=q.x*T*v.s+v.ox, sy=q.y*T*v.s+v.oy;
     c.fillStyle="rgba(61,90,254,.25)"; c.fillRect(sx,sy,q.w*T*v.s,q.h*T*v.s);
@@ -263,7 +265,7 @@ async function save(){
   if (pending){ pending=false; dirty=true; save(); }
 }
 function afterLoad(resetView){
-  if (sel && ((sel.kind==="room" && !roomById(sel.id)) || (sel.kind==="item" && !itemById(sel.id)))) sel = null;
+  if (sel && ((sel.kind==="room" && !roomById(sel.id)) || (sel.kind==="item" && !itemById(sel.id)) || (sel.kind==="auto" && !autoSel()))) sel = null;
   document.getElementById("mapName").value = S.name || "";
   if (resetView) fit(); else draw();
   refreshPanel(); updUndo();
@@ -340,8 +342,8 @@ function hitHandle(sx, sy, touch){
 }
 function hitItem(wx, wy){
   const items = allItems().filter(i=>i.z!=="floor").sort((a,b)=>sortKey(b)-sortKey(a));
-  for (const it of items){ const a = ASSETS[it.k]; const x=it.x*T, y=it.y*T;
-    if (wx>=x+3 && wx<=x+a.w-3 && wy>=y+3 && wy<=y+a.h-3) return it; }
+  for (const it of items){ const b = caixa(it);
+    if (wx>=b.x+3 && wx<=b.x+b.w-3 && wy>=b.y+3 && wy<=b.y+b.h-3) return it; }
   return null;
 }
 function startDrag(sx, sy, ptype){
@@ -406,7 +408,7 @@ function endDrag(){
   const d = drag; drag = null; info("");
   if (!d.moved){
     if (d.type==="create"){ toast("Arraste no mapa para desenhar a sala"); return; }
-    if (d.type==="item"){ const it = d.item; if (it.auto){ sel = {kind:"room", id:it.room}; toast("Arraste um móvel para mover à mão"); } else sel = {kind:"item", id:it.id}; openPanel(); draw(); return; }
+    if (d.type==="item"){ const it = d.item; if (it.auto){ const r = roomById(it.room); sel = {kind:"auto", room:it.room, key:chaveAuto(it, r), k:it.k}; } else sel = {kind:"item", id:it.id}; openPanel(); draw(); return; }
     if (d.type==="pickRoom"||d.type==="moveRoom"){ sel = {kind:"room", id:d.room.id}; openPanel(); draw(); return; }
     if (d.type==="pan"){ sel = null; closePanel(); draw(); return; }
     if (d.type==="resize") return;
@@ -424,8 +426,23 @@ function clampRoomItems(r, items0){
   for (const o of items0){ const i = itemById(o.id); if (!i) continue; const a = ASSETS[i.k];
     i.x = clamp(o.x, r.x, Math.max(r.x, r.x + r.w - a.w/T)); i.y = clamp(o.y, r.y - 2, Math.max(r.y, r.y + r.h - a.h/T + 0.2)); }
 }
+/* móvel automático selecionado (o giro fica guardado na sala) */
+function autoSel(){
+  if (!sel || sel.kind!=="auto") return null; const r = roomById(sel.room); if (!r || !r.auto) return null;
+  return allItems().find(i => i.room===r.id && i.auto && chaveAuto(i, r)===sel.key) || null;
+}
+function girarItem(it, r, modo){ // modo: "rot" | "flip" | "reset"
+  const alvo = r ? ((r.ajustes = r.ajustes || {})[sel.key] = r.ajustes[sel.key] || {}) : it;
+  if (modo==="rot") alvo.rot = (((alvo.rot||0) + 90) % 360) || undefined;
+  if (modo==="flip") alvo.flip = !alvo.flip || undefined;
+  if (modo==="reset"){ delete alvo.rot; delete alvo.flip; }
+  if (r && !alvo.rot && !alvo.flip) delete r.ajustes[sel.key];
+  if (!r){ if (!it.rot) delete it.rot; if (!it.flip) delete it.flip; }
+}
 function makeManual(r){
-  const conv = layout(r).map(it => { const c = Object.assign({}, it, {id:uid()}); delete c.auto; return c; });
+  const conv = layout(r).map(it => { const c = Object.assign({}, it, {id:uid()}); delete c.auto;
+    const aj = r.ajustes && r.ajustes[chaveAuto(it, r)]; if (aj){ if (aj.rot) c.rot = aj.rot; if (aj.flip) c.flip = true; } return c; });
+  delete r.ajustes;
   S.items.push(...conv); r.auto = false; return conv;
 }
 function hover(sx, sy){
@@ -469,6 +486,14 @@ function refreshPanel(){
       else makeManual(r);
       commit(b);
     };
+  } else if (sel.kind === "auto") {
+    const it = autoSel(), r = roomById(sel.room); if (!it || !r){ closePanel(); return; }
+    const a = ASSETS[it.k];
+    panel.innerHTML = `<h3><img src="${a.src}" style="image-rendering:pixelated;max-height:32px"> ${esc(a.label)} <button class="x" data-act="close" aria-label="Fechar">×</button></h3>
+      <p class="note">Móvel automático de <b>${esc(r.name)}</b>. Girar e espelhar não mudam o resto da sala. Arraste no mapa se quiser mover à mão.</p>
+      <div class="row"><label>Orientação</label><b>${it.rot||0}°${it.flip?" · espelhado":""}</b></div>
+      <div class="btns"><button class="btn" data-act="grot">↻ Girar 90°</button><button class="btn" data-act="gflip">⇋ Espelhar</button>${it.rot||it.flip?`<button class="btn" data-act="greset">Voltar ao normal</button>`:""}</div>
+      <p class="note">Atalhos: <b>G</b> gira, <b>F</b> espelha.</p>`;
   } else {
     const it = itemById(sel.id); if (!it){ closePanel(); return; }
     const a = ASSETS[it.k];
@@ -477,7 +502,8 @@ function refreshPanel(){
       ${it.k==="placa"?`<div class="row"><label>Texto</label><input type="text" id="iLabel" value="${esc(it.label||"")}" maxlength="12"></div>`:""}
       <div class="row"><label>Posição</label>${stepper("ix", it.x)}${stepper("iy", it.y)}</div>
       <p class="note">Tamanho: ${a.w/T} × ${a.h/T} tiles. Arraste no mapa para mover (passo de ¼ de tile).</p>
-      <div class="btns">${chair?`<button class="btn" data-act="rot">↻ Girar</button>`:""}${it.k.startsWith("tv")?`<button class="btn" data-act="tv">Liga/desliga</button>`:""}<button class="btn" data-act="idup">Duplicar</button><button class="btn dan" data-act="idel">Remover</button></div>`;
+      <div class="row"><label>Orientação</label><b>${chair ? esc(a.label) : (it.rot||0)+"°"}${it.flip?" · espelhado":""}</b></div>
+      <div class="btns">${chair?`<button class="btn" data-act="rot">↻ Girar</button>`:`<button class="btn" data-act="grot">↻ Girar 90°</button>`}<button class="btn" data-act="gflip">⇋ Espelhar</button>${it.rot||it.flip?`<button class="btn" data-act="greset">Voltar ao normal</button>`:""}${it.k.startsWith("tv")?`<button class="btn" data-act="tv">Liga/desliga</button>`:""}<button class="btn" data-act="idup">Duplicar</button><button class="btn dan" data-act="idel">Remover</button></div>`;
     const lb = panel.querySelector("#iLabel"); if (lb) lb.oninput = e => { const b=snapshot(); it.label = e.target.value; commitSoft(b); };
   }
 }
@@ -509,6 +535,9 @@ panel.addEventListener("click", e=>{
     S.rooms.push(n); for (const i of S.items.filter(i=>i.room===r.id)) S.items.push(Object.assign({}, i, {id:uid(), room:n.id, x:i.x+(n.x-r.x), y:i.y+(n.y-r.y)}));
     sel = {kind:"room", id:n.id}; commit(b); return; }
   if (a==="del"){ const id = sel.id; S.rooms = S.rooms.filter(r=>r.id!==id); S.items = S.items.filter(i=>i.room!==id); sel=null; closePanel(); commit(b); toast("Sala excluída – ↶ desfaz"); return; }
+  if (a==="grot"||a==="gflip"||a==="greset"){ const m = {grot:"rot", gflip:"flip", greset:"reset"}[a];
+    if (sel.kind==="auto") girarItem(null, roomById(sel.room), m); else girarItem(itemById(sel.id), null, m);
+    commit(b); refreshPanel(); return; }
   const it = itemById(sel.id); if (!it) return;
   if (a==="rot"){ const order=["cadeira_baixo","cadeira_esq","cadeira_cima","cadeira_dir"]; it.k = order[(order.indexOf(it.k)+1)%4]; commit(b); return; }
   if (a==="tv"){ it.k = it.k==="tv" ? "tv_off" : "tv"; commit(b); return; }
@@ -646,11 +675,13 @@ addEventListener("keydown", e=>{
   if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="y"){ e.preventDefault(); redo(); return; }
   if ((e.key==="Delete"||e.key==="Backspace") && sel){ e.preventDefault(); panel.querySelector(sel.kind==="room"?'[data-act="del"]':'[data-act="idel"]')?.click(); return; }
   if (e.key==="Escape"){ sel=null; closePanel(); setMode("select"); return; }
+  if ((e.key==="g" || e.key==="G") && sel && sel.kind!=="room"){ panel.querySelector('[data-act="grot"],[data-act="rot"]')?.click(); return; }
+  if ((e.key==="f" || e.key==="F") && sel && sel.kind!=="room"){ panel.querySelector('[data-act="gflip"]')?.click(); return; }
   if (e.key==="r" || e.key==="R") setMode("room");
   if (e.key==="v" || e.key==="V") setMode("select");
   if (e.key==="+"||e.key==="=") setZoom(view.s*1.25);
   if (e.key==="-") setZoom(view.s/1.25);
-  if (e.key.startsWith("Arrow") && sel){ e.preventDefault(); const d = {ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key]; const b=snapshot();
+  if (e.key.startsWith("Arrow") && sel && sel.kind!=="auto"){ e.preventDefault(); const d = {ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key]; const b=snapshot();
     if (sel.kind==="room"){ const r=roomById(sel.id); const nx=clamp(r.x+d[0],0,S.w-r.w), ny=clamp(r.y+d[1],2,S.h-r.h); for (const i of S.items.filter(i=>i.room===r.id)){ i.x+=nx-r.x; i.y+=ny-r.y; } r.x=nx; r.y=ny; }
     else { const it=itemById(sel.id); it.x+=d[0]*0.25; it.y+=d[1]*0.25; }
     commit(b); }

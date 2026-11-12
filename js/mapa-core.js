@@ -233,9 +233,23 @@ function doorTile(r){
   if (d.side==="esquerda"||d.side==="direita") return r.y + Math.max(0,Math.min(r.h-1, Math.round(d.pos*(r.h-1))));
   return null;
 }
+/* Giro/espelho: itens manuais guardam it.rot (0, 90, 180, 270) e it.flip; os automáticos de uma sala
+   guardam o ajuste em r.ajustes["k@dx,dy"] (posição relativa à sala, que não muda enquanto a sala tiver o mesmo tamanho). */
+const chaveAuto = (it, r) => it.k + "@" + (+(it.x - r.x).toFixed(2)) + "," + (+(it.y - r.y).toFixed(2));
+function caixa(it){ // retângulo desenhado (px), já considerando o giro em volta do centro
+  const a = ASSETS[it.k], rot = ((it.rot || 0) % 360 + 360) % 360, de = rot === 90 || rot === 270;
+  const w = de ? a.h : a.w, h = de ? a.w : a.h, cx = it.x*T + a.w/2, cy = it.y*T + a.h/2;
+  return { x: cx - w/2, y: cy - h/2, w, h, cx, cy, rot };
+}
+function desenharItem(c, it, im, px, py){
+  if (!it.rot && !it.flip){ c.drawImage(im, px, py); return; }
+  const a = ASSETS[it.k], b = caixa(it);
+  c.save(); c.translate(Math.round(b.cx), Math.round(b.cy)); if (b.rot) c.rotate(b.rot * Math.PI / 180); if (it.flip) c.scale(-1, 1);
+  c.drawImage(im, -a.w/2, -a.h/2); c.restore();
+}
 function allItems(){
   const out=[];
-  for (const r of S.rooms) if (r.auto) for (const it of layout(r)) out.push(it);
+  for (const r of S.rooms) if (r.auto) for (const it of layout(r)){ const aj = r.ajustes && r.ajustes[chaveAuto(it, r)]; if (aj){ if (aj.rot) it.rot = aj.rot; if (aj.flip) it.flip = true; } out.push(it); }
   for (const it of S.items) if (!(window.OCULTAR_PESSOAS && /^pessoa/.test(it.k))) out.push(it);
   return out;
 }
@@ -267,6 +281,7 @@ function sortKey(it){
   if (it._sobre === undefined && SOBRE_MESA.test(it.k)){ const v = topoDaMesa(it); if (v != null) return v; }
   if (it.sort!=null) return it.sort;
   if (it.z==="wall" || it.k==="projecao"){ const r=it.room && roomById(it.room); return (r? r.y*T : it.y*T) + 0.5; }
+  if (it.rot){ const b = caixa(it); return b.y + b.h; }
   return it.y*T + ASSETS[it.k].h;
 }
 
@@ -280,7 +295,7 @@ function drawWorld(c, extra){
   for (const r of S.rooms){ c.fillStyle = PAT[r.floor || TYPES[r.type].floor] || PAT.f_madeira; c.fillRect(r.x*T, r.y*T, r.w*T, r.h*T); }
   const items = allItems();
   const floorItems = items.filter(i=>i.z==="floor");
-  for (const it of floorItems) c.drawImage(IMG[it.k], Math.round(it.x*T), Math.round(it.y*T));
+  for (const it of floorItems) desenharItem(c, it, IMG[it.k], Math.round(it.x*T), Math.round(it.y*T));
   // drawables
   const D = [];
   for (const r of S.rooms){
@@ -300,7 +315,7 @@ function drawWorld(c, extra){
     if (it.draw){ it.draw(c); continue; }
     const im = IMG[it.k]; if (!im) continue;
     const px = Math.round(it.x*T), py = Math.round(it.y*T);
-    c.drawImage(im, px, py);
+    desenharItem(c, it, im, px, py);
     if (it.k==="placa" && it.label){
       c.save(); c.fillStyle="#fff"; c.font="bold 8px system-ui,sans-serif"; c.textAlign="center"; c.textBaseline="middle";
       c.fillText(String(it.label).toUpperCase().slice(0,12), px+35, py+17); c.restore();
@@ -346,7 +361,7 @@ function buildBlocked(){
   for (const it of allItems()){
     if (it.z==="floor" || it.z==="wall" || SEM_COLISAO.test(it.k)) continue;
     const a = ASSETS[it.k]; if (!a) continue;
-    const px0 = it.x*T + 4, px1 = it.x*T + a.w - 4, pb = it.y*T + a.h - 2, pt = pb - Math.min(a.h*0.45, 26);
+    const b = caixa(it), px0 = b.x + 4, px1 = b.x + b.w - 4, pb = b.y + b.h - 2, pt = pb - Math.min(b.h*0.45, 26);
     for (let cy=Math.floor(pt/C16); cy<=Math.floor(pb/C16); cy++) for (let cx=Math.floor(px0/C16); cx<=Math.floor(px1/C16); cx++) set(cx, cy);
   }
   return {cols, rows, g, blocked(cx, cy){ return cx<0 || cy<0 || cx>=cols || cy>=rows || g[cy*cols+cx]===1; }};
