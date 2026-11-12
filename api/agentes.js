@@ -16,7 +16,7 @@ const NV = "https://integrate.api.nvidia.com/v1/chat/completions";
 const PREFERIDOS = ["google/gemma-4-31b-it", "nvidia/nemotron-3.5-lightning-30b-a3b", "nv-mistralai/mistral-nemo-12b-instruct", "deepseek-ai/deepseek-v4.1-flash",
   "google/gemma-3-12b-it", "mistralai/mistral-large-2-instruct", "nvidia/llama-3.1-nemotron-70b-instruct", "openai/gpt-oss-20b"];
 const INICIO = { t: 0 };
-const LIMITE = 280000; // a função pode rodar até 300 s (vercel.json)
+const LIMITE = 54000; // a Vercel (plano Hobby) corta em 60 s
 const restante = () => LIMITE - (Date.now() - INICIO.t);
 const tentativas = [];
 const modelosMortos = new Set();
@@ -50,7 +50,7 @@ const ehFimDeCota = (status, txt) => [401, 402, 403, 429].includes(status) || /c
 async function perguntar(mensagens) {
   let ultimo;
   for (const modelo of (await modelos()).slice(0, 6)) {
-    if (restante() < 15000) break;
+    if (restante() < 8000) break;
     try { return await perguntarModelo(mensagens, modelo); }
     catch (e) { ultimo = e; if (e.modeloMorto) { modelosMortos.add(modelo); continue; } throw e; }
   }
@@ -67,7 +67,7 @@ async function perguntarModelo(mensagens, modelo) {
       method: "POST",
       headers: { Authorization: `Bearer ${lista[i]}`, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.7, max_tokens: 1200 }),
-      signal: AbortSignal.timeout(Math.max(5000, Math.min(90000, restante() - 5000))),
+      signal: AbortSignal.timeout(Math.max(5000, Math.min(25000, restante() - 3000))),
     }).catch(e => ({ ok: false, status: 0, text: async () => String(e) }));
     const reg = `${modelo} · chave ${i + 1} · ${r.status} · ${((Date.now() - t0) / 1000).toFixed(1)}s`;
     tentativas.push(reg); console.log("[agentes]", reg);
