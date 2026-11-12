@@ -137,7 +137,7 @@ const paredes = [];
 let objetos = null;
 function montar(S) {
   if (objetos) { cena.remove(objetos); objetos.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
-  objetos = new THREE.Group(); cena.add(objetos); paredes.length = 0; telas.length = 0;
+  objetos = new THREE.Group(); cena.add(objetos); paredes.length = 0; telas.length = 0; escuros.clear();
   const W = S.w, H = S.h;
   const tg = texturaPiso("f_grama"); tg.repeat.set((W + 40) / 2, (H + 40) / 2);
   const grama = new THREE.Mesh(new THREE.PlaneGeometry(W + 40, H + 40), new THREE.MeshStandardMaterial({ map: tg, roughness: 1 }));
@@ -152,6 +152,13 @@ function montar(S) {
       const rg = g.createRadialGradient(32, 26, 0, 32, 32, 34); rg.addColorStop(0, cor + "55"); rg.addColorStop(1, cor + "00"); g.fillStyle = rg; g.fillRect(0, 0, 64, 64);
       const tx = new THREE.CanvasTexture(c); const luz = new THREE.Mesh(new THREE.PlaneGeometry(r.w, r.h), new THREE.MeshBasicMaterial({ map: tx, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
       luz.rotation.x = -Math.PI / 2; luz.position.set(r.x + r.w / 2, 0.095, r.y + r.h / 2); objetos.add(luz);
+      escuros.set(r.id, { brilho: luz });
+    }
+    if (!TYPES[r.type].noWalls) { // "teto" escuro, ligado quando a luz da sala está apagada
+      const sombra = new THREE.Mesh(new THREE.PlaneGeometry(r.w, r.h), new THREE.MeshBasicMaterial({ color: 0x060816, transparent: true, opacity: 0.66, depthWrite: false }));
+      sombra.rotation.x = -Math.PI / 2; sombra.position.set(r.x + r.w / 2, ALT + 0.03, r.y + r.h / 2); sombra.renderOrder = 10; sombra.visible = false;
+      sombra.matrixAutoUpdate = true; objetos.add(sombra);
+      escuros.set(r.id, { ...(escuros.get(r.id) || {}), sombra });
     }
     if (TYPES[r.type].noWalls) continue;
     const vidro = TYPES[r.type].glass, dt = doorTile(r), lado = r.door ? r.door.side : "nenhuma";
@@ -261,10 +268,14 @@ function medirDesempenho(dt) {
 
 /* ---------- API para o escritório ---------- */
 let ativo = false, montadoPara = null;
+const escuros = new Map(); // sala → { brilho, sombra }
 const Iso3D = {
   get ativo() { return ativo; },
   ligar(sim, S) { ativo = !!sim; cv.style.display = ativo ? "block" : "none"; if (ativo) { if (montadoPara !== S) { montar(S); montadoPara = S; } ajustar(); } },
   montar(S) { montar(S); montadoPara = S; },
+  luzes(apagada) {
+    for (const [id, e] of escuros) { const off = apagada(id); if (e.sombra && e.sombra.visible !== off) e.sombra.visible = off; if (e.brilho && e.brilho.visible === off) e.brilho.visible = !off; }
+  },
   girar(d) { giroAlvo += d * Math.PI / 2; },
   // teclas/joystick: "cima" é para dentro da tela, conforme o giro da câmera
   direcaoTeclas(vx, vy) {

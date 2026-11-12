@@ -107,6 +107,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 .ed-win .tend-barra .tab.on{background:#e04fa0;border-color:#e04fa0}
 .ed-win .tend-barra select{margin-left:auto;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--chip);padding:0 8px;max-width:260px}
 .ed-win .tend-lista{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+#btnLuz.luz-off{background:#2a2f52;color:#ffd966}
 .tend-modos{display:flex;gap:4px;padding:8px 14px 0;border-bottom:1px solid var(--line);background:var(--chip)}
 .tend-modos button{padding:9px 14px;border-radius:10px 10px 0 0;font-weight:700;font-size:13.5px;border:1px solid transparent;border-bottom:0;margin-bottom:-1px;opacity:.75}
 .tend-modos button.on{background:var(--panel);border-color:var(--line);opacity:1}
@@ -243,7 +244,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 </div>
 <div class="zoom pill hud"><button id="zin" aria-label="Aproximar"></button><button id="zout" aria-label="Afastar"></button><button id="b3d" title="Alternar 2D / 3D isométrico" aria-label="Alternar 2D e 3D"></button><button id="gEsq" title="Girar câmera (Q)" style="display:none"></button><button id="gDir" title="Girar câmera (E)" style="display:none"></button></div>
 <div class="emotes pill hud">
-  <button id="btnAudio">Ligar áudio</button><button id="btnCfgAudio" title="Microfone, saída de áudio e volume de cada pessoa" aria-label="Configurar áudio"></button><i class="div"></i><button id="btnMont">Patinete</button><button id="btnMao" style="display:none">Levantar a mão</button><button data-emote="5" title="Acenar"></button><button data-emote="6" title="Dançar"></button><button data-emote="4" title="Sentar ou levantar"></button>
+  <button id="btnAudio">Ligar áudio</button><button id="btnCfgAudio" title="Microfone, saída de áudio e volume de cada pessoa" aria-label="Configurar áudio"></button><i class="div"></i><button id="btnMont">Patinete</button><button id="btnMao" style="display:none">Levantar a mão</button><button data-emote="5" title="Acenar"></button><button data-emote="6" title="Dançar"></button><button data-emote="4" title="Sentar ou levantar"></button><button id="btnLuz" style="display:none" title="Acender ou apagar a luz desta sala (L)"></button>
 </div>
 <button class="pill hud" id="btnProj"></button>
 <button class="pill hud" id="btnTelao" style="display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:78px;z-index:12;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe">Abrir telão</button>
@@ -356,6 +357,9 @@ function conectarSala(){
       }
     },
     aoSinal: msg => msg.canal === "proj" ? Projecao.aoSinal(msg) : Voz.aoSinal(msg),
+    aoLuz: (id, est) => aplicarLuz(id, est, true),
+    aoOla: () => { for (const [id, est] of Object.entries(luzes)) Sala.luz(id, est); },
+    aoConectar(){ for (const [id, est] of Object.entries(luzes)) Sala.luz(id, est); },
     aoDesconectar(){ toast("Conexão instável… tentando de novo"); },
   });
 }
@@ -434,6 +438,37 @@ const salaDoTelao = it => (it.room && roomById(it.room)) || roomAt(it.x*T + 96, 
 let telaoPerto = null, telaoSalaAberta = null;
 /* recursos de cada sala só para quem está dentro dela */
 const salaAtualId = () => { const r = P && roomAt(P.px, P.py - 4); return r ? r.id : null; };
+/* ---------- luz das salas: qualquer pessoa dentro da sala acende ou apaga; todos veem ----------
+   Estado combinado pelo canal do escritório (vale a mudança mais recente) e guardado no navegador. */
+const LUZ_KEY = "nextco_luzes";
+let luzes = (() => { try { return JSON.parse(localStorage.getItem(LUZ_KEY)) || {}; } catch (e) { return {}; } })();
+const luzApagada = id => !!(id && luzes[id] && luzes[id].acesa === false);
+const salaComLuz = r => !!r && !TYPES[r.type].noWalls;
+function guardarLuzes(){ try { localStorage.setItem(LUZ_KEY, JSON.stringify(luzes)); } catch (e) {} }
+function aplicarLuz(id, est, remoto){
+  const atual = luzes[id];
+  if (!est || (atual && atual.ts >= est.ts)) return false;
+  luzes[id] = { acesa: !!est.acesa, ts: est.ts, por: est.por || "" }; guardarLuzes(); atualizarBotaoLuz();
+  if (remoto && id === salaAtualId()) { const r = roomById(id); toast(`${est.acesa ? "💡" : "🌙"} ${est.por || "Alguém"} ${est.acesa ? "acendeu" : "apagou"} a luz${r ? " — " + r.name : ""}`); }
+  return true;
+}
+function alternarLuz(){
+  const id = salaAtualId(), r = id && roomById(id);
+  if (!salaComLuz(r)) return toast("Entre numa sala para mexer na luz");
+  const est = { acesa: luzApagada(id), ts: Date.now(), por: user.nome };
+  aplicarLuz(id, est, false); Sala.luz && Sala.luz(id, est);
+  toast(`${est.acesa ? "💡 Luz acesa" : "🌙 Luz apagada"} — ${r.name}`);
+  Dados.registrarAtividade(EMAIL, "acao", `${est.acesa ? "Acendeu" : "Apagou"} a luz`, { sala: r.name });
+}
+let _botaoLuz = "";
+function atualizarBotaoLuz(){
+  const b = document.getElementById("btnLuz"); if (!b || !P) return;
+  const id = salaAtualId(), r = id && roomById(id), chave = salaComLuz(r) ? (luzApagada(id) ? "off" : "on") : "";
+  if (chave === _botaoLuz) return; _botaoLuz = chave;
+  b.style.display = chave ? "" : "none";
+  if (chave) ROTULO(b, chave === "off" ? "lightbulb-off" : "lightbulb", chave === "off" ? "Acender a luz" : "Apagar a luz");
+  b.classList.toggle("luz-off", chave === "off");
+}
 const dentroDoTelao = it => { const r = salaDoTelao(it); return !r || r.id === salaAtualId(); };
 function abrirTelao(it){
   if (Telao.aberto) return;
@@ -478,7 +513,8 @@ function spawn(){
 /* ---------- entrada ---------- */
 const DIRKEYS = {ArrowUp:[0,-1],w:[0,-1],W:[0,-1],ArrowDown:[0,1],s:[0,1],S:[0,1],ArrowLeft:[-1,0],a:[-1,0],A:[-1,0],ArrowRight:[1,0],d:[1,0],D:[1,0]};
 addEventListener("keydown", e => { if (e.target.matches("input,select,textarea") || Telao.aberto || TI.aberto || Edicao.aberto || Acesso.aberto) return; if (DIRKEYS[e.key]) { keys.add(e.key); if (P) { P.path = null; P.emote = null; } e.preventDefault(); }
-  if (e.key === "1") emote(5); if (e.key === "2") emote(6); if (e.key === "3") sentarPerto(); });
+  if (e.key === "1") emote(5); if (e.key === "2") emote(6); if (e.key === "3") sentarPerto(); if ((e.key === "l" || e.key === "L") && !e.ctrlKey && !e.metaKey) alternarLuz(); });
+document.getElementById("btnLuz").addEventListener("click", alternarLuz);
 addEventListener("keyup", e => keys.delete(e.key));
 addEventListener("blur", () => keys.clear());
 const em3d = () => !!(window.Iso3D && Iso3D.ativo);
@@ -604,7 +640,7 @@ function loop(now){
   });
   telaoPerto = teloes.find(it => dentroDoTelao(it) && Math.hypot(it.x*T + 96 - P.px, it.y*T + 96 - P.py) < 120) || null;
   if (Telao.aberto && telaoSalaAberta && salaAtualId() !== telaoSalaAberta){ telaoSalaAberta = null; Telao.fechar(); toast("Você saiu da sala: o telão foi fechado"); }
-  TI.atualizar(); Edicao.atualizar();
+  TI.atualizar(); Edicao.atualizar(); atualizarBotaoLuz();
   const perto = !!telaoPerto;
   const bt = document.getElementById("btnTelao"); const mostra = perto && !Telao.aberto ? "block" : "none"; if (bt.style.display !== mostra) bt.style.display = mostra;
   for (const a of [P, ...visiveis]){ a.vozReal = now - (a.vozAtiva || -1e9) < 350; if (Voz.ligado) a.falando = a.vozReal; else if (a.vozReal) a.falando = true; }
@@ -660,18 +696,26 @@ function cam(){
 const TOM_SALA = { recepcao: "255,214,150", copa: "255,200,140", trabalho: "255,226,180", ti: "80,200,255", edicao: "230,90,190", auditorio: "255,190,120", reuniao: "170,190,255", silenciosa: "150,230,170" };
 let _telasMapa = null, _telasDe = null;
 const telasDoMapa = () => (_telasDe === S && _telasMapa) || (_telasDe = S, _telasMapa = allItems().filter(it => /^telao/.test(it.k) || it.k === "projecao"));
+// sala com a luz apagada: escurece o chão, as paredes e quem está dentro (telas continuam brilhando)
+function desenharEscuro(){
+  for (const r of S.rooms){
+    if (!luzApagada(r.id) || !salaComLuz(r)) continue;
+    ctx.fillStyle = "rgba(6,8,22,.68)"; ctx.fillRect(r.x*T, (r.y - 2)*T, r.w*T, (r.h + 2)*T);
+  }
+}
+const noEscuro = (x, y) => { const r = roomAt(x, y); return !!r && luzApagada(r.id); };
 function desenharLuz(ligados){
   ctx.save(); ctx.globalCompositeOperation = "lighter";
   for (const r of S.rooms){
-    const tom = TOM_SALA[r.type]; if (!tom) continue;
+    const tom = TOM_SALA[r.type]; if (!tom || luzApagada(r.id)) continue;
     const cx = (r.x + r.w/2)*T, cy = (r.y + r.h*0.35)*T, raio = Math.max(r.w, r.h)*T*0.7;
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, raio); g.addColorStop(0, `rgba(${tom},.10)`); g.addColorStop(1, `rgba(${tom},0)`);
     ctx.fillStyle = g; ctx.fillRect(r.x*T, (r.y - 2)*T, r.w*T, (r.h + 2)*T);
   }
   const brilho = (x, y, raio, cor, a) => { const g = ctx.createRadialGradient(x, y, 0, x, y, raio); g.addColorStop(0, `rgba(${cor},${a})`); g.addColorStop(1, `rgba(${cor},0)`); ctx.fillStyle = g; ctx.fillRect(x - raio, y - raio, raio*2, raio*2); };
   const pulso = 0.85 + 0.15*Math.sin(t*2.2);
-  for (const m of monitores) if (ligados.has(m.x + "," + m.y)) brilho(m.x*T + 16, m.y*T + 14, 34, "90,170,255", 0.22*pulso);
-  for (const it of telasDoMapa()) if (/^telao/.test(it.k) || it.k === "projecao") brilho(it.x*T + 96, it.y*T + 48, 120, it.k === "telao_rot" ? "230,90,190" : it.k === "telao_tend" ? "60,200,230" : "90,120,255", 0.13*pulso);
+  for (const m of monitores) if (ligados.has(m.x + "," + m.y)) { const esc = noEscuro(m.x*T + 16, m.y*T + 30); brilho(m.x*T + 16, m.y*T + 14, esc ? 46 : 34, "90,170,255", (esc ? 0.42 : 0.22)*pulso); }
+  for (const it of telasDoMapa()) if (/^telao/.test(it.k) || it.k === "projecao") { const esc = noEscuro(it.x*T + 96, it.y*T + 100); brilho(it.x*T + 96, it.y*T + 48, esc ? 170 : 120, it.k === "telao_rot" ? "230,90,190" : it.k === "telao_tend" ? "60,200,230" : "90,120,255", (esc ? 0.3 : 0.13)*pulso); }
   ctx.restore();
 }
 const PATHS_UI = {};
@@ -697,12 +741,14 @@ function draw(){
     .concat(Projecao.desenhaveis()).concat(TI.desenhaveis(t)).concat(Edicao.desenhaveis());
   ctx.imageSmoothingEnabled = false;
   if (tres){
+    if (Iso3D.luzes) Iso3D.luzes(luzApagada);
     Iso3D.render(atores, telasVivas, t, zoom, P, dtQuadro);
     const k = Iso3D.escala();
     for (const a of atores){ const [fx, fy] = Iso3D.tela(a.px, a.py, 0); ctx.setTransform(DPR*k, 0, 0, DPR*k, DPR*(fx - a.px*k), DPR*(fy - a.py*k)); a.balao(ctx, t); }
   } else {
     ctx.setTransform(zoom*DPR, 0, 0, zoom*DPR, c.ox*DPR, c.oy*DPR);
     drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(telasVivas));
+    desenharEscuro();
     desenharLuz(ligados);
     for (const a of atores) a.balao(ctx, t);
     if (marca){ ctx.strokeStyle = `rgba(61,90,254,${marca.t})`; ctx.lineWidth = 2/zoom*1.5; ctx.beginPath(); ctx.ellipse(marca.x, marca.y, 10*(1.6-marca.t*.6), 5*(1.6-marca.t*.6), 0, 0, Math.PI*2); ctx.stroke(); }

@@ -21,7 +21,8 @@ window.Sala = (function () {
       for (const id of [...presentes.keys()]) if (!agora.has(id)) { presentes.delete(id); cb.aoSair && cb.aoSair(id); }
     });
     canal.on("broadcast", { event: "pos" }, ({ payload }) => { if (payload && payload.id !== meuId) cb.aoMover && cb.aoMover(payload.id, payload); });
-    canal.on("broadcast", { event: "ola" }, ({ payload }) => { if (payload && payload.id !== meuId) ultimoEstado = ""; }); // alguém chegou: reenvia minha posição
+    canal.on("broadcast", { event: "ola" }, ({ payload }) => { if (payload && payload.id !== meuId) { ultimoEstado = ""; cb.aoOla && cb.aoOla(payload.id); } }); // alguém chegou: reenvia minha posição (e o estado das luzes)
+    canal.on("broadcast", { event: "luz" }, ({ payload }) => { if (payload && payload.sala) cb.aoLuz && cb.aoLuz(payload.sala, payload); });
     canal.on("broadcast", { event: "rtc" }, ({ payload }) => { if (payload && payload.to === meuId) cb.aoSinal && cb.aoSinal(payload); });
     canal.subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
@@ -45,6 +46,7 @@ window.Sala = (function () {
   }
   function atualizarPresenca(obj) { if (pronto) canal.track(obj); }
   function sinal(para, dados) { if (pronto) canal.send({ type: "broadcast", event: "rtc", payload: { from: meuId, to: para, ...dados } }); }
+  function luz(sala, est) { if (pronto) canal.send({ type: "broadcast", event: "luz", payload: { sala, acesa: !!est.acesa, ts: est.ts, por: est.por || "" } }); }
   function sair() { if (canal) { canal.untrack(); Dados.cliente.removeChannel(canal); canal = null; pronto = false; } }
-  return { entrar, enviarPosicao, atualizarPresenca, sinal, sair, get conectado() { return pronto; }, get online() { return presentes.size + 1; } };
+  return { entrar, enviarPosicao, atualizarPresenca, sinal, luz, sair, get conectado() { return pronto; }, get online() { return presentes.size + 1; } };
 })();
