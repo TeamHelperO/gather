@@ -5,15 +5,29 @@
      NVIDIA_API_KEYS   – uma ou mais chaves "nvapi-…", separadas por vírgula ou quebra de linha.
                          Quando uma chave acaba os créditos/tokens (ou é recusada), passa para a próxima sozinho.
      AGENTES_CHAVE     – a chave dos agentes (a mesma usada no agente_publicar).
-     NVIDIA_MODEL      – opcional; se não tiver ou for desativado, usa a lista MODELOS abaixo.
+     NVIDIA_MODEL      – opcional; se não tiver ou for desativado, escolhe sozinho entre os modelos que a NVIDIA oferece hoje (lista PREFERIDOS + catálogo /v1/models).
      CRON_SECRET       – opcional; a Vercel manda no cron. Também serve para chamar de fora: /api/agentes?segredo=…
    Quem pode rodar: o cron da Vercel, quem tiver o CRON_SECRET, ou um administrador logado (botão no painel). */
 const SUPA = process.env.SUPABASE_URL || "https://geqljiqocpzlkxjjoylk.supabase.co";
 const ANON = process.env.SUPABASE_ANON_KEY || "sb_publishable_eNVC3vsJuDQritXDoVyiOw_FbMokMGj";
 const NV = "https://integrate.api.nvidia.com/v1/chat/completions";
 // modelos em ordem de preferência: se um for desativado pela NVIDIA (404/410), passa para o próximo
-const MODELOS = [...new Set([process.env.NVIDIA_MODEL, "qwen/qwen3-next-80b-a3b-instruct", "openai/gpt-oss-120b", "meta/llama-3.1-70b-instruct", "meta/llama-3.1-8b-instruct"].filter(Boolean))];
+const PREFERIDOS = ["deepseek-ai/deepseek-v4.1-flash", "mistralai/mistral-large-4-1t-a52b", "google/gemma-4-31b-it", "nvidia/nemotron-3-super-120b-a12b",
+  "moonshotai/kimi-k2.6", "mistralai/mistral-large-2-instruct", "nvidia/llama-3.1-nemotron-70b-instruct", "google/gemma-3-12b-it", "openai/gpt-oss-20b"];
 const modelosMortos = new Set();
+let catalogo = null; // modelos que a NVIDIA oferece hoje (lido de /v1/models)
+async function modelos() {
+  if (!catalogo) {
+    try {
+      const k = chaves()[0];
+      const r = await fetch("https://integrate.api.nvidia.com/v1/models", { headers: k ? { Authorization: `Bearer ${k}` } : {} });
+      if (r.ok) catalogo = ((await r.json()).data || []).map(m => m.id);
+    } catch (e) {}
+  }
+  const tem = id => !catalogo || catalogo.includes(id);
+  const extras = (catalogo || []).filter(id => /instruct|-it$|chat/i.test(id) && !/embed|guard|safety|reward|parse|vision|vlm|coder|code|retriev|chatqa/i.test(id));
+  return [...new Set([process.env.NVIDIA_MODEL, ...PREFERIDOS.filter(tem), ...extras].filter(Boolean))].filter(m => !modelosMortos.has(m));
+}
 
 const AGENTES = [
   { id: "agente1", nome: "Radar", area: "redes sociais, Meta Ads, TikTok e marketing de performance", cat: "Social/Ads" },
@@ -30,12 +44,11 @@ const ehFimDeCota = (status, txt) => [401, 402, 403, 429].includes(status) || /c
 
 async function perguntar(mensagens) {
   let ultimo;
-  for (const modelo of MODELOS) {
-    if (modelosMortos.has(modelo)) continue;
+  for (const modelo of (await modelos()).slice(0, 8)) {
     try { return await perguntarModelo(mensagens, modelo); }
     catch (e) { ultimo = e; if (e.modeloMorto) { modelosMortos.add(modelo); continue; } throw e; }
   }
-  throw ultimo || new Error("Nenhum modelo da NVIDIA disponível");
+  throw ultimo || new Error("Nenhum modelo de conversa encontrado na NVIDIA");
 }
 async function perguntarModelo(mensagens, modelo) {
   const lista = chaves();
@@ -48,9 +61,9 @@ async function perguntarModelo(mensagens, modelo) {
       headers: { Authorization: `Bearer ${lista[i]}`, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.7, max_tokens: 1500 }),
     }).catch(e => ({ ok: false, status: 0, text: async () => String(e) }));
-    if (r.ok) { const j = await r.json(); return { texto: j.choices?.[0]?.message?.content || "", chave: i + 1, modelo }; }
+    if (r.ok) { const j = await r.json(); if (!j.choices?.[0]?.message?.content) { const e = new Error(`modelo ${modelo} respondeu vazio`); e.modeloMorto = true; throw e; } return { texto: j.choices?.[0]?.message?.content || "", chave: i + 1, modelo }; }
     const txt = await r.text();
-    if (r.status === 404 || r.status === 410) { const e = new Error(`modelo ${modelo} indisponível (${r.status})`); e.modeloMorto = true; throw e; }
+    if (r.status === 404 || r.status === 410 || r.status === 400 || r.status === 422) { const e = new Error(`modelo ${modelo} indisponível (${r.status})`); e.modeloMorto = true; throw e; }
     erros.push(`chave ${i + 1}: ${r.status}`);
     if (ehFimDeCota(r.status, txt)) { esgotadas.set(i, Date.now() + 60 * 60000); continue; } // acabou: próxima chave
     if (r.status >= 500 || r.status === 0) continue; // instabilidade: tenta a próxima
