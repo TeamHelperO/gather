@@ -30,6 +30,8 @@ ficam em `js/config.js`. As tabelas têm regras de acesso (RLS): só quem entrou
 - `js/mapa-core.js` – motor do mapa (salas, móveis automáticos, paredes, colisão, caminho)
 - `js/vida.js` – assentos, sentar sozinho, trabalhar no PC e conversas
 - `js/telao.js` – telão de tarefas (quadro, formulário, arrastar, escalonamento e a tela do telão no mapa)
+- `api/turn.js` – entrega servidores TURN da Cloudflare para o áudio funcionar no 4G/redes fechadas
+  (variáveis `CF_TURN_KEY_ID` e `CF_TURN_API_TOKEN` na Vercel; sem elas usa só STUN)
 - `js/vendor/supabase.js` – biblioteca do Supabase (cópia local)
 - `js/avatar.js` – catálogo das camadas do personagem e montagem do spritesheet
 - `assets/` – artes (personagens em camadas, piso, splash); `assets.js` – itens do mapa

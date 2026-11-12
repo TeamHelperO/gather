@@ -122,6 +122,7 @@ async function boot(){
   spawn();
   conectarSala();
   document.getElementById("load").remove();
+  ligarAudioAuto();
   if (matchMedia("(pointer:coarse)").matches) { document.getElementById("joy").style.display = "block"; document.getElementById("hint").textContent = "Use o controle ou toque no chão para andar"; }
   setTimeout(() => document.getElementById("hint").style.opacity = 0, 8000);
   checarSala(true);
@@ -143,7 +144,7 @@ function conectarSala(){
     aoMover(id, st){
       const a = outros.find(o => o.id === id); if (!a) return;
       if (!a.visto){ a.x = st.x; a.y = st.y; a.visto = true; }
-      a.alvo = { x: st.x, y: st.y }; a.dir = st.dir; a.remotoAndando = !!st.mov; a.mic = !!st.mic;
+      a.alvo = { x: st.x, y: st.y }; a.dir = st.dir; a.remotoAndando = !!st.mov; a.mic = !!st.mic; a.audio = st.audio === undefined ? undefined : !!st.audio;
       if (st.emote !== a.emote){ a.emote = st.emote; a.emoteT = 0; }
       const atual = a.assento ? a.assento.id : null;
       if (st.assento !== atual){
@@ -176,6 +177,17 @@ function recarregarMapa(novo){
   toast("O mapa do escritório foi atualizado");
 }
 /* ---------- áudio ---------- */
+/* Ao entrar, o áudio e o microfone já ligam sozinhos (dá para mutar no botão). */
+async function ligarAudioAuto(){
+  if (Voz.ligado) return;
+  const b = document.getElementById("btnAudio"); b.textContent = "⏳ Ligando…";
+  const r = await Voz.ativar(P.id);
+  if (!r.comMicrofone) toast("Microfone bloqueado: permita o microfone no navegador para falar");
+  Dados.registrarAtividade(EMAIL, "audio", r.comMicrofone ? "Entrou com o microfone ligado" : "Entrou só ouvindo (microfone bloqueado)");
+  atualizarBotaoAudio();
+}
+// o navegador só libera o som depois do primeiro toque/clique/tecla
+for (const ev of ["pointerdown", "keydown", "touchstart"]) addEventListener(ev, () => Voz.desbloquear(), { passive: true });
 async function ligarAudio(){
   const b = document.getElementById("btnAudio");
   if (!Voz.ligado){
@@ -183,6 +195,10 @@ async function ligarAudio(){
     const r = await Voz.ativar(P.id);
     if (!r.comMicrofone) toast("Sem permissão do microfone: você ouve, mas não fala");
     Dados.registrarAtividade(EMAIL, "audio", r.comMicrofone ? "Ligou o áudio com microfone" : "Ligou o áudio só para ouvir");
+  } else if (!Voz.temMic) {
+    // estava só ouvindo (microfone negado): tenta de novo
+    const r = await Voz.trocarMic(Voz.pref.mic);
+    if (!r.ok) toast("O navegador ainda está bloqueando o microfone (cadeado na barra de endereço)");
   } else Voz.alternarMic();
   atualizarBotaoAudio();
 }
@@ -307,7 +323,7 @@ function loop(now){
   moverOutros(dt);
   const visiveis = outros.filter(o => o.visto && o.sheet);
   Voz.atualizar(P, visiveis, now);
-  Sala.enviarPosicao({ x: Math.round(P.x), y: Math.round(P.y), dir: P.dir, mov: P.moving, assento: P.assento ? P.assento.id : null, emote: P.emote, mic: Voz.micAberto }, now);
+  Sala.enviarPosicao({ x: Math.round(P.x), y: Math.round(P.y), dir: P.dir, mov: P.moving, assento: P.assento ? P.assento.id : null, emote: P.emote, mic: Voz.micAberto, audio: Voz.ligado }, now);
   atualizarConversas([P, ...visiveis], dt, (a, o) => {
     if (a !== P) return;
     const agora = Date.now(); if (conversasLog[o.nome] && agora - conversasLog[o.nome] < 60000) return;
@@ -360,7 +376,9 @@ function draw(){
     const sx = a.px*zoom + c.ox, top = a.assento ? a.assento.sy - 40 : a.y - 45, sy = naMesa ? (a.assento.sy + 14)*zoom + c.oy + 19 : (top - 2)*zoom + c.oy;
     if (sx < -60 || sx > VW + 60 || sy < -40 || sy > VH + 40) continue;
     const vp = a !== P ? (a.volPessoal ?? Voz.volumePessoa(a.id)) : 1;
-    const txt = a.nome + (vp === 0 ? " 🔇" : a !== P && a.ouvindo ? " 🔊" : "") + (vp > 0 && vp < 0.99 ? ` ${Math.round(vp*100)}%` : vp > 1.01 ? ` ${Math.round(vp*100)}%` : "") + (a.vozReal ? " 🗣" : "");
+    const est = a !== P && Voz.ligado && !a.ouvindo && a.estadoAudio === "conectando" ? " ⏳" : "";
+    const semMic = a !== P && a.audio !== false && a.mic === false && a.visto ? " 🎙️✕" : "";
+    const txt = a.nome + (vp === 0 ? " 🔇" : a !== P && a.ouvindo ? " 🔊" : "") + est + semMic + (vp > 0 && vp < 0.99 ? ` ${Math.round(vp*100)}%` : vp > 1.01 ? ` ${Math.round(vp*100)}%` : "") + (a.vozReal ? " 🗣" : "");
     ctx.font = "700 12px system-ui,sans-serif"; const w = ctx.measureText(txt).width + 12;
     ctx.fillStyle = a === P ? "rgba(61,90,254,.92)" : "rgba(20,16,32,.72)"; ctx.beginPath(); ctx.roundRect(sx - w/2, sy - 19, w, 17, 6); ctx.fill();
     ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(txt, sx, sy - 10.5); ctx.textAlign = "left";

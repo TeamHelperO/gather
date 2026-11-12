@@ -20,7 +20,17 @@ window.Voz = (function () {
   const SAIDA_NO_ELEMENTO = typeof HTMLMediaElement !== "undefined" && typeof HTMLMediaElement.prototype.setSinkId === "function";
 
   let ligado = false, stream = null, micAberto = true, ctxAudio = null, meuId = null;
+  let iceServers = (window.CONFIG && CONFIG.ICE) || [];
+  /* Busca servidores TURN (necessários em 4G/redes de empresa). /api/turn devolve [] se não estiver configurado. */
+  async function carregarIce() {
+    try {
+      const r = await fetch("/api/turn", { cache: "no-store" });
+      if (r.ok) { const j = await r.json(); if (j && Array.isArray(j.iceServers) && j.iceServers.length) iceServers = [...(CONFIG.ICE || []), ...j.iceServers]; }
+    } catch (e) {}
+  }
+  const temTurn = () => iceServers.some(s => [].concat(s.urls || s.url || []).some(u => /^turns?:/.test(u)));
   const peers = new Map(); // id -> { pc, audio, fonte, ganho, analisador, pendentes:[], vol }
+  const proximaTentativa = new Map(), falhas = new Map(); // reconexão com espera crescente
   let nivelLocal = null;
 
   /* ---------- preferências ---------- */
@@ -75,6 +85,7 @@ window.Voz = (function () {
   async function ativar(id) {
     meuId = id;
     garantirCtx();
+    await carregarIce();
     await aplicarSaida(pref.saida, false);
     stream = await pegarMic(pref.mic);
     if (stream) { nivelLocal = medidor(stream); for (const t of stream.getAudioTracks()) t.enabled = micAberto; }
@@ -87,6 +98,11 @@ window.Voz = (function () {
       const buf = new Uint8Array(an.fftSize);
       return () => { an.getByteTimeDomainData(buf); let s = 0; for (const v of buf) { const x = (v - 128) / 128; s += x * x; } return Math.sqrt(s / buf.length); };
     } catch (e) { return null; }
+  }
+  /* Navegadores só tocam som depois de um toque/clique na página: chamar no primeiro gesto. */
+  function desbloquear() {
+    garantirCtx();
+    for (const p of peers.values()) if (p.audio && p.audio.paused) p.audio.play().catch(() => {});
   }
   function alternarMic() {
     if (!stream) return false;
@@ -193,8 +209,8 @@ window.Voz = (function () {
 
   /* ---------- ligações ---------- */
   function criar(id, iniciar) {
-    const pc = new RTCPeerConnection({ iceServers: CONFIG.ICE });
-    const p = { pc, audio: null, fonte: null, ganho: null, analisador: null, pendentes: [], vol: 0 };
+    const pc = new RTCPeerConnection({ iceServers });
+    const p = { pc, audio: null, fonte: null, ganho: null, analisador: null, pendentes: [], vol: 0, criado: performance.now(), conectouEm: 0, caiuEm: 0 };
     peers.set(id, p);
     if (stream) for (const t of stream.getAudioTracks()) pc.addTrack(t, stream);
     else pc.addTransceiver("audio", { direction: "recvonly" });
@@ -218,7 +234,12 @@ window.Voz = (function () {
       p.audio.play().catch(() => {});
       p.analisador = medidor(ms);
     };
-    pc.onconnectionstatechange = () => { if (["failed", "closed"].includes(pc.connectionState)) fechar(id, false); };
+    pc.onconnectionstatechange = () => {
+      const st = pc.connectionState;
+      if (st === "connected") { p.conectouEm = performance.now(); p.caiuEm = 0; }
+      else if (st === "disconnected") p.caiuEm = performance.now();
+      else if (st === "failed" || st === "closed") { falhas.set(id, (falhas.get(id) || 0) + 1); fechar(id, st === "failed"); }
+    };
     if (iniciar) (async () => {
       const oferta = await pc.createOffer(); await pc.setLocalDescription(oferta);
       Sala.sinal(id, { tipo: "oferta", sdp: pc.localDescription.toJSON() });
@@ -259,17 +280,33 @@ window.Voz = (function () {
     if (nivelLocal && micAberto && nivelLocal() > 0.04) eu.vozAtiva = agora;
     if (!ligado) return;
     for (const o of outros) {
-      const v = regra(eu, o), p = peers.get(o.id);
+      const v = o.audio === false ? 0 : regra(eu, o);
+      let p = peers.get(o.id);
       o.volPessoal = volumePessoa(o.id);
+      // ligação travada (o outro não respondeu ou a rede bloqueou): derruba e tenta de novo
+      if (p) {
+        const st = p.pc.connectionState;
+        const travada = st !== "connected" && agora - p.criado > 10000;
+        const caiu = st === "disconnected" && p.caiuEm && agora - p.caiuEm > 5000;
+        if (travada || caiu) {
+          const n = (falhas.get(o.id) || 0) + 1; falhas.set(o.id, n);
+          fechar(o.id, true); p = null;
+          proximaTentativa.set(o.id, agora + Math.min(30000, 1500 * n));
+        }
+      }
       if (v > 0) {
-        if (!p && meuId < o.id && !o._pedindo) criar(o.id, true);
+        if (!p && meuId < o.id && agora >= (proximaTentativa.get(o.id) || 0)) criar(o.id, true);
         const q = peers.get(o.id);
+        o.estadoAudio = !q ? "esperando" : q.pc.connectionState === "connected" ? "conectado" : "conectando";
+        o.audioFalhas = falhas.get(o.id) || 0;
         if (q) {
           if (Math.abs(q.vol - v) > 0.01) { q.vol = v; aplicarVolume(q, o.id); }
           if (q.analisador && q.analisador() > 0.03) o.vozAtiva = agora;
         }
-        o.ouvindo = !!q;
+        o.ouvindo = !!q && q.pc.connectionState === "connected";
+        if (o.ouvindo) falhas.delete(o.id);
       } else {
+        o.estadoAudio = null;
         if (p) fechar(o.id, true);
         o.ouvindo = false;
       }
@@ -290,11 +327,11 @@ window.Voz = (function () {
   }
 
   return {
-    configurar, ativar, alternarMic, aoSinal, atualizar, desligar, zona,
+    configurar, ativar, alternarMic, desbloquear, aoSinal, atualizar, desligar, zona,
     dispositivos, pedirPermissao, trocarMic, processamento, aplicarSaida, testarSaida, testeMic,
     volumePessoa, definirVolumePessoa,
     get pref() { return { ...pref, vols: { ...pref.vols } }; },
     get ligado() { return ligado; }, get temMic() { return !!stream; }, get micAberto() { return micAberto && !!stream; },
-    get conexoes() { return peers.size; }, get micAtual() { return stream ? (stream.getAudioTracks()[0] || {}).label || "" : ""; },
+    get conexoes() { return peers.size; }, get temTurn() { return temTurn(); }, get micAtual() { return stream ? (stream.getAudioTracks()[0] || {}).label || "" : ""; },
   };
 })();
