@@ -56,7 +56,7 @@ async function chamar(modelo, chave, n, mensagens, sinal) {
     method: "POST",
     headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json", Accept: "application/json" },
     // desliga o "raciocínio" (senão o modelo gasta os tokens pensando e não escreve a resposta)
-    body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.6, max_tokens: 3000, ...(semKw.has(modelo) ? {} : { chat_template_kwargs: { enable_thinking: false, thinking: false } }) }),
+    body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.6, max_tokens: 4096, ...(semKw.has(modelo) ? {} : { chat_template_kwargs: { enable_thinking: false, thinking: false } }) }),
     signal: AbortSignal.any([sinal, AbortSignal.timeout(Math.max(5000, restante() - 3000))]),
   }).catch(e => ({ ok: false, status: 0, text: async () => String(e) }));
   const reg = `${modelo} · chave ${n} · ${r.status} · ${((Date.now() - t0) / 1000).toFixed(1)}s`;
@@ -67,7 +67,7 @@ async function chamar(modelo, chave, n, mensagens, sinal) {
     const j = await r.json(), msg = j.choices?.[0]?.message || {};
     // alguns modelos (com "raciocínio") devolvem a resposta em reasoning_content, ou o JSON dentro de ```json
     const texto = [msg.content, msg.reasoning_content, msg.reasoning].filter(Boolean).join("\n");
-    if (!Object.keys(lerJSON(texto)).length) { console.log("[agentes] sem JSON:", JSON.stringify(msg).slice(0, 400)); throw erro(`${modelo} não devolveu JSON`, "semJson"); }
+    if (!Object.keys(lerJSON(texto)).length) { console.log("[agentes] sem JSON:", JSON.stringify(msg).slice(0, 300), "…", JSON.stringify(msg).slice(-300), "finish:", j.choices?.[0]?.finish_reason); throw erro(`${modelo} não devolveu JSON`, "semJson"); }
     return { texto, chave: n, modelo };
   }
   const txt = await r.text(); console.log("[agentes] resposta:", txt.slice(0, 200));
@@ -107,16 +107,43 @@ const rpc = (fn, corpo, token) => fetch(`${SUPA}/rest/v1/rpc/${fn}`, {
 });
 const status = (agente, s, d) => rpc("agente_status", { p_chave: process.env.AGENTES_CHAVE, p_agente: agente, p_status: s, p_detalhe: d }).catch(() => {});
 
+// lê o JSON da IA mesmo "sujo": texto antes/depois, ```json, quebra de linha dentro de texto, vírgula sobrando ou resposta cortada
+function consertarJSON(t) {
+  let out = "", dentro = false, esc = false; const pilha = [], cortes = [];
+  for (let k = 0; k < t.length; k++) {
+    const ch = t[k];
+    if (dentro) {
+      if (esc) { esc = false; out += ch; continue; }
+      if (ch === "\\") { esc = true; out += ch; continue; }
+      if (ch === '"') { dentro = false; out += ch; continue; }
+      if (ch === "\n") { out += "\\n"; continue; }
+      if (ch === "\r" || ch === "\t") { out += " "; continue; }
+      out += ch; continue;
+    }
+    if (ch === '"') { dentro = true; out += ch; continue; }
+    if (ch === "{" || ch === "[") pilha.push(ch === "{" ? "}" : "]");
+    else if (ch === "}" || ch === "]") { pilha.pop(); out += ch; cortes.push([out.length, pilha.slice()]); continue; }
+    out += ch;
+  }
+  const limpar = x => x.replace(/,\s*([}\]])/g, "$1");
+  const tentar = x => { try { return JSON.parse(limpar(x)); } catch (e) { return null; } };
+  let o = tentar(out); if (o) return o;
+  if (dentro) out += '"';
+  o = tentar(out + pilha.slice().reverse().join("")); if (o) return o;
+  // cortada no meio: volta até o último objeto/lista completo e fecha o resto
+  for (let c = cortes.length - 1; c >= 0; c--) { const [pos, pl] = cortes[c]; o = tentar(out.slice(0, pos) + pl.slice().reverse().join("")); if (o) return o; }
+  return null;
+}
 function lerJSON(txt) {
   txt = String(txt || "").replace(/<think>[\s\S]*?<\/think>/g, "").replace(/```(?:json)?/gi, "");
-  // pega o último bloco {...} que for JSON válido (o raciocínio pode vir antes)
-  const ini = [...txt.matchAll(/\{/g)].map(m => m.index);
-  const fim = txt.lastIndexOf("}");
+  // tenta cada "{" (o raciocínio pode vir antes); fica com o primeiro objeto que tenha alguma lista dentro
+  const ini = [...txt.matchAll(/\{/g)].map(m => m.index).slice(0, 40);
   for (const a of ini) {
-    try { const o = JSON.parse(txt.slice(a, fim + 1)); if (o && typeof o === "object" && !Array.isArray(o) && Object.values(o).some(Array.isArray)) return o; } catch (e) {}
+    const o = consertarJSON(txt.slice(a));
+    if (o && typeof o === "object" && !Array.isArray(o) && Object.values(o).some(Array.isArray)) return o;
   }
-  const arr = txt.match(/\[[\s\S]*\]/); // veio só uma lista: vira do primeiro agente
-  if (arr) try { const l = JSON.parse(arr[0]); if (Array.isArray(l)) return { agente1: l }; } catch (e) {}
+  const arr = txt.indexOf("["); // veio só uma lista: vira do primeiro agente
+  if (arr >= 0) { const l = consertarJSON(txt.slice(arr)); if (Array.isArray(l)) return { agente1: l }; }
   return {};
 }
 
