@@ -216,6 +216,10 @@ window.Projecao = (function () {
       if (!v || v.de !== de) { if (v) largar(sala); pedir(sala, de); continue; }
       const espera = Math.min(20000, 6000 * v.tentativas);
       if (!v.conectado && agora - v.pedidoEm > espera) pedir(sala, de); // não respondeu: pede de novo
+      // conectado mas sem imagem: o navegador pode ter pausado o vídeo escondido; dá play de novo
+      if (v.video && v.stream && (v.video.paused || v.video.readyState < 2) && agora - (v.tocouEm || 0) > 1500) { v.tocouEm = agora; v.video.play().catch(() => {}); }
+      // conectado há 12 s e nenhuma imagem: refaz a conexão do zero
+      if (v.conectado && v.video && v.video.readyState < 2 && agora - v.pedidoEm > 12000) { largar(sala); pedir(sala, de); }
     }
     for (const sala of [...vendo.keys()]) if (!queroVer.has(sala)) largar(sala);
     atualizarBotao(eu);
@@ -271,7 +275,8 @@ window.Projecao = (function () {
       g.fillStyle = "#1d1b26"; g.fillRect(x, y, w, h);
       g.fillStyle = "#fff"; g.font = "bold 9px system-ui,sans-serif"; g.fillText(`🎬 ${ap.nome} está apresentando`, x + w / 2, y + h / 2 - 8);
       g.fillStyle = "#b9b4c8"; g.font = "7px system-ui,sans-serif";
-      g.fillText(Math.floor(t * 2) % 2 ? "Clique para assistir" : "Carregando…", x + w / 2, y + h / 2 + 8);
+      const v = vendo.get(sala), est = !v ? "Clique para assistir" : !v.conectado ? (v.tentativas > 2 ? "Sem conexão com quem apresenta · tentando de novo" : "Conectando à apresentação…") : "Recebendo a imagem…";
+      g.fillText(est, x + w / 2, y + h / 2 + 8);
       etiqueta(g, x + 3, y + 3, "● AO VIVO", "#e5484d");
     } else {
       g.fillStyle = "rgba(61,90,254,.08)"; g.fillRect(x, y, w, h);
@@ -374,13 +379,16 @@ window.Projecao = (function () {
   function videoOculto(ms, mudo) {
     const v = document.createElement("video");
     v.muted = mudo; v.playsInline = true; v.autoplay = true; v.srcObject = ms;
-    v.style.cssText = "position:fixed;width:2px;height:2px;opacity:0;pointer-events:none;left:-10px;top:-10px";
+    // fica dentro da tela (1 px quase transparente): vídeo fora da tela pode ser pausado pelo navegador e a imagem não chega
+    v.style.cssText = "position:fixed;width:1px;height:1px;opacity:.01;pointer-events:none;left:0;bottom:0;z-index:-1";
     document.body.appendChild(v); v.play().catch(() => {});
     return v;
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); }
 
-  return {
+  // diagnóstico no console: Projecao.diagnostico()
+  function diagnostico() { return [...vendo.entries()].map(([sala, v]) => ({ sala, de: v.de, conectado: v.conectado, tentativas: v.tentativas, estado: v.pc && v.pc.connectionState, ice: v.pc && v.pc.iceConnectionState, temStream: !!v.stream, videoPronto: v.video && v.video.readyState, pausado: v.video && v.video.paused })); }
+  return { diagnostico,
     iniciar, recalcular, aoSinal, atualizar, desenhaveis, clicou, clicarBotao, abrirPopup, fecharPopup, parar,
     get minhaSala() { return share && share.tipo === "palco" ? share.sala : null; },
     get minhaTela() { return !!(share && share.tipo === "mesa"); },
