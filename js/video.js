@@ -1,7 +1,7 @@
 /* Corte (editor de vídeo da sala de Edição): transforma um roteiro em um vídeo vertical ANIMADO (motion graphics).
    Tudo no navegador: ilustrações animadas por cena, texto cinético, legenda palavra a palavra, transições e trilha sonora
-   gerada na hora (Web Audio). Grava com MediaRecorder (MP4 quando o navegador deixa, senão WebM).
-   Uso: Video.gerar(roteiro, { aoProgredir(p), cancelado() }) → Promise<{ blob, ext, duracao }> */
+   gerada na hora (Web Audio), com narração em português gerada no próprio navegador (Piper, js/vendor/vits). Grava com MediaRecorder (MP4 quando o navegador deixa, senão WebM).
+   Uso: Video.gerar(roteiro, { voz, aoStatus(txt), aoProgredir(p), cancelado() }) → Promise<{ blob, ext, duracao }> */
 window.Video = (function () {
   const W = 720, H = 1280, FPS = 30;
   const PALETAS = [["#2b1140", "#e04fa0", "#ffd166"], ["#0e2238", "#2fd4e8", "#ffd166"], ["#122a1a", "#3fbf5f", "#e8f56a"], ["#33190c", "#f2a33a", "#fff1c1"], ["#1c1338", "#8b6cff", "#2fd4e8"]];
@@ -58,7 +58,7 @@ window.Video = (function () {
   function legenda(g, txt, y, p, ac) {
     if (!txt) return;
     g.font = "800 34px system-ui,sans-serif"; g.textAlign = "left"; g.textBaseline = "middle";
-    const todas = String(txt).split(/\s+/).filter(Boolean), n = todas.length, atual = Math.floor(seg(p, 0.05, 0.92) * n);
+    const todas = String(txt).split(/\s+/).filter(Boolean), n = todas.length, atual = Math.min(n - 1, Math.floor(clamp(p, 0, 1) * n));
     // mostra um bloco de até ~7 palavras por vez
     const bloco = 7, ini = Math.floor(Math.min(atual, n - 1) / bloco) * bloco, pal = todas.slice(ini, ini + bloco);
     const linhas = quebrar(g, pal.join(" "), W - 120); let k = ini;
@@ -236,13 +236,16 @@ window.Video = (function () {
   }
 
   /* ---------- trilha sonora (Web Audio) ---------- */
-  function trilha(ac, destino, cenas, total) {
-    const mestre = ac.createGain(); mestre.gain.value = 0.55; mestre.connect(destino);
-    const t0 = ac.currentTime + 0.05, bpm = 112, beat = 60 / bpm;
+  function trilha(ac, destino, lista, total) {
+    const mestre = ac.createGain(); mestre.gain.value = 1; mestre.connect(destino);
+    const musica = ac.createGain(); musica.connect(mestre);
+    const t0 = ac.currentTime + 0.1, bpm = 112, beat = 60 / bpm;
+    const temVoz = lista.some(x => x.vozBuf), base = temVoz ? 0.3 : 0.55;
+    musica.gain.setValueAtTime(base, t0);
     const ruido = (() => { const b = ac.createBuffer(1, ac.sampleRate, ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; })();
-    const nota = (freq, ini, dur, tipo = "sine", vol = 0.2, ataque = 0.01) => { const o = ac.createOscillator(), gg = ac.createGain(); o.type = tipo; o.frequency.value = freq; gg.gain.setValueAtTime(0, ini); gg.gain.linearRampToValueAtTime(vol, ini + ataque); gg.gain.exponentialRampToValueAtTime(0.001, ini + dur); o.connect(gg).connect(mestre); o.start(ini); o.stop(ini + dur + 0.05); };
-    const chimbal = ini => { const s = ac.createBufferSource(), f = ac.createBiquadFilter(), gg = ac.createGain(); s.buffer = ruido; f.type = "highpass"; f.frequency.value = 7000; gg.gain.setValueAtTime(0.08, ini); gg.gain.exponentialRampToValueAtTime(0.001, ini + 0.06); s.connect(f).connect(gg).connect(mestre); s.start(ini); s.stop(ini + 0.08); };
-    const bumbo = ini => { const o = ac.createOscillator(), gg = ac.createGain(); o.frequency.setValueAtTime(140, ini); o.frequency.exponentialRampToValueAtTime(45, ini + 0.15); gg.gain.setValueAtTime(0.6, ini); gg.gain.exponentialRampToValueAtTime(0.001, ini + 0.25); o.connect(gg).connect(mestre); o.start(ini); o.stop(ini + 0.3); };
+    const nota = (freq, ini, dur, tipo = "sine", vol = 0.2, ataque = 0.01, saida = musica) => { const o = ac.createOscillator(), gg = ac.createGain(); o.type = tipo; o.frequency.value = freq; gg.gain.setValueAtTime(0, ini); gg.gain.linearRampToValueAtTime(vol, ini + ataque); gg.gain.exponentialRampToValueAtTime(0.001, ini + dur); o.connect(gg).connect(saida); o.start(ini); o.stop(ini + dur + 0.05); };
+    const chimbal = ini => { const s = ac.createBufferSource(), f = ac.createBiquadFilter(), gg = ac.createGain(); s.buffer = ruido; f.type = "highpass"; f.frequency.value = 7000; gg.gain.setValueAtTime(0.08, ini); gg.gain.exponentialRampToValueAtTime(0.001, ini + 0.06); s.connect(f).connect(gg).connect(musica); s.start(ini); s.stop(ini + 0.08); };
+    const bumbo = ini => { const o = ac.createOscillator(), gg = ac.createGain(); o.frequency.setValueAtTime(140, ini); o.frequency.exponentialRampToValueAtTime(45, ini + 0.15); gg.gain.setValueAtTime(0.6, ini); gg.gain.exponentialRampToValueAtTime(0.001, ini + 0.25); o.connect(gg).connect(musica); o.start(ini); o.stop(ini + 0.3); };
     const acordes = [[220, 261.6, 329.6], [174.6, 220, 261.6], [196, 246.9, 293.7], [164.8, 207.7, 246.9]]; // Am F G E
     const nBeats = Math.ceil(total / beat);
     for (let b = 0; b < nBeats; b++) {
@@ -252,18 +255,46 @@ window.Video = (function () {
       if (b % 4 === 0) { const ac_ = acordes[(b / 4) % 4]; ac_.forEach(f => nota(f, t, beat * 4, "triangle", 0.05, 0.3)); nota(ac_[0] / 2, t, beat * 1.8, "sawtooth", 0.06); nota(ac_[0] / 2, t + beat * 2, beat * 1.8, "sawtooth", 0.06); }
       if (b % 2 === 1 && b > 4 && !fim) nota(acordes[Math.floor(b / 4) % 4][(b >> 1) % 3] * 2, t, beat * 0.5, "square", 0.025);
     }
-    // efeitos em cada cena: "whoosh" na troca e "ding" quando o roteiro pede
+    // efeitos e narração de cada parte do vídeo
     let acc = 0;
-    for (const c of cenas) {
+    for (const c of lista) {
       const t = t0 + acc;
-      const s = ac.createBufferSource(), f = ac.createBiquadFilter(), gg = ac.createGain(); s.buffer = ruido; f.type = "bandpass"; f.Q.value = 1.2;
-      f.frequency.setValueAtTime(400, t); f.frequency.exponentialRampToValueAtTime(4000, t + 0.35); gg.gain.setValueAtTime(0, t); gg.gain.linearRampToValueAtTime(0.18, t + 0.12); gg.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
-      s.connect(f).connect(gg).connect(mestre); s.start(t); s.stop(t + 0.5);
-      if (/ding|confirma|notifica|alerta|sino|plim/i.test(c.audio || "") || c.tipo === "dashboard" || c.tipo === "cadeado") { nota(1318.5, t + c.s * 0.45, 0.6, "sine", 0.12); nota(1975.5, t + c.s * 0.45 + 0.08, 0.6, "sine", 0.08); }
+      if (acc > 0) {
+        const s = ac.createBufferSource(), f = ac.createBiquadFilter(), gg = ac.createGain(); s.buffer = ruido; f.type = "bandpass"; f.Q.value = 1.2;
+        f.frequency.setValueAtTime(400, t); f.frequency.exponentialRampToValueAtTime(4000, t + 0.35); gg.gain.setValueAtTime(0, t); gg.gain.linearRampToValueAtTime(0.16, t + 0.12); gg.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+        s.connect(f).connect(gg).connect(mestre); s.start(t); s.stop(t + 0.5);
+      }
+      if (/ding|confirma|notifica|alerta|sino|plim/i.test(c.audio || "") || c.tipo === "dashboard" || c.tipo === "cadeado") { nota(1318.5, t + c.s * 0.45, 0.6, "sine", 0.1, 0.01, mestre); nota(1975.5, t + c.s * 0.45 + 0.08, 0.6, "sine", 0.06, 0.01, mestre); }
+      if (c.vozBuf) {
+        const ini = t + c.vozIni, fimVoz = ini + c.vozBuf.duration;
+        const v = ac.createBufferSource(), vg = ac.createGain(); v.buffer = c.vozBuf; vg.gain.value = 1.15; v.connect(vg).connect(mestre); v.start(ini);
+        musica.gain.setTargetAtTime(base * 0.45, ini - 0.15, 0.08); musica.gain.setTargetAtTime(base, fimVoz + 0.05, 0.25); // abaixa a música enquanto fala
+      }
       acc += c.s;
     }
-    mestre.gain.setValueAtTime(0.55, t0 + total - 1.2); mestre.gain.linearRampToValueAtTime(0, t0 + total);
+    mestre.gain.setValueAtTime(1, t0 + total - 1.2); mestre.gain.linearRampToValueAtTime(0, t0 + total);
+    return t0;
   }
+
+  /* ---------- narração (voz em português gerada no navegador, Piper/VITS) ---------- */
+  const VOZ = "pt_BR-faber-medium";
+  let tts = null;
+  async function narrar(ac, lista, o) {
+    tts = tts || await import(new URL("js/vendor/vits/vits-web.js", location.href).href);
+    const salvas = await tts.stored().catch(() => []);
+    if (!salvas.includes(VOZ)) {
+      if (o.aoStatus) o.aoStatus("Baixando a voz em português (só na primeira vez, ~60 MB)…");
+      await tts.download(VOZ, pr => { if (o.aoStatus && pr.total) o.aoStatus(`Baixando a voz em português (só na primeira vez)… ${Math.round(pr.loaded * 100 / pr.total)}%`); });
+    }
+    const falas = lista.filter(x => x.texto);
+    for (let i = 0; i < falas.length; i++) {
+      if (o.cancelado && o.cancelado()) return;
+      if (o.aoStatus) o.aoStatus(`🎙️ Gravando a narração ${i + 1} de ${falas.length}…`);
+      const wav = await tts.predict({ text: falas[i].texto, voiceId: VOZ });
+      falas[i].vozBuf = await ac.decodeAudioData(await wav.arrayBuffer());
+    }
+  }
+  const limparFala = t => String(t || "").replace(/[*_#>`~|]/g, " ").replace(/\s+/g, " ").trim();
 
   /* ---------- montagem ---------- */
   async function gerar(r, o = {}) {
@@ -271,11 +302,21 @@ window.Video = (function () {
     const canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H; const g = canvas.getContext("2d");
     const cta = (String(r.roteiro || "").match(/CTA:\s*(.+)$/m) || [])[1];
     const cenas = (r.cenas || []).map((c, i) => ({ ...c, tipo: escolherTipo(c, i), s: clamp(segundos(c.duracao) || 4, 2.5, 7) }));
-    const lista = [{ capa: true, s: 3 }, ...cenas, ...(cta ? [{ fim: true, s: 3, fala: "" }] : [])];
-    const total = lista.reduce((a, x) => a + x.s, 0);
+    const lista = [{ capa: true, s: 3, texto: limparFala([r.titulo, r.gancho].filter(Boolean).join(". ")) },
+      ...cenas.map(c => ({ ...c, texto: limparFala(c.fala || c.texto_tela) })),
+      ...(cta ? [{ fim: true, s: 3, fala: "", texto: limparFala(cta) }] : [])];
     if (o.canvas) o.canvas(canvas);
 
     const ac = new (window.AudioContext || window.webkitAudioContext)(); await ac.resume().catch(() => {});
+    let semVoz = null;
+    if (o.voz !== false) {
+      try { await narrar(ac, lista, o); }
+      catch (e) { console.warn("narração:", e); semVoz = "Não consegui gerar a voz (" + (e.message || e) + "). O vídeo saiu só com música."; lista.forEach(x => delete x.vozBuf); }
+    }
+    // cada parte dura pelo menos o tempo da fala
+    for (const x of lista) if (x.vozBuf) { x.vozIni = x.capa ? 0.5 : 0.35; x.s = Math.max(x.s, x.vozIni + x.vozBuf.duration + 0.45); }
+    const total = lista.reduce((a, x) => a + x.s, 0);
+    if (o.aoStatus) o.aoStatus("");
     const destino = ac.createMediaStreamDestination();
     const stream = new MediaStream([...canvas.captureStream(FPS).getVideoTracks(), ...destino.stream.getAudioTracks()]);
     const tipo = ["video/mp4;codecs=avc1.42E01F,mp4a.40.2", "video/mp4;codecs=avc1,mp4a.40.2", "video/mp4;codecs=avc1,opus", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find(t => MediaRecorder.isTypeSupported(t)) || "";
@@ -301,7 +342,8 @@ window.Video = (function () {
         g.fillStyle = pal[1]; g.font = "800 24px system-ui"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText(`${x.n || i} / ${cenas.length}`, 48, 70);
         ilustrar(g, x.tipo, W / 2, 470, p, sec, pal, x);
         titulo(g, x.texto_tela || "", W / 2, 830, W - 100, p, "#fff", pal[1], 56);
-        legenda(g, x.fala, 1010, p, pal[2]);
+        const local = p * x.s, fala = x.vozBuf ? clamp((local - x.vozIni) / x.vozBuf.duration, 0, 1) : seg(p, 0.05, 0.92);
+        legenda(g, x.fala, 1010, fala, pal[2]);
       }
       g.restore();
       // barra de progresso no topo
@@ -309,14 +351,13 @@ window.Video = (function () {
     };
 
     quadro(0);
-    trilha(ac, destino, cenas, total);
+    const t0 = trilha(ac, destino, lista, total);
     rec.start(500);
-    const t0 = performance.now();
     await new Promise(res => {
       // timer em vez de requestAnimationFrame: continua gravando mesmo se a aba ficar em segundo plano
       const id = setInterval(() => {
         if (o.cancelado && o.cancelado()) { clearInterval(id); return res(); }
-        const sec = (performance.now() - t0) / 1000;
+        const sec = Math.max(0, ac.currentTime - t0); // relógio do áudio: voz e imagem ficam sincronizadas
         if (sec >= total) { clearInterval(id); return res(); }
         quadro(sec); if (o.aoProgredir) o.aoProgredir(sec / total);
       }, 1000 / FPS);
@@ -324,7 +365,7 @@ window.Video = (function () {
     await new Promise(res => { rec.onstop = res; try { rec.stop(); } catch (e) { res(); } });
     ac.close().catch(() => {});
     if (o.cancelado && o.cancelado()) return null;
-    return { blob: new Blob(partes, { type: tipo || "video/webm" }), ext: /mp4/.test(tipo) ? "mp4" : "webm", duracao: total };
+    return { blob: new Blob(partes, { type: tipo || "video/webm" }), ext: /mp4/.test(tipo) ? "mp4" : "webm", duracao: total, aviso: semVoz, comVoz: lista.some(x => x.vozBuf) };
   }
   return { gerar, escolherTipo, TIPOS };
 })();

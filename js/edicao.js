@@ -148,6 +148,7 @@ window.Edicao = (function () {
         ${r.gancho ? `<p class="ed-gancho">🪝 ${esc(r.gancho)}</p>` : ""}
         <div class="tc-acoes"><button class="btn" data-abrir="${r.id}">${exp ? "▲ Fechar" : "▼ Roteiro e cenas"}</button>
           <button class="btn pri" data-video="${r.id}">🎞️ Gerar vídeo animado</button>
+          <label class="ed-voz" title="Narração em português gerada no seu navegador"><input type="checkbox" data-voz ${comVoz ? "checked" : ""}> 🎙️ com voz</label>
           <button class="btn" data-copiar="${r.id}">📋 Copiar</button>
           ${adm ? `<button class="btn" data-excluir="${r.id}" title="Excluir">🗑️</button>` : ""}</div>
         ${exp ? `<div class="ed-detalhe">
@@ -179,6 +180,7 @@ window.Edicao = (function () {
   }
   async function aoMudar(e) {
     if (e.target.matches("[data-formato]")) { formato = e.target.value; return; }
+    if (e.target.matches("[data-voz]")) { comVoz = e.target.checked; return; }
     if (e.target.matches("[data-status]")) {
       try { await Dados.mexerRoteiro(e.target.dataset.status, e.target.value); opt.toast("Status: " + STATUS[e.target.value]); }
       catch (er) { opt.toast("Não consegui mudar o status"); }
@@ -203,17 +205,19 @@ window.Edicao = (function () {
   }
 
   /* ---------------- vídeo animado (js/video.js) ---------------- */
-  let gravacao = null;
+  let gravacao = null, comVoz = true;
   function pararVideo() { if (gravacao) { gravacao.cancelado = true; gravacao = null; } }
   async function gerarVideo(r) {
     if (!r || !window.Video) return;
     pararVideo(); await new Promise(res => setTimeout(res, 60));
     const area = painel && painel.querySelector(`[data-video-area="${r.id}"]`); if (!area) return;
     const eu = gravacao = { cancelado: false };
-    area.innerHTML = `<p class="ed-dica">✂️ Corte está animando o vídeo… <span data-prog>0%</span> <small>(é gravado em tempo real; deixe esta janela aberta)</small></p>`;
+    area.innerHTML = `<p class="ed-dica">✂️ Corte está animando o vídeo… <span data-prog>0%</span> <small>(é gravado em tempo real; deixe esta janela aberta)</small></p><p class="ed-dica" data-status></p>`;
     try {
       const res = await Video.gerar(r, {
         canvas: c => { c.className = "ed-canvas"; area.appendChild(c); },
+        voz: comVoz,
+        aoStatus: t => { const e = area.querySelector("[data-status]"); if (e) e.textContent = t; },
         aoProgredir: p => { const e = area.querySelector("[data-prog]"); if (e) e.textContent = Math.round(p * 100) + "%"; },
         cancelado: () => eu.cancelado,
       });
@@ -221,7 +225,8 @@ window.Edicao = (function () {
       gravacao = null;
       const url = URL.createObjectURL(res.blob);
       const nome = (r.titulo || "roteiro").normalize("NFD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").toLowerCase().slice(0, 50);
-      area.innerHTML = `<p class="ed-dica">✂️ Vídeo animado pronto (${Math.round(res.duracao)} s, com trilha sonora).</p>
+      area.innerHTML = `<p class="ed-dica">✂️ Vídeo animado pronto (${Math.round(res.duracao)} s, ${res.comVoz ? "com narração e trilha sonora" : "com trilha sonora"}).</p>
+        ${res.aviso ? `<p class="ed-dica">⚠️ ${esc(res.aviso)}</p>` : ""}
         <video class="ed-canvas" src="${url}" controls playsinline></video>
         <a class="btn pri" href="${url}" download="${nome}.${res.ext}">⬇️ Baixar vídeo (.${res.ext})</a>`;
       Dados.registrarAtividade(null, "acao", `Gerou vídeo animado: ${r.titulo}`, { sala: "Edição" });
