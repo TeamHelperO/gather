@@ -1,7 +1,7 @@
 /* Sala de Edição: Pena (roteirista), Claquete (diretor de cenas) e Corte (editor de vídeo).
    – Pega as tendências marcadas como "pega" na sala de Pesquisa e pede à IA um roteiro com cenas detalhadas (api/agentes.js).
    – O telão de roteiros mostra os últimos; clicar abre o painel (só para quem está na sala).
-   – "Gerar vídeo rascunho": monta no navegador um vídeo-guia (animatic) com as cenas, para baixar.
+   – "Gerar vídeo animado": monta no navegador um vídeo animado (js/video.js), para baixar.
    Registra as artes: precisa ser carregado ANTES de js/mapa-core.js (e depois de js/ti.js). */
 (function registrarArtes() {
   if (!window.ASSETS) return;
@@ -147,7 +147,7 @@ window.Edicao = (function () {
           <select data-status="${r.id}">${Object.entries(STATUS).map(([k, l]) => `<option value="${k}" ${r.status === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
         ${r.gancho ? `<p class="ed-gancho">🪝 ${esc(r.gancho)}</p>` : ""}
         <div class="tc-acoes"><button class="btn" data-abrir="${r.id}">${exp ? "▲ Fechar" : "▼ Roteiro e cenas"}</button>
-          <button class="btn pri" data-video="${r.id}">🎞️ Gerar vídeo rascunho</button>
+          <button class="btn pri" data-video="${r.id}">🎞️ Gerar vídeo animado</button>
           <button class="btn" data-copiar="${r.id}">📋 Copiar</button>
           ${adm ? `<button class="btn" data-excluir="${r.id}" title="Excluir">🗑️</button>` : ""}</div>
         ${exp ? `<div class="ed-detalhe">
@@ -157,7 +157,8 @@ window.Edicao = (function () {
             <div><span>🎥 Como gravar</span>${esc(c.visual)}</div>
             ${c.fala ? `<div><span>🗣️ Fala</span>${esc(c.fala)}</div>` : ""}
             ${c.texto_tela ? `<div><span>🔤 Na tela</span>${esc(c.texto_tela)}</div>` : ""}
-            ${c.audio ? `<div><span>🎵 Áudio</span>${esc(c.audio)}</div>` : ""}</div>`).join("")}</div>
+            ${c.audio ? `<div><span>🎵 Áudio</span>${esc(c.audio)}</div>` : ""}
+            <div><span>✨ Animação</span>${esc(window.Video ? Video.escolherTipo(c, c.n - 1) : c.animacao || "")}</div></div>`).join("")}</div>
           <div class="ed-video" data-video-area="${r.id}"></div></div>` : ""}
       </article>`;
     }).join("");
@@ -201,78 +202,30 @@ window.Edicao = (function () {
     pedindo = null; await recarregar(); render();
   }
 
-  /* ---------------- vídeo rascunho (animatic) ---------------- */
+  /* ---------------- vídeo animado (js/video.js) ---------------- */
   let gravacao = null;
-  function pararVideo() { if (gravacao) { try { gravacao.rec.state !== "inactive" && gravacao.rec.stop(); } catch (e) {} gravacao.cancelado = true; gravacao = null; } }
-  const segundos = d => { const n = String(d || "").match(/(\d+(?:[.,]\d+)?)\s*(?:-|a|–)\s*(\d+(?:[.,]\d+)?)/); if (n) return +n[2].replace(",", ".") - +n[1].replace(",", "."); const m = String(d || "").match(/(\d+(?:[.,]\d+)?)/); return m ? +m[1].replace(",", ".") : 4; };
-  function quebrar(g, txt, larg) {
-    const out = []; let l = "";
-    for (const p of String(txt || "").split(/\s+/)) { const t = l ? l + " " + p : p; if (g.measureText(t).width > larg && l) { out.push(l); l = p; } else l = t; }
-    if (l) out.push(l); return out;
-  }
+  function pararVideo() { if (gravacao) { gravacao.cancelado = true; gravacao = null; } }
   async function gerarVideo(r) {
-    if (!r) return;
-    if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) { opt.toast("Este navegador não grava vídeo. Use o Chrome no computador."); return; }
-    pararVideo(); await new Promise(res => setTimeout(res, 50));
+    if (!r || !window.Video) return;
+    pararVideo(); await new Promise(res => setTimeout(res, 60));
     const area = painel && painel.querySelector(`[data-video-area="${r.id}"]`); if (!area) return;
-    const W = 540, H = 960, c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d");
-    area.innerHTML = `<p class="ed-dica">✂️ Corte está montando o vídeo-guia… <span data-prog>0%</span></p>`; area.appendChild(c); c.className = "ed-canvas";
-    const cenas = (r.cenas || []).map(x => ({ ...x, s: Math.max(2, Math.min(8, segundos(x.duracao) || 4)) }));
-    const capa = { capa: true, s: 2.5 }, lista = [capa, ...cenas], total = lista.reduce((a, x) => a + x.s, 0);
-    const tipo = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"].find(t => MediaRecorder.isTypeSupported(t)) || "";
-    const stream = c.captureStream(30), rec = new MediaRecorder(stream, tipo ? { mimeType: tipo, videoBitsPerSecond: 2500000 } : {}), partes = [];
-    rec.ondataavailable = e => e.data.size && partes.push(e.data);
-    const eu = gravacao = { rec, cancelado: false };
-    const cores = [["#2b1a3a", "#e04fa0"], ["#14243a", "#2fd4e8"], ["#1d2b1a", "#3fbf5f"], ["#3a2414", "#f2a33a"], ["#22183a", "#7b4fd8"]];
-    const quadro = (x, t) => {
-      const [bg, ac] = cores[(x.n || 0) % cores.length];
-      const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, bg); gr.addColorStop(1, "#0c0a12"); g.fillStyle = gr; g.fillRect(0, 0, W, H);
-      g.fillStyle = ac; g.fillRect(0, 0, W * Math.min(1, t), 6);
-      g.textAlign = "center"; g.textBaseline = "top";
-      if (x.capa) {
-        g.fillStyle = ac; g.font = "bold 22px system-ui,sans-serif"; g.fillText("ROTEIRO · NEXT CO.", W / 2, 120);
-        g.fillStyle = "#fff"; g.font = "bold 38px system-ui,sans-serif"; quebrar(g, r.titulo, W - 70).slice(0, 5).forEach((l, i) => g.fillText(l, W / 2, 300 + i * 48));
-        g.fillStyle = "#c9b4c8"; g.font = "22px system-ui,sans-serif"; quebrar(g, r.gancho, W - 90).slice(0, 4).forEach((l, i) => g.fillText(l, W / 2, 600 + i * 30));
-        return;
-      }
-      g.fillStyle = ac; g.font = "bold 22px system-ui,sans-serif"; g.fillText(`CENA ${x.n}  ·  ${x.duracao || x.s + "s"}`, W / 2, 40);
-      // como gravar
-      g.fillStyle = "rgba(255,255,255,.08)"; g.fillRect(30, 90, W - 60, 300);
-      g.fillStyle = "#c9b4c8"; g.font = "bold 16px system-ui,sans-serif"; g.fillText("🎥 COMO GRAVAR", W / 2, 105);
-      g.fillStyle = "#fff"; g.font = "20px system-ui,sans-serif"; quebrar(g, x.visual, W - 100).slice(0, 9).forEach((l, i) => g.fillText(l, W / 2, 140 + i * 27));
-      // texto na tela
-      if (x.texto_tela) { g.font = "bold 40px system-ui,sans-serif"; const ls = quebrar(g, x.texto_tela, W - 70).slice(0, 3);
-        ls.forEach((l, i) => { const w = g.measureText(l).width + 24; g.fillStyle = ac; g.fillRect((W - w) / 2, 440 + i * 54, w, 50); g.fillStyle = "#fff"; g.fillText(l, W / 2, 445 + i * 54); }); }
-      // fala (legenda)
-      if (x.fala) { g.font = "24px system-ui,sans-serif"; const ls = quebrar(g, x.fala, W - 80).slice(0, 5);
-        g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(24, 690, W - 48, ls.length * 32 + 24);
-        g.fillStyle = "#fff"; ls.forEach((l, i) => g.fillText(l, W / 2, 702 + i * 32)); }
-      if (x.audio) { g.fillStyle = "#c9b4c8"; g.font = "18px system-ui,sans-serif"; g.fillText("🎵 " + quebrar(g, x.audio, W - 80)[0], W / 2, H - 50); }
-    };
-    rec.start(500);
-    const t0 = performance.now(), prog = area.querySelector("[data-prog]");
-    await new Promise(res => {
-      const passo = () => {
-        if (eu.cancelado) return res();
-        const el = (performance.now() - t0) / 1000;
-        if (el >= total) return res();
-        let acc = 0, atual = lista[0];
-        for (const x of lista) { if (el < acc + x.s) { atual = x; break; } acc += x.s; }
-        quadro(atual, (el - acc) / atual.s);
-        if (prog) prog.textContent = Math.round(el / total * 100) + "%";
-        requestAnimationFrame(passo);
-      };
-      passo();
-    });
-    if (eu.cancelado) return;
-    await new Promise(res => { rec.onstop = res; rec.stop(); });
-    gravacao = null;
-    const blob = new Blob(partes, { type: tipo || "video/webm" }), url = URL.createObjectURL(blob), ext = /mp4/.test(tipo) ? "mp4" : "webm";
-    const nome = (r.titulo || "roteiro").normalize("NFD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").toLowerCase().slice(0, 50);
-    area.innerHTML = `<p class="ed-dica">✂️ Vídeo-guia pronto (${Math.round(total)} s). Ele mostra cada cena com o que gravar, a fala e o texto na tela.</p>
-      <video class="ed-canvas" src="${url}" controls playsinline></video>
-      <a class="btn pri" href="${url}" download="${nome}.${ext}">⬇️ Baixar vídeo</a>`;
-    Dados.registrarAtividade(null, "acao", `Gerou vídeo rascunho: ${r.titulo}`, { sala: "Edição" });
+    const eu = gravacao = { cancelado: false };
+    area.innerHTML = `<p class="ed-dica">✂️ Corte está animando o vídeo… <span data-prog>0%</span> <small>(é gravado em tempo real; deixe esta janela aberta)</small></p>`;
+    try {
+      const res = await Video.gerar(r, {
+        canvas: c => { c.className = "ed-canvas"; area.appendChild(c); },
+        aoProgredir: p => { const e = area.querySelector("[data-prog]"); if (e) e.textContent = Math.round(p * 100) + "%"; },
+        cancelado: () => eu.cancelado,
+      });
+      if (!res || eu.cancelado) return;
+      gravacao = null;
+      const url = URL.createObjectURL(res.blob);
+      const nome = (r.titulo || "roteiro").normalize("NFD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").toLowerCase().slice(0, 50);
+      area.innerHTML = `<p class="ed-dica">✂️ Vídeo animado pronto (${Math.round(res.duracao)} s, com trilha sonora).</p>
+        <video class="ed-canvas" src="${url}" controls playsinline></video>
+        <a class="btn pri" href="${url}" download="${nome}.${res.ext}">⬇️ Baixar vídeo (.${res.ext})</a>`;
+      Dados.registrarAtividade(null, "acao", `Gerou vídeo animado: ${r.titulo}`, { sala: "Edição" });
+    } catch (e) { area.innerHTML = `<p class="ed-dica">⚠️ ${esc(e.message || "Não consegui gerar o vídeo")}</p>`; gravacao = null; }
   }
 
   return { iniciar, recarregar, desenhaveis, clicou, abrirPainel, fecharPainel, atualizar, get aberto() { return !!painel; } };

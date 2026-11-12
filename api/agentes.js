@@ -175,12 +175,14 @@ async function roteirizar(t, formato, pedidoPor) {
     { role: "user", content: `Crie um vídeo no formato "${formato}" sobre esta tendência de mercado, para uma agência/empresa digital brasileira:\n` +
       `Título: ${texto(t.titulo, 200)}\nResumo: ${texto(t.resumo, 800)}\nCategoria: ${texto(t.categoria, 60)}\n\n` +
       `Devolva: {"titulo": "título do vídeo", "gancho": "frase dos 3 primeiros segundos", "roteiro": "texto completo da narração", ` +
-      `"cenas": [{"n": 1, "duracao": "0-3s", "visual": "o que aparece e como gravar (enquadramento, movimento, cenário, quem aparece)", "fala": "o que é dito", "texto_tela": "legenda/letreiro", "audio": "música/efeito"}], ` +
+      `"cenas": [{"n": 1, "duracao": "0-3s", "visual": "o que aparece e como gravar (enquadramento, movimento, cenário, quem aparece)", "fala": "o que é dito", "texto_tela": "frase curta de impacto (até 6 palavras)", "audio": "música/efeito", ` +
+      `"animacao": "uma destas: chat, grafico, dashboard, cadeado, celular, relogio, dinheiro, robo, integracao, pessoa, numero, alvo"}], ` +
       `"cta": "chamada final"}. De 5 a 8 cenas, prontas para alguém gravar com celular. Não invente números nem marcas reais.` },
   ]);
   const j = lerJSON(resp);
   const cenas = [].concat(j.cenas || []).filter(c => c && (c.visual || c.fala)).slice(0, 12).map((c, k) => ({
     n: k + 1, duracao: texto(c.duracao, 20), visual: texto(c.visual, 600), fala: texto(c.fala, 600), texto_tela: texto(c.texto_tela, 200), audio: texto(c.audio, 200),
+    animacao: ["chat", "grafico", "dashboard", "cadeado", "celular", "relogio", "dinheiro", "robo", "integracao", "pessoa", "numero", "alvo"].includes(String(c.animacao || "").toLowerCase()) ? String(c.animacao).toLowerCase() : undefined,
   }));
   if (!cenas.length) throw new Error(`A IA (${modelo.split("/").pop()}) não devolveu as cenas`);
   await status("agente7", "cenas prontas", `${cenas.length} cenas detalhadas`);
@@ -192,7 +194,7 @@ async function roteirizar(t, formato, pedidoPor) {
   if (!r.ok) throw new Error("Não consegui salvar o roteiro (" + r.status + "): " + (await r.text()).slice(0, 120));
   const id = await r.json();
   await status("agente6", "roteiro pronto", `${texto(j.titulo || t.titulo, 80)} · ${modelo.split("/").pop()} · chave ${chave}`);
-  await status("agente8", "pronto para editar", "Abra o roteiro e clique em Gerar vídeo rascunho");
+  await status("agente8", "pronto para editar", "Abra o roteiro e clique em Gerar vídeo animado");
   return { id, cenas: cenas.length, modelo };
 }
 
