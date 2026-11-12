@@ -177,9 +177,19 @@ async function roteirizar(t, formato, pedidoPor) {
       `Devolva: {"titulo": "título do vídeo", "gancho": "frase dos 3 primeiros segundos", "roteiro": "texto completo da narração", ` +
       `"cenas": [{"n": 1, "duracao": "0-3s", "visual": "o que aparece e como gravar (enquadramento, movimento, cenário, quem aparece)", "fala": "o que é dito", "texto_tela": "frase curta de impacto (até 6 palavras)", "audio": "música/efeito", ` +
       `"animacao": "uma destas: chat, grafico, dashboard, cadeado, celular, relogio, dinheiro, robo, integracao, pessoa, numero, alvo"}], ` +
-      `"cta": "chamada final"}. De 5 a 8 cenas, prontas para alguém gravar com celular. Não invente números nem marcas reais.` },
+      `"cta": "chamada final"}.\n` +
+      `Regras da narração (o vídeo é narrado do começo ao fim, sem silêncio):\n` +
+      `- De 5 a 8 cenas. TODA cena tem "fala" — nenhuma cena muda.\n` +
+      `- Cada "fala" tem de 8 a 22 palavras (cerca de 2,5 palavras por segundo) e a "duracao" combina com ela.\n` +
+      `- As falas formam um texto corrido: cada uma continua a anterior e puxa a próxima (use conectores como "e mais", "só que", "por isso", "resultado:").\n` +
+      `- O campo "roteiro" é a junção das falas, na ordem.\n` +
+      `- "texto_tela" resume a fala em até 6 palavras (não repete a fala inteira).\n` +
+      `- "animacao" escolhe o desenho que melhor ilustra a fala; evite repetir a mesma em cenas seguidas.\n` +
+      `Prontas para alguém gravar com celular. Não invente números nem marcas reais.` },
   ]);
   const j = lerJSON(resp);
+  // nenhuma cena sem fala: usa o texto da tela ou a descrição como último recurso
+  [].concat(j.cenas || []).forEach(c => { if (c && !String(c.fala || "").trim()) c.fala = c.texto_tela || ""; });
   const cenas = [].concat(j.cenas || []).filter(c => c && (c.visual || c.fala)).slice(0, 12).map((c, k) => ({
     n: k + 1, duracao: texto(c.duracao, 20), visual: texto(c.visual, 600), fala: texto(c.fala, 600), texto_tela: texto(c.texto_tela, 200), audio: texto(c.audio, 200),
     animacao: ["chat", "grafico", "dashboard", "cadeado", "celular", "relogio", "dinheiro", "robo", "integracao", "pessoa", "numero", "alvo"].includes(String(c.animacao || "").toLowerCase()) ? String(c.animacao).toLowerCase() : undefined,

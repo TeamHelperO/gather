@@ -94,7 +94,8 @@ window.Video = (function () {
   function ilustrar(g, tipo, cx, cy, p, sec, pal, c) {
     const [, ac, ac2] = pal, S = 1;
     g.save(); g.translate(cx, cy); g.lineCap = "round"; g.lineJoin = "round";
-    const entra = back(seg(p, 0, 0.18)); g.scale(entra, entra);
+    const entra = back(seg(p, 0, 0.18)), resp = 1 + 0.025 * Math.sin(sec * 2.2) + 0.06 * p; // nunca fica parado
+    g.translate(0, Math.sin(sec * 1.6) * 8); g.scale(entra * resp, entra * resp);
     const branco = "#ffffff", cinza = "rgba(255,255,255,.18)";
     switch (tipo) {
       case "chat": {
@@ -235,6 +236,23 @@ window.Video = (function () {
     g.restore();
   }
 
+  /* ---------- ícones flutuando em volta da ilustração ---------- */
+  const ICONES = { chat: ["💬", "✅", "⚡"], grafico: ["📈", "🚀", "💹"], numero: ["📈", "🎯", "✨"], dashboard: ["🗂️", "✅", "🔥"], cadeado: ["🔒", "🛡️", "✅"],
+    celular: ["📱", "🔔", "❤️"], relogio: ["⏰", "🌙", "⚡"], dinheiro: ["💰", "📉", "💸"], robo: ["🤖", "✨", "⚙️"], integracao: ["🔗", "⚙️", "🔄"], pessoa: ["👤", "💡", "⭐"], alvo: ["🎯", "📍", "✨"] };
+  function icones(g, tipo, cx, cy, p, sec) {
+    const lista = ICONES[tipo] || ["✨", "⭐", "⚡"];
+    g.save(); g.textAlign = "center"; g.textBaseline = "middle";
+    lista.forEach((ic, i) => {
+      const a = back(seg(p, 0.15 + i * 0.1, 0.3 + i * 0.1)); if (a <= 0) return;
+      const ang = -2.4 + i * 2.1 + Math.sin(sec * 0.9 + i) * 0.15, r = 300 + 12 * Math.sin(sec * 2 + i);
+      const x = cx + Math.cos(ang) * r, y = cy + Math.sin(ang) * r * 0.85;
+      g.save(); g.translate(x, y + Math.sin(sec * 2.5 + i * 1.3) * 10); g.scale(a, a); g.rotate(Math.sin(sec * 1.8 + i) * 0.12);
+      g.fillStyle = "rgba(255,255,255,.12)"; g.beginPath(); g.arc(0, 0, 46, 0, 7); g.fill();
+      g.font = "52px system-ui"; g.fillText(ic, 0, 3); g.restore();
+    });
+    g.restore();
+  }
+
   /* ---------- trilha sonora (Web Audio) ---------- */
   function trilha(ac, destino, lista, total) {
     const mestre = ac.createGain(); mestre.gain.value = 1; mestre.connect(destino);
@@ -302,6 +320,9 @@ window.Video = (function () {
     const canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H; const g = canvas.getContext("2d");
     const cta = (String(r.roteiro || "").match(/CTA:\s*(.+)$/m) || [])[1];
     const cenas = (r.cenas || []).map((c, i) => ({ ...c, tipo: escolherTipo(c, i), s: clamp(segundos(c.duracao) || 4, 2.5, 7) }));
+    // não repete a mesma animação em cenas seguidas
+    const reserva = ["robo", "celular", "grafico", "chat", "alvo", "pessoa", "integracao", "relogio"];
+    cenas.forEach((c, i) => { if (i && c.tipo === cenas[i - 1].tipo && !c.animacao) c.tipo = reserva.find(t => t !== c.tipo && t !== (cenas[i + 1] || {}).tipo && t !== cenas[i - 1].tipo); });
     const lista = [{ capa: true, s: 3, texto: limparFala([r.titulo, r.gancho].filter(Boolean).join(". ")) },
       ...cenas.map(c => ({ ...c, texto: limparFala(c.fala || c.texto_tela) })),
       ...(cta ? [{ fim: true, s: 3, fala: "", texto: limparFala(cta) }] : [])];
@@ -314,7 +335,8 @@ window.Video = (function () {
       catch (e) { console.warn("narração:", e); semVoz = "Não consegui gerar a voz (" + (e.message || e) + "). O vídeo saiu só com música."; lista.forEach(x => delete x.vozBuf); }
     }
     // cada parte dura pelo menos o tempo da fala
-    for (const x of lista) if (x.vozBuf) { x.vozIni = x.capa ? 0.5 : 0.35; x.s = Math.max(x.s, x.vozIni + x.vozBuf.duration + 0.45); }
+    // com voz, cada parte dura exatamente a fala + um respiro curto: o vídeo fica narrado do começo ao fim, sem cena parada
+    for (const x of lista) if (x.vozBuf) { x.vozIni = x.capa ? 0.35 : 0.15; x.s = Math.max(x.capa || x.fim ? 2.2 : 1.6, x.vozIni + x.vozBuf.duration + 0.3); }
     const total = lista.reduce((a, x) => a + x.s, 0);
     if (o.aoStatus) o.aoStatus("");
     const destino = ac.createMediaStreamDestination();
@@ -328,7 +350,7 @@ window.Video = (function () {
       const x = lista[i], p = clamp((sec - acc) / x.s, 0, 1), pal = PALETAS[i % PALETAS.length];
       fundo(g, pal, sec);
       // transição: entra deslizando e sai com zoom
-      const entrada = ease(seg(p, 0, 0.12)), saida = seg(p, 0.92, 1);
+      const loc = p * x.s, entrada = ease(clamp(loc / 0.28, 0, 1)), saida = clamp((loc - (x.s - 0.22)) / 0.22, 0, 1);
       g.save(); g.translate(W / 2, H / 2); g.scale(1 + saida * 0.08, 1 + saida * 0.08); g.translate(-W / 2 + (1 - entrada) * W * 0.35, -H / 2); g.globalAlpha = Math.min(1, entrada * 1.5) * (1 - saida * 0.9);
       if (x.capa) {
         titulo(g, r.titulo, W / 2, 470, W - 110, p, "#fff", null, 72);
@@ -340,6 +362,7 @@ window.Video = (function () {
         g.fillStyle = pal[1]; rr(g, -200, -50, 400, 100, 50); g.fill(); g.fillStyle = "#fff"; g.font = "900 38px system-ui"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("Fale com a gente", 0, 2); g.restore();
       } else {
         g.fillStyle = pal[1]; g.font = "800 24px system-ui"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText(`${x.n || i} / ${cenas.length}`, 48, 70);
+        icones(g, x.tipo, W / 2, 470, p, sec);
         ilustrar(g, x.tipo, W / 2, 470, p, sec, pal, x);
         titulo(g, x.texto_tela || "", W / 2, 830, W - 100, p, "#fff", pal[1], 56);
         const local = p * x.s, fala = x.vozBuf ? clamp((local - x.vozIni) / x.vozBuf.duration, 0, 1) : seg(p, 0.05, 0.92);
