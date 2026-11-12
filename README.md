@@ -21,6 +21,8 @@ ficam em `js/config.js`. As tabelas têm regras de acesso (RLS): só quem entrou
 
 - `js/sala.js` – presença em tempo real: todo mundo se vê andando no mapa
 - `js/voz.js` – áudio por WebRTC: sala fechada (reunião, telão, auditório) só quem está dentro ouve;
+  botão ⚙️ (ou clicar numa pessoa no mapa): escolher microfone e saída de áudio, redução de ruído/eco
+  e volume individual de cada colega (0–200%, vale só para você; salvo neste navegador);
   área aberta ouve quem está perto; área silenciosa sem áudio. Botão 🎧 liga o áudio.
 
 ## Outros arquivos
