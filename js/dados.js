@@ -106,6 +106,10 @@
       return armazenamento.gravar(db);
     },
 
+    /* ---- preferências da pessoa (ex.: mostrar colegas de teste) ---- */
+    getPref(email, chave, padrao) { const u = armazenamento.ler().usuarios[limpaEmail(email)]; return u && u.prefs && chave in u.prefs ? u.prefs[chave] : padrao; },
+    async setPref(email, chave, valor) { const db = armazenamento.ler(); const u = db.usuarios[limpaEmail(email)]; if (!u) return false; (u.prefs || (u.prefs = {}))[chave] = valor; return armazenamento.gravar(db); },
+
     /* ---- atividades (tudo o que a pessoa fez) ---- */
     async registrarAtividade(email, tipo, detalhe, extra = {}) {
       const db = armazenamento.ler(); email = limpaEmail(email);

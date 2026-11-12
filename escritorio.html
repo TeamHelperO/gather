@@ -45,9 +45,9 @@ html,body{height:100%;overflow:hidden}
 </div>
 <div class="zoom pill"><button id="zin" aria-label="Aproximar">+</button><button id="zout" aria-label="Afastar">−</button></div>
 <div class="emotes pill">
-  <button data-emote="5">👋 Acenar</button><button data-emote="6">💃 Dançar</button><button data-emote="4">🪑 Sentar</button>
+  <button data-emote="5">👋 Acenar</button><button data-emote="6">💃 Dançar</button><button data-emote="4">🪑 Sentar/levantar</button>
 </div>
-<div id="hint">Setas ou WASD para andar · clique no chão para ir até lá</div>
+<div id="hint">Setas/WASD ou clique para andar · pare perto de uma cadeira para sentar</div>
 <div id="joy"><div id="knob"></div></div>
 <aside id="menu" class="sheet hidden"></aside>
 <div id="toast"></div>
@@ -56,14 +56,15 @@ html,body{height:100%;overflow:hidden}
 <script src="js/dados.js"></script>
 <script src="js/mapa-core.js"></script>
 <script src="js/avatar.js"></script>
+<script src="js/vida.js"></script>
 <script>
 const EMAIL = Dados.exigirSessao("index.html");
-window.OCULTAR_PESSOAS = true; // no escritório só aparecem pessoas de verdade
-let S = null, grid = null, user = null, sheet = null;
+window.OCULTAR_PESSOAS = true; // no escritório só aparecem pessoas de verdade (e os colegas de teste)
+let S = null, grid = null, user = null, assentos = [];
 const mapaId = Dados.mapaAtualId();
 const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
 let DPR = 1, VW = 0, VH = 0, zoom = innerWidth <= 760 ? 1.6 : 2;
-const P = { x: 0, y: 0, dir: 0, moving: false, frame: 0, path: null, emote: null, emoteT: 0, sala: null };
+let P = null; const bots = []; let comBots = true;
 const keys = new Set(); let joyV = null;
 
 function resize(){ DPR = Math.min(devicePixelRatio || 1, 2); VW = innerWidth; VH = innerHeight; cv.width = VW*DPR; cv.height = VH*DPR; }
@@ -79,15 +80,32 @@ async function boot(){
   document.getElementById("nome").textContent = user.nome;
   S = Dados.lerMapaLocal(mapaId) || templateNext();
   grid = buildBlocked();
-  sheet = await Avatar.montar(user.avatar);
+  assentos = construirAssentos();
+  const sheet = await Avatar.montar(user.avatar);
+  P = new Ator({ id: "eu", nome: user.nome, sheet, x: 0, y: 0 });
   const m = document.getElementById("mini").getContext("2d"); m.imageSmoothingEnabled = false; m.drawImage(sheet, 8, 4, 16, 16, 0, 0, 32, 32);
   spawn();
+  comBots = Dados.getPref(EMAIL, "colegasTeste", true);
+  if (comBots) await criarBots();
   document.getElementById("load").remove();
   if (matchMedia("(pointer:coarse)").matches) { document.getElementById("joy").style.display = "block"; document.getElementById("hint").textContent = "Use o controle ou toque no chão para andar"; }
-  setTimeout(() => document.getElementById("hint").style.opacity = 0, 7000);
+  setTimeout(() => document.getElementById("hint").style.opacity = 0, 8000);
   checarSala(true);
   last = performance.now(); requestAnimationFrame(loop);
 }
+function carregarImg(src){ return new Promise((ok, err) => { const im = new Image(); im.onload = () => ok(im); im.onerror = err; im.src = src; }); }
+async function criarBots(){
+  const n = Math.min(6, NOMES_BOTS.length);
+  for (let i = 0; i < n; i++){
+    const sheet = await carregarImg(`assets/npcs/npc${i+1}.png`);
+    const p = pontoLivreAleatorio(grid) || [P.x, P.y];
+    const b = new Ator({ id: "bot" + i, nome: NOMES_BOTS[i], sheet, x: p[0], y: p[1], bot: true, timer: Math.random()*3, ficaConversa: 0 });
+    const livres = assentos.filter(s => s.trabalho && !s.ocupante);
+    if (i < 3 && livres.length){ const s = livres[Math.floor(Math.random()*livres.length)]; b.x = s.sx; b.y = s.sy + 10; b.sentar(s); b.volta = {x: s.sx, y: s.sy + 22}; b.timer = 10 + Math.random()*30; }
+    bots.push(b);
+  }
+}
+function removerBots(){ for (const b of bots) b.levantar(); bots.length = 0; }
 function livre(x, y){ // caixa dos pés (12x6 px) livre?
   for (const [dx, dy] of [[-6,-3],[6,-3],[-6,3],[6,3]]) if (grid.blocked(Math.floor((x+dx)/C16), Math.floor((y+dy)/C16))) return false;
   return x > 8 && y > 8 && x < S.w*T-8 && y < S.h*T-8;
@@ -106,8 +124,8 @@ function spawn(){
 
 /* ---------- entrada ---------- */
 const DIRKEYS = {ArrowUp:[0,-1],w:[0,-1],W:[0,-1],ArrowDown:[0,1],s:[0,1],S:[0,1],ArrowLeft:[-1,0],a:[-1,0],A:[-1,0],ArrowRight:[1,0],d:[1,0],D:[1,0]};
-addEventListener("keydown", e => { if (e.target.matches("input,select,textarea")) return; if (DIRKEYS[e.key]) { keys.add(e.key); P.path = null; P.emote = null; e.preventDefault(); }
-  if (e.key === "1") emote(5); if (e.key === "2") emote(6); if (e.key === "3") emote(4); });
+addEventListener("keydown", e => { if (e.target.matches("input,select,textarea")) return; if (DIRKEYS[e.key]) { keys.add(e.key); if (P) { P.path = null; P.emote = null; } e.preventDefault(); }
+  if (e.key === "1") emote(5); if (e.key === "2") emote(6); if (e.key === "3") sentarPerto(); });
 addEventListener("keyup", e => keys.delete(e.key));
 addEventListener("blur", () => keys.clear());
 const toWorld = (sx, sy) => { const c = cam(); return [(sx - c.ox)/zoom, (sy - c.oy)/zoom]; };
@@ -123,10 +141,15 @@ const up = e => {
   const had = ptrs.get(e.pointerId); ptrs.delete(e.pointerId);
   if (pinch){ if (ptrs.size < 2){ pinch = null; pularUp = ptrs.size; } return; }
   if (pularUp > 0){ pularUp--; return; }
-  if (!had || !grid) return;
+  if (!had || !grid || !P) return;
   const [wx, wy] = toWorld(e.clientX, e.clientY);
-  const path = findPath(grid, Math.floor(P.x/C16), Math.floor(P.y/C16), Math.floor(wx/C16), Math.floor(wy/C16));
-  if (path && path.length) { P.path = path; P.emote = null; marca = {x: path[path.length-1][0], y: path[path.length-1][1], t: 1}; }
+  // clicou num assento? vai até ele e senta
+  let alvo = null, bd = 1e9;
+  for (const s of assentos){ if (s.ocupante && s.ocupante !== P) continue; const d = Math.hypot(s.sx - wx, s.sy - 4 - wy); if (d < 18 && d < bd){ bd = d; alvo = s; } }
+  if (P.assento) P.levantar();
+  const [gx, gy] = alvo ? [alvo.sx, alvo.sy + 6] : [wx, wy];
+  const path = findPath(grid, Math.floor(P.x/C16), Math.floor(P.y/C16), Math.floor(gx/C16), Math.floor(gy/C16));
+  if (path && path.length) { P.path = path; P.emote = null; P.saiuDe = null; marca = {x: path[path.length-1][0], y: path[path.length-1][1], t: 1}; }
   else toast("Não dá para chegar aí");
 };
 cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", e => { ptrs.delete(e.pointerId); pinch = null; });
@@ -144,51 +167,69 @@ function joyMove(e){
   const r = joy.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width/2), dy = e.clientY - (r.top + r.height/2);
   const d = Math.hypot(dx, dy), max = 40; if (d > max){ dx *= max/d; dy *= max/d; }
   knob.style.transform = `translate(${dx}px,${dy}px)`;
-  joyV = d > 8 ? [dx/max, dy/max] : null; if (joyV){ P.path = null; P.emote = null; }
+  joyV = d > 8 ? [dx/max, dy/max] : null; if (joyV && P){ P.path = null; P.emote = null; }
 }
-document.querySelector(".emotes").onclick = e => { const b = e.target.closest("[data-emote]"); if (b) emote(+b.dataset.emote); };
+document.querySelector(".emotes").onclick = e => { const b = e.target.closest("[data-emote]"); if (!b) return; const r = +b.dataset.emote; r === 4 ? sentarPerto() : emote(r); };
 function emote(row){
+  if (!P) return; if (P.assento) P.levantar();
   P.emote = row; P.emoteT = 0; P.path = null;
-  const nomes = {5:"acenou", 6:"dançou", 4:"sentou"};
-  Dados.registrarAtividade(EMAIL, "acao", `${nomes[row][0].toUpperCase()+nomes[row].slice(1)}${P.sala ? " em " + P.sala : ""}`, {sala: P.sala});
+  Dados.registrarAtividade(EMAIL, "acao", `${row === 5 ? "Acenou" : "Dançou"}${P.sala ? " em " + P.sala : ""}`, {sala: P.sala});
+}
+function sentarPerto(){
+  if (!P) return; if (P.assento){ P.levantar(); return; }
+  let alvo = null, bd = 1e9;
+  for (const s of assentos){ if (s.ocupante) continue; const d = Math.hypot(s.sx - P.x, s.sy - P.y); if (d < 120 && d < bd){ bd = d; alvo = s; } }
+  if (!alvo){ toast("Chegue perto de uma cadeira, sofá ou pufe"); return; }
+  const path = findPath(grid, Math.floor(P.x/C16), Math.floor(P.y/C16), Math.floor(alvo.sx/C16), Math.floor((alvo.sy + 6)/C16));
+  if (path) { P.path = path; P.saiuDe = null; } else P.sentar(alvo);
 }
 
 /* ---------- loop ---------- */
-let last = 0, marca = null, anim = 0, sujo = false, ultimoSave = 0;
-const VEL = 120;
+let last = 0, marca = null, sujo = false, ultimoSave = 0, t = 0;
+const VEL = 120, conversasLog = {};
 function loop(now){
-  const dt = Math.min(0.05, (now - last)/1000); last = now;
+  const dt = Math.min(0.05, (now - last)/1000); last = now; t += dt;
+  // você
   let vx = 0, vy = 0;
   for (const k of keys){ const d = DIRKEYS[k]; if (d){ vx += d[0]; vy += d[1]; } }
   if (joyV){ vx = joyV[0]; vy = joyV[1]; }
-  if (!vx && !vy && P.path){
-    const [tx, ty] = P.path[0]; const dx = tx - P.x, dy = ty - P.y, d = Math.hypot(dx, dy);
-    if (d < 3){ P.path.shift(); if (!P.path.length) P.path = null; }
-    else { vx = dx/d; vy = dy/d; }
+  if ((vx || vy) && P.assento) P.levantar();
+  if (!vx && !vy && !P.assento && P.path) [vx, vy] = seguirCaminho(P);
+  if (!P.assento) moverAtor(P, dt, vx, vy, livre, VEL); else { P.moving = false; P.parado += dt; }
+  if (P.moving){ P.emote = null; sujo = true; }
+  if (P.emote != null){ P.emoteT += dt; if (P.emoteT > 3) P.emote = null; }
+  if (P.saiuDe && Math.hypot(P.saiuDe.sx - P.x, P.saiuDe.sy - P.y) > 40) P.saiuDe = null;
+  if (!P.assento && !P.moving && !P.path && P.parado > 0.35 && P.emote == null){
+    const s = assentoPerto(assentos, P.x, P.y);
+    if (s && s !== P.saiuDe && P.sentar(s)){
+      sujo = true;
+      Dados.registrarAtividade(EMAIL, "acao", s.trabalho ? `Sentou para trabalhar${P.sala ? " em " + P.sala : ""}` : `Sentou${s.sala ? " em " + s.sala : ""}`, {sala: s.sala});
+    }
   }
-  const mag = Math.hypot(vx, vy);
-  P.moving = mag > 0.01;
-  if (P.moving){
-    if (mag > 1){ vx /= mag; vy /= mag; }
-    const sx = vx*VEL*dt, sy = vy*VEL*dt;
-    if (livre(P.x + sx, P.y)) P.x += sx;
-    if (livre(P.x, P.y + sy)) P.y += sy;
-    P.dir = Math.abs(vx) > Math.abs(vy) ? (vx < 0 ? 1 : 2) : (vy < 0 ? 3 : 0);
-    P.emote = null; sujo = true;
-    anim += dt*8; P.frame = 1 + (Math.floor(anim) % 4);
-  } else P.frame = 0;
-  if (P.emote != null) P.emoteT += dt;
+  // colegas
+  for (const b of bots){
+    pensarBot(b, grid, assentos, P, bots, dt);
+    const [bx, by] = b.assento ? [0, 0] : seguirCaminho(b);
+    if (!b.assento) moverAtor(b, dt, bx, by, null, 70); else b.moving = false;
+  }
+  atualizarConversas([P, ...bots], dt, (a, o) => {
+    if (a !== P) return;
+    const agora = Date.now(); if (conversasLog[o.nome] && agora - conversasLog[o.nome] < 60000) return;
+    conversasLog[o.nome] = agora;
+    Dados.registrarAtividade(EMAIL, "conversa", `Conversou com ${o.nome}${P.sala ? " em " + P.sala : ""}`, {sala: P.sala, com: o.nome});
+  });
   checarSala(false);
   if (sujo && now - ultimoSave > 4000){ salvarPos(); ultimoSave = now; }
   if (marca){ marca.t -= dt*1.5; if (marca.t <= 0) marca = null; }
   draw();
   requestAnimationFrame(loop);
 }
-function salvarPos(){ sujo = false; Dados.salvarPosicao(EMAIL, {mapa: mapaId, x: Math.round(P.x), y: Math.round(P.y), direcao: P.dir}); }
+function salvarPos(){ if (!P) return; sujo = false; const v = P.assento && P.volta ? P.volta : P;
+  Dados.salvarPosicao(EMAIL, {mapa: mapaId, x: Math.round(v.x), y: Math.round(v.y), direcao: P.dir}); }
 addEventListener("pagehide", salvarPos);
 document.addEventListener("visibilitychange", () => { if (document.hidden) salvarPos(); });
 function checarSala(first){
-  const r = roomAt(P.x, P.y - 4);
+  const r = roomAt(P.px, P.py - 4);
   const nome = r ? r.name : "Área externa";
   if (nome === P.sala && !first) return;
   P.sala = nome; document.getElementById("sala").textContent = "📍 " + nome;
@@ -196,32 +237,29 @@ function checarSala(first){
 }
 function cam(){
   const W = S.w*T*zoom, H = S.h*T*zoom;
-  let ox = VW/2 - P.x*zoom, oy = VH/2 - (P.y - 20)*zoom;
+  let ox = VW/2 - P.px*zoom, oy = VH/2 - (P.py - 20)*zoom;
   if (W > VW) ox = Math.min(0, Math.max(VW - W, ox)); else ox = (VW - W)/2;
   if (H > VH) oy = Math.min(0, Math.max(VH - H, oy)); else oy = (VH - H)/2;
   return {ox: Math.round(ox), oy: Math.round(oy)};
 }
 function draw(){
   ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle = "#16141f"; ctx.fillRect(0, 0, cv.width, cv.height);
-  const c = cam();
+  const c = cam(), atores = [P, ...bots];
   ctx.imageSmoothingEnabled = false;
   ctx.setTransform(zoom*DPR, 0, 0, zoom*DPR, c.ox*DPR, c.oy*DPR);
-  const eu = { sort: P.y + 0.5, draw(g){
-    let row = P.dir, col = P.frame;
-    if (P.emote != null && !P.moving){ row = P.emote; const n = row === 6 ? 6 : row === 5 ? 4 : 2;
-      col = row === 4 ? (P.dir === 3 ? 2 : 0) + (Math.floor(P.emoteT*2) % 2) : Math.floor(P.emoteT*7) % n;
-      if (row !== 4 && P.emoteT > 3) P.emote = null; }
-    g.fillStyle = "rgba(20,15,30,.25)"; g.beginPath(); g.ellipse(P.x, P.y + 1, 8, 3, 0, 0, Math.PI*2); g.fill();
-    g.drawImage(sheet, col*32, row*48, 32, 48, Math.round(P.x - 16), Math.round(P.y - 45), 32, 48);
-  }};
-  drawWorld(ctx, [eu]);
+  drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })));
+  for (const a of atores) a.balao(ctx, t);
   if (marca){ ctx.strokeStyle = `rgba(61,90,254,${marca.t})`; ctx.lineWidth = 2/zoom*1.5; ctx.beginPath(); ctx.ellipse(marca.x, marca.y, 10*(1.6-marca.t*.6), 5*(1.6-marca.t*.6), 0, 0, Math.PI*2); ctx.stroke(); }
-  // nome sobre a cabeça (tela)
+  // nomes (tela)
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  const sx = P.x*zoom + c.ox, sy = (P.y - 48)*zoom + c.oy;
-  ctx.font = "700 12px system-ui,sans-serif"; const w = ctx.measureText(user.nome).width + 14;
-  ctx.fillStyle = "rgba(20,16,32,.75)"; ctx.beginPath(); ctx.roundRect(sx - w/2, sy - 20, w, 19, 7); ctx.fill();
-  ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(user.nome, sx, sy - 10.5); ctx.textAlign = "left";
+  for (const a of atores){
+    const sx = a.px*zoom + c.ox, top = a.assento ? a.assento.sy - 40 : a.y - 45, sy = (top - 2)*zoom + c.oy;
+    if (sx < -60 || sx > VW + 60 || sy < -40 || sy > VH + 40) continue;
+    const txt = a.bot ? a.nome + " · teste" : a.nome;
+    ctx.font = a.bot ? "600 11px system-ui,sans-serif" : "700 12px system-ui,sans-serif"; const w = ctx.measureText(txt).width + 12;
+    ctx.fillStyle = a === P ? "rgba(61,90,254,.92)" : "rgba(20,16,32,.72)"; ctx.beginPath(); ctx.roundRect(sx - w/2, sy - 19, w, 17, 6); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(txt, sx, sy - 10.5); ctx.textAlign = "left";
+  }
 }
 
 /* ---------- menu ---------- */
@@ -229,16 +267,18 @@ const menu = document.getElementById("menu");
 document.getElementById("eu").onclick = async () => {
   if (!menu.classList.contains("hidden")) { menu.classList.add("hidden"); return; }
   const acts = await Dados.listarAtividades(EMAIL, 40);
-  const ico = {cadastro:"✨", entrou:"🚪", saiu:"👋", avatar:"🧍", sala:"📍", acao:"🎉", editor:"🛠️"};
+  const ico = {cadastro:"✨", entrou:"🚪", saiu:"👋", avatar:"🧍", sala:"📍", acao:"🎉", editor:"🛠️", conversa:"💬"};
   menu.innerHTML = `<h3>${esc(user.nome)} <button class="x" data-close aria-label="Fechar">×</button></h3>
     <div style="color:var(--mut);font-size:13px;margin:-6px 0 8px">${esc(user.email)}</div>
     <a class="mi" href="avatar.html">🧍 Editar meu personagem</a>
     <a class="mi" href="editor.html">🛠️ Editor de salas</a>
+    <label class="mi" style="cursor:pointer"><input type="checkbox" id="optBots" ${comBots ? "checked" : ""} style="width:18px;height:18px;accent-color:var(--brand)"> Mostrar colegas de teste</label>
     <button class="mi" data-exp>💾 Baixar meus dados (JSON)</button>
     <button class="mi" data-sair>🚪 Sair</button>
     <div class="sep"></div>
     <div style="font-weight:700;margin:8px 0 4px">O que eu fiz</div>
     ${acts.map(a => `<div class="act"><div class="ico">${ico[a.tipo]||"•"}</div><div><b>${esc(a.detalhe||a.tipo)}</b><small>${new Date(a.quando).toLocaleString("pt-BR")}</small></div></div>`).join("") || `<p style="color:var(--mut)">Nada ainda.</p>`}`;
+  menu.querySelector("#optBots").onchange = async e => { comBots = e.target.checked; await Dados.setPref(EMAIL, "colegasTeste", comBots); if (comBots) await criarBots(); else removerBots(); };
   menu.classList.remove("hidden");
 };
 menu.onclick = async e => {
