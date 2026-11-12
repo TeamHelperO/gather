@@ -47,41 +47,51 @@ const esgotadas = new Map(); // índice -> até quando
 const chaves = () => (process.env.NVIDIA_API_KEYS || process.env.NVIDIA_API_KEY || "").split(/[\s,;]+/).map(s => s.trim()).filter(Boolean);
 const ehFimDeCota = (status, txt) => [401, 402, 403, 429].includes(status) || /credit|quota|limit|insufficient|exceed|expired/i.test(txt || "");
 
-async function perguntar(mensagens) {
-  let ultimo;
-  for (const modelo of (await modelos()).slice(0, 6)) {
-    if (restante() < 8000) break;
-    try { return await perguntarModelo(mensagens, modelo); }
-    catch (e) { ultimo = e; if (e.modeloMorto) { modelosMortos.add(modelo); continue; } throw e; }
+// chama um modelo com uma chave; erros marcados: cota (troca de chave) ou morto (pula o modelo)
+async function chamar(modelo, chave, n, mensagens, sinal) {
+  const t0 = Date.now();
+  const r = await fetch(NV, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.6, max_tokens: 1200 }),
+    signal: AbortSignal.any([sinal, AbortSignal.timeout(Math.max(5000, restante() - 3000))]),
+  }).catch(e => ({ ok: false, status: 0, text: async () => String(e) }));
+  const reg = `${modelo} · chave ${n} · ${r.status} · ${((Date.now() - t0) / 1000).toFixed(1)}s`;
+  tentativas.push(reg); console.log("[agentes]", reg);
+  const erro = (msg, tipo) => { const e = new Error(msg); e[tipo] = true; return e; };
+  if (r.status === 0) { if (sinal.aborted) throw erro("cancelado", "cancelado"); throw erro(`${modelo} demorou demais`, "morto"); }
+  if (r.ok) {
+    const j = await r.json(), texto = j.choices?.[0]?.message?.content || "";
+    if (!/\{[\s\S]*\}/.test(texto)) throw erro(`${modelo} não devolveu JSON`, "morto");
+    return { texto, chave: n, modelo };
   }
-  throw ultimo || new Error("Nenhum modelo de conversa encontrado na NVIDIA");
+  const txt = await r.text(); console.log("[agentes] resposta:", txt.slice(0, 200));
+  if ([404, 410, 400, 422].includes(r.status)) throw erro(`${modelo} indisponível (${r.status})`, "morto");
+  if (ehFimDeCota(r.status, txt)) throw erro(`chave ${n} sem créditos (${r.status})`, "cota");
+  throw erro(`${modelo}: erro ${r.status}`, "morto");
 }
-async function perguntarModelo(mensagens, modelo) {
+
+// várias IAs ao mesmo tempo: a primeira que responder bem ganha, as outras são canceladas
+async function perguntar(mensagens) {
   const lista = chaves();
   if (!lista.length) throw new Error("NVIDIA_API_KEYS não configurada");
-  const erros = [];
+  let ultimo = "nenhum modelo respondeu";
   for (let i = 0; i < lista.length; i++) {
     if ((esgotadas.get(i) || 0) > Date.now()) continue;
-    const t0 = Date.now();
-    const r = await fetch(NV, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${lista[i]}`, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ model: modelo, messages: mensagens, temperature: 0.7, max_tokens: 1200 }),
-      signal: AbortSignal.timeout(Math.max(5000, Math.min(25000, restante() - 3000))),
-    }).catch(e => ({ ok: false, status: 0, text: async () => String(e) }));
-    const reg = `${modelo} · chave ${i + 1} · ${r.status} · ${((Date.now() - t0) / 1000).toFixed(1)}s`;
-    tentativas.push(reg); console.log("[agentes]", reg);
-    if (r.status === 0) { const et = await r.text(); console.log("[agentes] falha de rede:", et); const e = new Error(/timeout|abort/i.test(et) ? `modelo ${modelo} demorou demais` : `falha ao chamar ${modelo}: ${et.slice(0, 80)}`); e.modeloMorto = true; throw e; }
-    if (r.ok) { const j = await r.json(); if (!j.choices?.[0]?.message?.content) { const e = new Error(`modelo ${modelo} respondeu vazio`); e.modeloMorto = true; throw e; } return { texto: j.choices?.[0]?.message?.content || "", chave: i + 1, modelo }; }
-    const txt = await r.text();
-    console.log("[agentes] resposta:", txt.slice(0, 300));
-    if (r.status === 404 || r.status === 410 || r.status === 400 || r.status === 422) { const e = new Error(`modelo ${modelo} indisponível (${r.status})`); e.modeloMorto = true; throw e; }
-    erros.push(`chave ${i + 1}: ${r.status}`);
-    if (ehFimDeCota(r.status, txt)) { esgotadas.set(i, Date.now() + 60 * 60000); continue; } // acabou: próxima chave
-    if (r.status >= 500 || r.status === 0) continue; // instabilidade: tenta a próxima
-    throw new Error(`NVIDIA ${r.status}: ${txt.slice(0, 200)}`);
+    while (restante() > 8000) {
+      const cands = (await modelos()).slice(0, 5);
+      if (!cands.length) break;
+      const ctrl = new AbortController();
+      try { const r = await Promise.any(cands.map(m => chamar(m, lista[i], i + 1, mensagens, ctrl.signal))); ctrl.abort(); return r; }
+      catch (agg) {
+        const erros = agg.errors || [agg];
+        erros.forEach((e, k) => { if (e.morto) modelosMortos.add(cands[k]); });
+        ultimo = erros.map(e => e.message).filter(m => m !== "cancelado").slice(-1)[0] || ultimo;
+        if (erros.some(e => e.cota)) { esgotadas.set(i, Date.now() + 60 * 60000); break; } // acabou: próxima chave
+      }
+    }
   }
-  throw new Error("Todas as chaves da NVIDIA falharam ou estão sem créditos (" + erros.join(", ") + ")");
+  throw new Error("A IA da NVIDIA não respondeu: " + ultimo);
 }
 
 const rpc = (fn, corpo, token) => fetch(`${SUPA}/rest/v1/rpc/${fn}`, {
@@ -101,7 +111,7 @@ async function rodada(lista, porAgente) {
   await Promise.all(lista.map(a => status(a.id, "pesquisando", `Pedindo à IA tendências de ${a.cat}`)));
   const hoje = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   const { texto, chave, modelo } = await perguntar([
-    { role: "system", content: "Você é uma equipe de analistas de tendências de mercado. Responda só com JSON válido, em português do Brasil, sem texto fora do JSON." },
+    { role: "system", content: "/no_think Você é uma equipe de analistas de tendências de mercado. Responda só com JSON válido, em português do Brasil, sem texto fora do JSON." },
     { role: "user", content: `Hoje é ${hoje}. Para uma agência/empresa digital brasileira, cada agente lista ${porAgente} tendências atuais e acionáveis da sua área:\n` +
       lista.map(a => `- ${a.id} (${a.nome}): ${a.area}`).join("\n") +
       `\nFormato: {"agente1": [{"titulo": "até 90 caracteres", "resumo": "2 frases: o que é e por que vale (ou não) pegar", "relevancia": 1-5}], ...}. Não invente números nem links.` },
