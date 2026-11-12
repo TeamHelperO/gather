@@ -108,7 +108,7 @@ window.TI = (function () {
       const a = agenteInfo(it.agente);
       const sx = (it.x * T + 16) * zoom + cam.ox, sy = (it.y * T + 56) * zoom + cam.oy;
       if (sx < -80 || sx > innerWidth + 80 || sy < -40 || sy > innerHeight + 40) continue;
-      const on = online(a), txt = `🤖 ${a.nome}` + (on && a.status && a.status !== "parado" ? ` · ${a.status}` : "");
+      const on = online(a), st = String(a.status || ""), txt = `🤖 ${a.nome}` + (on && st && st !== "parado" ? ` · ${st.length > 14 ? st.slice(0, 13) + "…" : st}` : "");
       ctx.font = "700 11px system-ui,sans-serif"; const w = ctx.measureText(txt).width + 12;
       ctx.fillStyle = on ? "rgba(19,166,184,.92)" : "rgba(20,16,32,.72)"; ctx.beginPath(); ctx.roundRect(sx - w / 2, sy - 18, w, 16, 6); ctx.fill();
       ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(txt, sx, sy - 10); ctx.textAlign = "left";

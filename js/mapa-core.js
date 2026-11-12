@@ -28,19 +28,20 @@ const PAT = {};
 
 function blankMap(name){ return {v:1,name:name||"Novo escritório",w:40,h:28,rooms:[],items:[]}; }
 function room(type,name,x,y,w,h,door){ return {id:uid(),type,name,x,y,w,h,floor:null,door:{side:door||"baixo",pos:.5},auto:true}; }
+/* Escritório da Next Co. para 5 pessoas: tudo grande e perto. */
 function templateNext(){
-  const m = {v:1,name:"Escritório Next Co.",w:60,h:40,rooms:[],items:[]};
-  m.rooms.push(room("recepcao","Recepção",2,3,13,15));
-  m.rooms.push(room("trabalho","Área de trabalho",15,3,19,15));
-  m.rooms.push(room("silenciosa","Área silenciosa",34,3,7,15));
-  m.rooms.push(room("telao","Telão da equipe",41,3,17,15));
-  m.rooms.push(room("corredor","Corredor",2,18,56,3,"nenhuma"));
-  m.rooms.push(room("reuniao","Sala 1",2,23,6,15,"cima"));
-  m.rooms.push(room("reuniao","Sala 2",8,23,7,15,"cima"));
-  m.rooms.push(room("reuniao","Sala 3",15,23,7,15,"cima"));
-  m.rooms.push(room("auditorio","Auditório",22,23,21,15,"cima"));
-  m.rooms.push(room("copa","Copa e lazer",43,23,15,15,"cima"));
-  [[1,8,10],[2,20,16.3],[3,46,13],[4,30,19],[5,50,30],[6,12,19.5],[7,36,9],[8,26,32]].forEach(([n,x,y])=>m.items.push({id:uid(),k:"pessoa"+n,x,y,room:null}));
+  const m = {v:1,name:"Escritório Next Co.",w:58,h:32,rooms:[],items:[]};
+  // em cima (portas para o corredor)
+  m.rooms.push(room("recepcao","Recepção",2,3,14,11));
+  m.rooms.push(room("trabalho","Área de trabalho",16,3,17,11));
+  m.rooms.push(room("ti","TI",33,3,14,11));
+  m.rooms.push(room("copa","Copa e lazer",47,3,9,11));
+  m.rooms.push(room("corredor","Corredor",2,14,54,3,"nenhuma"));
+  // embaixo
+  const r1 = room("reuniao","Reunião 1",2,19,10,9,"cima"); r1.door.pos = 0.12; m.rooms.push(r1);
+  const r2 = room("reuniao","Reunião 2",12,19,10,9,"cima"); r2.door.pos = 0.12; m.rooms.push(r2);
+  m.rooms.push(room("auditorio","Auditório",22,19,14,11,"cima"));
+  m.rooms.push(room("silenciosa","Área silenciosa",36,19,12,9,"cima"));
   return m;
 }
 
@@ -53,43 +54,48 @@ function layoutBase(r){
   const fits = (tx,ty,k) => tx >= x-0.05 && tx+aw(k) <= x+w+0.05 && ty+ah(k) <= y+h+0.15;
   switch (r.type) {
     case "recepcao": {
+      const telaoRec = w >= 14 && h >= 7;
       if (w >= 4) P("logo", x+0.4, y-1.85, {z:"wall"});
       if (w >= 8) P("quadro_avisos", x+w-2.4, y-1.3, {z:"wall"});
+      if (telaoRec) P("telao", cx-3, y-1.85);
       P("relogio_ponto", x+0.1, y-0.6);
-      if (h >= 4 && w >= 3) { P("npc_mascote", cx-0.5, y+0.35); P("mesa", cx-1, y+1.6); P("sino", cx+0.15, y+1.05); }
+      const dy = telaoRec ? 1.6 : 0;
+      if (h >= 4 && w >= 3) { P("npc_mascote", cx-0.5, y+0.35+dy); P("mesa", cx-1, y+1.6+dy); P("sino", cx+0.15, y+1.05+dy); }
       if (h >= 7 && w >= 5) P("tapete", cx-1.5, y+h-3.9, {z:"floor"});
       if (h >= 6 && w >= 5) P("sofa", cx-1.5, y+h-1.3);
       if (w >= 6 && h >= 5) { P("planta_grande", x+0.1, y+h-2.1); P("planta_grande", x+w-1.1, y+h-2.1); }
       break;
     }
     case "trabalho": {
+      const telaoTrab = w >= 10 && ASSETS.telao;
+      if (telaoTrab) P("telao", cx-3, y-1.85);
       if (w >= 7) P("estante", x+w-2.3, y-1.4);
-      if (w >= 4) P("relogio", cx-0.5, y-1.6, {z:"wall"});
+      if (w >= 4) P("relogio", telaoTrab ? x+1.4 : cx-0.5, y-1.6, {z:"wall"});
       P("planta", x+0.1, y-0.25);
-      // mesas grandes (3 x 1,5 tiles) com 1 tile de corredor entre elas
-      const n = Math.max(1, Math.floor((w+1)/4)), m = Math.max(1, Math.floor((h-3.1)/3.5)+1);
-      const span = n*4-1, sx = x + (w-span)/2;
+      // estações grandes (mesa de 3 tiles com 2 telas + gabinete), 2 tiles de corredor entre elas
+      const gap = w >= 15 ? 2 : 1, passo = 3 + gap, ry = h >= 10 ? 4.5 : 3.5;
+      const n = Math.max(1, Math.floor((w + gap - 1) / passo)), m = Math.max(1, Math.floor((h - 3.1) / ry) + 1);
+      const span = n*passo - gap, sx = x + (w - span)/2, y0 = y + (telaoTrab ? 1.9 : 0.9);
+      let k = 0;
       for (let j=0;j<m;j++) for (let i=0;i<n;i++) {
-        const tx = sx+i*4, ty = y+0.9+j*3.5;
+        const tx = sx+i*passo, ty = y0+j*ry;
         if (tx+3 > x+w+0.01 || ty+2.3 > y+h+0.1) continue;
         P("mesa_pc", tx, ty);
-        const tipo = (i + j) % 3;
-        if (tipo === 2){ // notebook
-          P("notebook", tx+0.85, ty-0.2); P("mouse", tx+1.9, ty+0.22);
-        } else if (tipo === 1){ // PC gamer
-          P("monitor", tx+0.55, ty-0.47); P("gabinete", tx+2.0, ty-0.44);
-          P("teclado_rgb", tx+0.55, ty+0.34); P("mouse", tx+1.55, ty+0.22);
-        } else { // dois monitores
-          P("monitor", tx+0.5, ty-0.47); P("monitor", tx+1.5, ty-0.47);
-          P("teclado", tx+1, ty+0.34); P("mouse", tx+2.05, ty+0.22);
-        }
+        if (k % 3 === 2){ P("notebook", tx+0.4, ty-0.2); P("monitor", tx+1.35, ty-0.47); P("mouse", tx+2.05, ty+0.22); }
+        else { P("monitor", tx+0.35, ty-0.47); P("monitor", tx+1.25, ty-0.47); P("gabinete", tx+2.15, ty-0.44); P(k % 2 ? "teclado" : "teclado_rgb", tx+0.8, ty+0.34); P("mouse", tx+1.8, ty+0.22); }
         P("cadeira_cima", tx+1, ty+1.3);
+        k++;
       }
+      if (h >= 9 && w >= 6) P("planta_grande", x+w-1.1, y+h-2.1);
       break;
     }
     case "reuniao": {
-      if (w >= 3) P("tv", cx-1.5, y-1.25);
-      if (w >= 8) P("placa", x+0.2, y-1.7, {z:"wall", label:r.name});
+      // telão de tarefas na parede de cima, longe da porta
+      let tvx = cx-3; const dtr = doorTile(r), portaCima = r.door && r.door.side === "cima";
+      if (portaCima && dtr >= tvx-0.6 && dtr <= tvx+6.2) tvx = dtr < cx ? x+w-6.2 : x+0.2;
+      const cabe = !portaCima || dtr < tvx-0.6 || dtr > tvx+6.2;
+      if (w >= 8 && ASSETS.telao && cabe) P("telao", tvx, y-1.85); else if (w >= 3) P("tv", cx-1.5, y-1.25);
+      if (w >= 8 && !ASSETS.telao) P("placa", x+0.2, y-1.7, {z:"wall", label:r.name});
       const tw = w >= 7 ? 5 : (w >= 4 ? 3 : 2);
       const tk = tw === 5 ? "mesa_reuniao10" : tw === 3 ? "mesa_reuniao6" : "mesa_copa";
       let ty = y + Math.max(1.6, (h-2.2)/2); ty = Math.min(ty, y+h-2.05);
@@ -131,7 +137,9 @@ function layoutBase(r){
       P("pulpito", cx-0.5, y+sh-1.3);
       if (w >= 5) { P("caixa_som", x+0.05, y-0.6); P("caixa_som", x+w-1.05, y-0.6); }
       const aisle = w >= 7 ? Math.floor(cx) : null;
-      for (let ty=y+sh+1.5; ty+1<=y+h+0.05; ty+=1.5) for (let tx=x+1; tx<=x+w-2; tx++) { if (tx===aisle) continue; P("cadeira_plateia", tx, ty); }
+      let fil = 0;
+      const fx0 = w >= 12 ? x+2 : x+1, fx1 = w >= 12 ? x+w-3 : x+w-2; // auditório pequeno: plateia compacta, 2 fileiras
+      for (let ty=y+sh+1.6; ty+1<=y+h+0.05 && fil<2; ty+=1.8, fil++) for (let tx=fx0; tx<=fx1; tx++) { if (tx===aisle) continue; P("cadeira_plateia", tx, ty); }
       if (h > sh+2) P("megafone", x+0.05, y+sh+0.9);
       break;
     }

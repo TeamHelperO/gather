@@ -93,6 +93,24 @@ html,body{height:100%;overflow:hidden}
 .acc-form{display:flex;flex-direction:column;gap:6px;padding:10px;border:2px solid var(--brand);border-radius:12px}
 .acc-pessoas{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:4px;padding:6px;background:var(--chip);border-radius:9px}
 .ck{display:flex;gap:6px;align-items:center;font-size:13.5px;cursor:pointer}
+/* ---- moderação do palco ---- */
+#btnMao.on{background:#f2a33a!important;color:#1d1d1f}
+#palcoPainel{position:fixed;left:8px;bottom:70px;z-index:15;width:290px;max-height:calc(100vh - 160px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.35);padding:10px;font-size:13px}
+.pp-top{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}.pp-top small{color:var(--mut);margin-left:auto}
+.pp-acoes{display:flex;gap:6px}
+.pp-btn{flex:1;padding:9px 10px;border-radius:10px;font-weight:800;background:#3fbf5f;color:#fff}
+.pp-btn.alerta{background:#e5484d}
+.pp-sec{font-weight:800;margin:10px 0 4px;display:flex;gap:6px;align-items:center}
+.pp-sec i{font-style:normal;background:#f2a33a;color:#1d1d1f;border-radius:999px;padding:0 7px;font-size:12px}
+.pp-linha{display:flex;align-items:center;gap:6px;padding:6px 7px;border:1px solid var(--line);border-radius:9px;margin-bottom:4px}
+.pp-linha span{flex:1;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pp-linha small{color:var(--mut);font-weight:500}
+.pp-linha.primeiro{border-color:#f2a33a;background:rgba(242,163,58,.1)}
+.pp-linha.falando{border-color:#3fbf5f;background:rgba(63,191,95,.12)}
+.pp-mini{padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--chip);font-weight:700;font-size:12px;white-space:nowrap}
+.pp-mini.ok{background:#3fbf5f;color:#fff;border-color:#3fbf5f}.pp-mini.alerta{background:#e5484d;color:#fff;border-color:#e5484d}
+.pp-vazio{color:var(--mut);padding:4px 2px}
+.pp-det{margin-top:8px}.pp-det summary{cursor:pointer;font-weight:700;color:var(--mut);margin-bottom:4px}
+@media (max-width:760px){#palcoPainel{left:8px;right:8px;width:auto;bottom:118px;max-height:40vh}}
 /* ---- telão de projeção ---- */
 #btnProj{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:70px;z-index:12;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe;white-space:nowrap}
 #btnProj.parar{background:#e5484d;border-color:#e5484d}
@@ -141,7 +159,7 @@ html,body{height:100%;overflow:hidden}
 </div>
 <div class="zoom pill"><button id="zin" aria-label="Aproximar">+</button><button id="zout" aria-label="Afastar">−</button></div>
 <div class="emotes pill">
-  <button id="btnAudio" style="background:#3d5afe;color:#fff">🎧 Ligar áudio</button><button id="btnCfgAudio" title="Microfone, saída de áudio e volume de cada pessoa" aria-label="Configurar áudio">⚙️</button><button data-emote="5">👋 Acenar</button><button data-emote="6">💃 Dançar</button><button data-emote="4">🪑 Sentar/levantar</button>
+  <button id="btnAudio" style="background:#3d5afe;color:#fff">🎧 Ligar áudio</button><button id="btnCfgAudio" title="Microfone, saída de áudio e volume de cada pessoa" aria-label="Configurar áudio">⚙️</button><button id="btnMao" style="display:none">✋ Levantar a mão</button><button data-emote="5">👋 Acenar</button><button data-emote="6">💃 Dançar</button><button data-emote="4">🪑 Sentar/levantar</button>
 </div>
 <button class="pill" id="btnProj"></button>
 <button class="pill" id="btnTelao" style="display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:70px;z-index:12;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe">📊 Abrir telão</button>
@@ -154,6 +172,7 @@ html,body{height:100%;overflow:hidden}
 <script src="assets.js"></script>
 <script src="js/projecao.js"></script>
 <script src="js/ti.js"></script>
+<script src="js/palco.js"></script>
 <script src="js/vendor/supabase.js"></script>
 <script src="js/config.js"></script>
 <script src="js/dados.js"></script>
@@ -200,6 +219,7 @@ async function boot(){
   const m = document.getElementById("mini").getContext("2d"); m.imageSmoothingEnabled = false; m.drawImage(sheet, 8, 4, 16, 16, 0, 0, 32, 32);
   spawn();
   Projecao.iniciar({ eu: () => P, outros: () => outros, toast, registrar: (d, sala) => Dados.registrarAtividade(EMAIL, "acao", d, {sala}) });
+  Palco.iniciar({ eu: () => P, outros: () => outros, toast, aoMudarAudio: () => atualizarBotaoAudio() });
   TI.iniciar({ toast, aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
   conectarSala();
   document.getElementById("load").remove();
@@ -225,7 +245,7 @@ function conectarSala(){
     aoMover(id, st){
       const a = outros.find(o => o.id === id); if (!a) return;
       if (!a.visto){ a.x = st.x; a.y = st.y; a.visto = true; }
-      a.alvo = { x: st.x, y: st.y }; a.dir = st.dir; a.remotoAndando = !!st.mov; a.mic = !!st.mic; a.audio = st.audio === undefined ? undefined : !!st.audio; a.proj = st.proj || null; a.tela = !!st.tela;
+      a.alvo = { x: st.x, y: st.y }; a.dir = st.dir; a.remotoAndando = !!st.mov; a.mic = !!st.mic; a.audio = st.audio === undefined ? undefined : !!st.audio; a.proj = st.proj || null; a.tela = !!st.tela; a.mao = st.mao || null; a.mod = st.mod || null;
       if (st.emote !== a.emote){ a.emote = st.emote; a.emoteT = 0; }
       const atual = a.assento ? a.assento.id : null;
       if (st.assento !== atual){
@@ -276,6 +296,8 @@ async function ligarAudio(){
     const r = await Voz.ativar(P.id);
     if (!r.comMicrofone) toast("Sem permissão do microfone: você ouve, mas não fala");
     Dados.registrarAtividade(EMAIL, "audio", r.comMicrofone ? "Ligou o áudio com microfone" : "Ligou o áudio só para ouvir");
+  } else if (Voz.bloqueado) {
+    toast("🔇 O palestrante mutou a plateia. Use ✋ Levantar a mão para pedir a palavra");
   } else if (!Voz.temMic) {
     // estava só ouvindo (microfone negado): tenta de novo
     const r = await Voz.trocarMic(Voz.pref.mic);
@@ -287,6 +309,7 @@ function atualizarBotaoAudio(){
   const b = document.getElementById("btnAudio");
   if (!Voz.ligado) b.textContent = "🎧 Ligar áudio";
   else if (!Voz.temMic) b.textContent = "🔈 Só ouvindo";
+  else if (Voz.bloqueado) b.textContent = "🔇 Mutado pelo palestrante";
   else b.textContent = Voz.micAberto ? "🎙️ Microfone ligado" : "🔇 Microfone mudo";
   b.classList.toggle("mudo", Voz.ligado && !Voz.micAberto);
 }
@@ -386,6 +409,7 @@ function joyMove(e){
   joyV = d > 8 ? [dx/max, dy/max] : null; if (joyV && P){ P.path = null; P.emote = null; }
 }
 document.getElementById("btnAudio").onclick = e => { e.stopPropagation(); ligarAudio(); };
+document.getElementById("btnMao").onclick = e => { e.stopPropagation(); Palco.levantarMao(); };
 document.getElementById("btnCfgAudio").onclick = e => { e.stopPropagation(); const el = document.getElementById("audioCfg"); el.classList.contains("hidden") ? abrirConfigAudio() : fecharConfigAudio(); };
 document.querySelector(".emotes").onclick = e => { const b = e.target.closest("[data-emote]"); if (!b) return; const r = +b.dataset.emote; r === 4 ? sentarPerto() : emote(r); };
 function emote(row){
@@ -428,7 +452,8 @@ function loop(now){
   const visiveis = outros.filter(o => o.visto && o.sheet);
   Voz.atualizar(P, visiveis, now);
   Projecao.atualizar(now);
-  Sala.enviarPosicao({ x: Math.round(P.x), y: Math.round(P.y), dir: P.dir, mov: P.moving, assento: P.assento ? P.assento.id : null, emote: P.emote, mic: Voz.micAberto, audio: Voz.ligado, proj: Projecao.minhaSala, tela: Projecao.minhaTela }, now);
+  Palco.atualizar();
+  Sala.enviarPosicao({ x: Math.round(P.x), y: Math.round(P.y), dir: P.dir, mov: P.moving, assento: P.assento ? P.assento.id : null, emote: P.emote, mic: Voz.micAberto, audio: Voz.ligado, proj: Projecao.minhaSala, tela: Projecao.minhaTela, mao: Palco.mao, mod: Palco.estado }, now);
   atualizarConversas([P, ...visiveis], dt, (a, o) => {
     if (a !== P) return;
     const agora = Date.now(); if (conversasLog[o.nome] && agora - conversasLog[o.nome] < 60000) return;
@@ -485,6 +510,13 @@ function draw(){
     const est = a !== P && Voz.ligado && !a.ouvindo && a.estadoAudio === "conectando" ? " ⏳" : "";
     const semMic = a !== P && a.audio !== false && a.mic === false && a.visto ? " 🎙️✕" : "";
     const tela = a === P ? Projecao.minhaTela : a.tela;
+    const mao = a === P ? Palco.mao : a.mao;
+    if (mao){ // mão levantada em cima da pessoa
+      const by = sy - 46 - Math.abs(Math.sin(t*4))*3;
+      ctx.fillStyle = "#fff"; ctx.strokeStyle = "#f2a33a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(sx - 15, by, 30, 26, 8); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx - 5, by + 26); ctx.lineTo(sx, by + 32); ctx.lineTo(sx + 5, by + 26); ctx.fill();
+      ctx.font = "17px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "#000"; ctx.fillText("✋", sx, by + 14); ctx.textAlign = "left";
+    }
     const txt = a.nome + (tela ? " 🖥️" : "") + (vp === 0 ? " 🔇" : a !== P && a.ouvindo ? " 🔊" : "") + est + semMic + (vp > 0 && vp < 0.99 ? ` ${Math.round(vp*100)}%` : vp > 1.01 ? ` ${Math.round(vp*100)}%` : "") + (a.vozReal ? " 🗣" : "");
     ctx.font = "700 12px system-ui,sans-serif"; const w = ctx.measureText(txt).width + 12;
     ctx.fillStyle = a === P ? "rgba(61,90,254,.92)" : "rgba(20,16,32,.72)"; ctx.beginPath(); ctx.roundRect(sx - w/2, sy - 19, w, 17, 6); ctx.fill();

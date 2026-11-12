@@ -104,8 +104,17 @@ window.Voz = (function () {
     garantirCtx();
     for (const p of peers.values()) if (p.audio && p.audio.paused) p.audio.play().catch(() => {});
   }
+  /* Palestrante do auditório mutou: o microfone fica fechado e a pessoa não consegue abrir sozinha. */
+  let bloqueado = false;
+  function bloquear(b, abrirAoSoltar = true) {
+    b = !!b; if (b === bloqueado) return;
+    bloqueado = b;
+    if (b) { micAberto = false; if (stream) for (const t of stream.getAudioTracks()) t.enabled = false; }
+    else if (abrirAoSoltar) { micAberto = true; if (stream) for (const t of stream.getAudioTracks()) t.enabled = true; }
+  }
   function alternarMic() {
     if (!stream) return false;
+    if (bloqueado) return false;
     micAberto = !micAberto;
     for (const t of stream.getAudioTracks()) t.enabled = micAberto;
     return micAberto;
@@ -327,7 +336,7 @@ window.Voz = (function () {
   }
 
   return {
-    configurar, ativar, alternarMic, desbloquear, aoSinal, atualizar, desligar, zona,
+    configurar, ativar, alternarMic, desbloquear, bloquear, get bloqueado() { return bloqueado; }, aoSinal, atualizar, desligar, zona,
     dispositivos, pedirPermissao, trocarMic, processamento, aplicarSaida, testarSaida, testeMic,
     volumePessoa, definirVolumePessoa,
     get pref() { return { ...pref, vols: { ...pref.vols } }; },

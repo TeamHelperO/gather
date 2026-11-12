@@ -339,7 +339,7 @@ window.Projecao = (function () {
     iniciar, recalcular, aoSinal, atualizar, desenhaveis, clicou, clicarBotao, abrirPopup, fecharPopup, parar,
     get minhaSala() { return share && share.tipo === "palco" ? share.sala : null; },
     get minhaTela() { return !!(share && share.tipo === "mesa"); },
-    abrirTelaDe,
+    abrirTelaDe, salaNoPalco,
     get apresentando() { return !!share; },
     get estado() { return { apresentando: share && share.sala, assistindo: [...vendo.entries()].map(([s, v]) => ({ sala: s, de: v.de, video: !!v.stream, conectado: !!v.conectado })), salas: [...salasComTelao()], popup: popup && popup.sala }; },
   };
