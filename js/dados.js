@@ -90,6 +90,7 @@
     async getUsuario(_email) { if (!perfil && usuarioAuth) await carregarPerfil(); return paraUsuario(perfil); },
     async listarUsuarios() { const { data } = await sb.from("perfis").select("id,email,nome,avatar,papel").order("nome"); return (data || []).map(paraUsuario); },
     ehAdmin() { return !!perfil && perfil.papel === "admin"; },
+    async token() { const { data } = await sb.auth.getSession(); return data.session ? data.session.access_token : null; },
     async definirPapel(id, papel) { const { error } = await sb.rpc("definir_papel", { p_usuario: id, p_papel: papel }); if (error) throw error; },
     async salvarNome(nome) { const { data } = await sb.from("perfis").update({ nome }).eq("id", usuarioAuth.id).select().single(); if (data) perfil = data; },
     async salvarAvatar(_email, avatar) {

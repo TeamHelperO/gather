@@ -1,1 +1,15 @@
-{ "cleanUrls": true, "trailingSlash": false }
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "functions": {
+    "api/agentes.js": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/agentes",
+      "schedule": "0 11 * * *"
+    }
+  ]
+}

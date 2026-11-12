@@ -163,6 +163,21 @@ window.TI = (function () {
     renderPainel();
     Dados.registrarAtividade(null, "acao", "Abriu o painel de tendências", { sala: "TI" });
   }
+  let rodando = false;
+  async function rodarAgentes() {
+    if (rodando) return; rodando = true; renderPainel();
+    try {
+      const token = Dados.token ? await Dados.token() : null;
+      const r = await fetch("/api/agentes", { method: "POST", headers: token ? { Authorization: "Bearer " + token } : {} });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j.erro) opt.toast("🤖 " + (j.erro || "Não consegui rodar os agentes (" + r.status + ")"));
+      else {
+        const n = (j.resultado || []).reduce((s, x) => s + (x.publicadas || 0), 0), falhas = (j.resultado || []).filter(x => x.erro);
+        opt.toast(`🤖 ${n} tendência(s) nova(s)` + (falhas.length ? ` · erro: ${falhas[0].erro}` : ""));
+      }
+    } catch (e) { opt.toast("🤖 Falha ao chamar os agentes"); }
+    rodando = false; await recarregar(); renderPainel();
+  }
   function fecharPainel() { if (!painel) return; painel.remove(); painel = null; removeEventListener("keydown", escFechar); }
   function escFechar(e) { if (e.key === "Escape") fecharPainel(); }
   function renderPainel() {
@@ -179,7 +194,7 @@ window.TI = (function () {
       <div class="tend-barra">
         ${[["pendente", "🆕 Para avaliar"], ["pega", "✅ Pega"], ["nao_pega", "❌ Não pega"], ["todas", "Todas"]].map(([k, l]) => `<button class="tab ${filtro === k ? "on" : ""}" data-filtro="${k}">${l}${k !== "todas" ? ` <i>${cont[k]}</i>` : ""}</button>`).join("")}
         <input data-busca placeholder="Buscar…" value="${esc(busca)}">
-        ${adm ? `<button class="btn pri" data-nova>＋ Nova</button>` : ""}
+        ${adm ? `<button class="btn" data-rodar ${rodando ? "disabled" : ""} title="Os 5 agentes pedem tendências à IA da NVIDIA agora">${rodando ? "⏳ Agentes trabalhando…" : "▶ Rodar agentes"}</button><button class="btn pri" data-nova>＋ Nova</button>` : ""}
       </div>
       ${adm && painel.dataset.nova ? `<form class="tend-form" data-form>
         <input name="titulo" placeholder="Título da tendência" required maxlength="200">
@@ -214,6 +229,7 @@ window.TI = (function () {
   async function aoClicar(e) {
     if (e.target === painel || e.target.closest("[data-fechar]")) return fecharPainel();
     const f = e.target.closest("[data-filtro]"); if (f) { filtro = f.dataset.filtro; return renderPainel(); }
+    if (e.target.closest("[data-rodar]")) return rodarAgentes();
     if (e.target.closest("[data-nova]")) { painel.dataset.nova = painel.dataset.nova ? "" : "1"; return renderPainel(); }
     if (e.target.closest("[data-cancelar]")) { painel.dataset.nova = ""; return renderPainel(); }
     const card = e.target.closest("[data-id]"); if (!card) return;
