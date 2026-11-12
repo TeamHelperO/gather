@@ -70,6 +70,25 @@ html,body{height:100%;overflow:hidden}
 .tc-acoes .dec.nao.on{background:#e5484d;color:#fff;border-color:#e5484d}
 .tc-acoes .trava.on{background:#1d1d1f;color:#fff;border-color:#1d1d1f}
 .tc-acoes .del{margin-left:auto}
+/* sala de Edição */
+.ed-win .tend-barra .tab.on{background:#e04fa0;border-color:#e04fa0}
+.ed-win .tend-barra select{margin-left:auto;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--chip);padding:0 8px;max-width:260px}
+.ed-win .tend-lista{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+.ed-win .tc{border-left-color:#e04fa0}.ed-win .tc.aprovado{border-left-color:#3fbf5f}.ed-win .tc.gravando{border-left-color:#f2a33a}.ed-win .tc.publicado{border-left-color:#2fd4e8}.ed-win .tc.descartado{opacity:.6;border-left-color:#6b6577}
+.ed-win .tc-acoes .btn.pri,.ed-win .ed-video .btn.pri{background:#e04fa0;color:#fff;border-color:#e04fa0}
+.ed-win .tc-meta select{margin-left:auto;border:1px solid var(--line);border-radius:8px;background:var(--chip);padding:3px 6px;font-size:12px}
+.ed-rot:has(.ed-detalhe){grid-column:1/-1}
+.ed-dica{grid-column:1/-1;margin:2px 0;color:var(--mut);font-size:13px}
+.ed-gancho{font-style:italic}
+.ed-detalhe h4{margin:8px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+.ed-texto{white-space:pre-wrap}
+.ed-cenas{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}
+.ed-cena{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--chip);display:flex;flex-direction:column;gap:5px;font-size:13px}
+.ed-cena b small{font-weight:500;color:var(--mut);margin-left:4px}
+.ed-cena span{display:block;font-size:11px;font-weight:700;color:var(--mut)}
+.ed-video{display:flex;flex-direction:column;gap:8px;align-items:flex-start;margin-top:10px}
+.ed-video .btn{padding:8px 12px;border-radius:9px;border:1px solid var(--line);font-weight:700;text-decoration:none}
+.ed-canvas{width:min(270px,100%);aspect-ratio:9/16;border-radius:10px;background:#000}
 .tc-acoes button:disabled{opacity:.45;cursor:not-allowed}
 .tc-quem{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--mut)}
 /* ---- acesso / administração ---- */
@@ -173,6 +192,7 @@ html,body{height:100%;overflow:hidden}
 <script src="assets.js"></script>
 <script src="js/projecao.js"></script>
 <script src="js/ti.js"></script>
+<script src="js/edicao.js"></script>
 <script src="js/palco.js"></script>
 <script src="js/vendor/supabase.js"></script>
 <script src="js/config.js"></script>
@@ -223,6 +243,7 @@ async function boot(){
   Projecao.iniciar({ eu: () => P, outros: () => outros, toast, registrar: (d, sala) => Dados.registrarAtividade(EMAIL, "acao", d, {sala}) });
   Palco.iniciar({ eu: () => P, outros: () => outros, toast, aoMudarAudio: () => atualizarBotaoAudio() });
   TI.iniciar({ eu: () => P, toast, aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
+  Edicao.iniciar({ eu: () => P, toast, aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
   conectarSala();
   document.getElementById("load").remove();
   ligarAudioAuto();
@@ -354,7 +375,7 @@ function livre(x, y){ // caixa dos pés (12x6 px) livre?
 }
 /* computadores da sala de TI ficam sempre ligados (os agentes estão trabalhando) */
 let monitoresTI = new Set();
-function marcarMonitoresTI(){ monitoresTI = new Set(monitores.filter(m => { const r = roomAt(m.x*T + 16, m.y*T + 28); return r && r.type === "ti"; }).map(m => m.x + "," + m.y)); }
+function marcarMonitoresTI(){ monitoresTI = new Set(monitores.filter(m => { const r = roomAt(m.x*T + 16, m.y*T + 28); return r && (r.type === "ti" || r.type === "edicao"); }).map(m => m.x + "," + m.y)); }
 /* regras de acesso: não deixa entrar em sala com senha/restrita (abre o pedido de senha) */
 const salaLivreEm = (x, y) => { const r = roomAt(x, y - 4); return !r || Acesso.podeEntrar(r); };
 function livreP(x, y){
@@ -377,7 +398,7 @@ function spawn(){
 
 /* ---------- entrada ---------- */
 const DIRKEYS = {ArrowUp:[0,-1],w:[0,-1],W:[0,-1],ArrowDown:[0,1],s:[0,1],S:[0,1],ArrowLeft:[-1,0],a:[-1,0],A:[-1,0],ArrowRight:[1,0],d:[1,0],D:[1,0]};
-addEventListener("keydown", e => { if (e.target.matches("input,select,textarea") || Telao.aberto || TI.aberto || Acesso.aberto) return; if (DIRKEYS[e.key]) { keys.add(e.key); if (P) { P.path = null; P.emote = null; } e.preventDefault(); }
+addEventListener("keydown", e => { if (e.target.matches("input,select,textarea") || Telao.aberto || TI.aberto || Edicao.aberto || Acesso.aberto) return; if (DIRKEYS[e.key]) { keys.add(e.key); if (P) { P.path = null; P.emote = null; } e.preventDefault(); }
   if (e.key === "1") emote(5); if (e.key === "2") emote(6); if (e.key === "3") sentarPerto(); });
 addEventListener("keyup", e => keys.delete(e.key));
 addEventListener("blur", () => keys.clear());
@@ -403,6 +424,7 @@ const up = e => {
   if (mon){ const s = assentos.find(s => s.monitores && s.monitores.some(m2 => m2.x === mon.x && m2.y === mon.y)); const dono = s && s.ocupante;
     if (dono && dono !== P){ if (dono.tela) { verTelaDe(dono); return; } toast(`${dono.nome} não abriu a tela do computador`); return; } }
   if (TI.clicou(wx, wy)) return;
+  if (Edicao.clicou(wx, wy)) return;
   if (Projecao.clicou(wx, wy)) return;
   for (const it of teloes){ if (wx >= it.x*T && wx <= it.x*T + 192 && wy >= it.y*T && wy <= it.y*T + 90){ abrirTelao(it); return; } }
   // clicou num assento? vai até ele e senta
@@ -487,7 +509,7 @@ function loop(now){
   });
   telaoPerto = teloes.find(it => dentroDoTelao(it) && Math.hypot(it.x*T + 96 - P.px, it.y*T + 96 - P.py) < 120) || null;
   if (Telao.aberto && telaoSalaAberta && salaAtualId() !== telaoSalaAberta){ telaoSalaAberta = null; Telao.fechar(); toast("Você saiu da sala: o telão foi fechado"); }
-  TI.atualizar();
+  TI.atualizar(); Edicao.atualizar();
   const perto = !!telaoPerto;
   const bt = document.getElementById("btnTelao"); const mostra = perto && !Telao.aberto ? "block" : "none"; if (bt.style.display !== mostra) bt.style.display = mostra;
   for (const a of [P, ...visiveis]){ a.vozReal = now - (a.vozAtiva || -1e9) < 350; if (Voz.ligado) a.falando = a.vozReal; else if (a.vozReal) a.falando = true; }
@@ -525,7 +547,7 @@ function draw(){
   ctx.setTransform(zoom*DPR, 0, 0, zoom*DPR, c.ox*DPR, c.oy*DPR);
   drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => { const r = salaDoTelao(it); if (!dentroDoTelao(it)){ telaoTrancado(g, it.x*T, it.y*T, r); return; } Telao.desenharTela(g, it.x*T, it.y*T, r ? Telao.filtrarSala(tarefas, r.id, salaPadrao()) : tarefas, r ? "TELÃO · " + r.name.toUpperCase() : "TELÃO DA EQUIPE"); } })))
     .concat(monitores.map(it => ({ sort: sortKey(it) + 0.01, draw: g => desenharMonitor(g, it, ligados.has(it.x + "," + it.y), t) })))
-    .concat(Projecao.desenhaveis()).concat(TI.desenhaveis(t)));
+    .concat(Projecao.desenhaveis()).concat(TI.desenhaveis(t)).concat(Edicao.desenhaveis()));
   for (const a of atores) a.balao(ctx, t);
   if (marca){ ctx.strokeStyle = `rgba(61,90,254,${marca.t})`; ctx.lineWidth = 2/zoom*1.5; ctx.beginPath(); ctx.ellipse(marca.x, marca.y, 10*(1.6-marca.t*.6), 5*(1.6-marca.t*.6), 0, 0, Math.PI*2); ctx.stroke(); }
   // nomes (tela)
@@ -576,6 +598,7 @@ document.getElementById("eu").onclick = async () => {
     <button class="mi" data-telao>📊 Telão da equipe</button>
     <button class="mi" data-cfgaudio>🎚️ Áudio: microfone, saída e volumes</button>
     <button class="mi" data-tend>📈 Tendências de mercado</button>
+    <button class="mi" data-edicao>🎬 Roteiros (Edição)</button>
     ${Dados.ehAdmin() ? `<button class="mi" data-admin>🛡️ Administração: salas, senhas e papéis</button>` : ""}
     <a class="mi" href="editor.html">🛠️ Editor de salas</a>
     <button class="mi" data-exp>💾 Baixar meus dados (JSON)</button>
@@ -590,6 +613,7 @@ menu.onclick = async e => {
   if (e.target.closest("[data-telao]")) { menu.classList.add("hidden"); abrirTelao(); }
   if (e.target.closest("[data-cfgaudio]")) { menu.classList.add("hidden"); abrirConfigAudio(); }
   if (e.target.closest("[data-tend]")) { menu.classList.add("hidden"); TI.abrirPainel(); }
+  if (e.target.closest("[data-edicao]")) { menu.classList.add("hidden"); Edicao.abrirPainel(); }
   if (e.target.closest("[data-admin]")) { menu.classList.add("hidden"); Acesso.abrirAdmin(); }
   if (e.target.closest("[data-sair]")) { salvarPos(); await Dados.sair(); location.href = "index.html"; }
   if (e.target.closest("[data-exp]")) {

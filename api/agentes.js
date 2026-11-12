@@ -157,8 +157,58 @@ async function autorizado(req) {
   return !!(r && r.ok && (await r.json()) === true);
 }
 
+/* ---------- Sala de Edição: roteirista (Pena) + diretor de cenas (Claquete) + editor (Corte) ---------- */
+async function usuarioLogado(req) {
+  const auth = req.headers.authorization || "", token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!token || token === process.env.CRON_SECRET) return null;
+  const r = await fetch(`${SUPA}/auth/v1/user`, { headers: { apikey: ANON, Authorization: `Bearer ${token}` } }).catch(() => null);
+  if (!r || !r.ok) return null;
+  const u = await r.json(); return u && u.id ? u.id : null;
+}
+const texto = (v, n) => (v == null ? "" : String(v)).slice(0, n);
+
+async function roteirizar(t, formato, pedidoPor) {
+  await status("agente6", "escrevendo", `Roteiro sobre: ${texto(t.titulo, 120)}`);
+  await status("agente7", "planejando cenas", "Esperando o roteiro do Pena");
+  const { texto: resp, modelo, chave } = await perguntar([
+    { role: "system", content: "/no_think\nVocê é uma dupla de criação de vídeos curtos para redes sociais: um roteirista e um diretor de cenas. Responda só com JSON válido, em português do Brasil." },
+    { role: "user", content: `Crie um vídeo no formato "${formato}" sobre esta tendência de mercado, para uma agência/empresa digital brasileira:\n` +
+      `Título: ${texto(t.titulo, 200)}\nResumo: ${texto(t.resumo, 800)}\nCategoria: ${texto(t.categoria, 60)}\n\n` +
+      `Devolva: {"titulo": "título do vídeo", "gancho": "frase dos 3 primeiros segundos", "roteiro": "texto completo da narração", ` +
+      `"cenas": [{"n": 1, "duracao": "0-3s", "visual": "o que aparece e como gravar (enquadramento, movimento, cenário, quem aparece)", "fala": "o que é dito", "texto_tela": "legenda/letreiro", "audio": "música/efeito"}], ` +
+      `"cta": "chamada final"}. De 5 a 8 cenas, prontas para alguém gravar com celular. Não invente números nem marcas reais.` },
+  ]);
+  const j = lerJSON(resp);
+  const cenas = [].concat(j.cenas || []).filter(c => c && (c.visual || c.fala)).slice(0, 12).map((c, k) => ({
+    n: k + 1, duracao: texto(c.duracao, 20), visual: texto(c.visual, 600), fala: texto(c.fala, 600), texto_tela: texto(c.texto_tela, 200), audio: texto(c.audio, 200),
+  }));
+  if (!cenas.length) throw new Error(`A IA (${modelo.split("/").pop()}) não devolveu as cenas`);
+  await status("agente7", "cenas prontas", `${cenas.length} cenas detalhadas`);
+  const roteiro = texto(j.roteiro, 6000) + (j.cta ? `\n\nCTA: ${texto(j.cta, 300)}` : "");
+  const r = await rpc("agente_roteiro", {
+    p_chave: process.env.AGENTES_CHAVE, p_agente: "agente6", p_tendencia: t.id || null, p_titulo: texto(j.titulo || t.titulo, 200),
+    p_gancho: texto(j.gancho, 500), p_roteiro: roteiro, p_formato: texto(formato, 60), p_cenas: cenas, p_pedido_por: pedidoPor,
+  });
+  if (!r.ok) throw new Error("Não consegui salvar o roteiro (" + r.status + "): " + (await r.text()).slice(0, 120));
+  const id = await r.json();
+  await status("agente6", "roteiro pronto", `${texto(j.titulo || t.titulo, 80)} · ${modelo.split("/").pop()} · chave ${chave}`);
+  await status("agente8", "pronto para editar", "Abra o roteiro e clique em Gerar vídeo rascunho");
+  return { id, cenas: cenas.length, modelo };
+}
+
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
+  const corpo = typeof req.body === "string" ? (() => { try { return JSON.parse(req.body); } catch (e) { return {}; } })() : (req.body || {});
+  if (corpo.acao === "roteiro") {
+    // qualquer pessoa logada pode pedir um roteiro
+    const uid = await usuarioLogado(req);
+    if (!uid) return res.status(401).json({ erro: "Entre na sua conta para pedir roteiros" });
+    if (!chaves().length || !process.env.AGENTES_CHAVE) return res.status(200).json({ ok: false, erro: "Configure NVIDIA_API_KEYS e AGENTES_CHAVE na Vercel" });
+    if (!corpo.tendencia || !corpo.tendencia.titulo) return res.status(400).json({ erro: "Escolha uma tendência" });
+    INICIO.t = Date.now(); tentativas.length = 0; puladosNaRodada.clear();
+    try { return res.status(200).json({ ok: true, ...(await roteirizar(corpo.tendencia, texto(corpo.formato || "Reels/TikTok de 30 a 60 segundos", 60), uid)), tentativas }); }
+    catch (e) { await status("agente6", "erro", e.message.slice(0, 140)); return res.status(200).json({ ok: false, erro: e.message, tentativas }); }
+  }
   if (!(await autorizado(req))) return res.status(401).json({ erro: "Só administradores (ou o cron) podem rodar os agentes" });
   if (!chaves().length || !process.env.AGENTES_CHAVE) return res.status(200).json({ ok: false, erro: "Configure NVIDIA_API_KEYS e AGENTES_CHAVE na Vercel" });
   const porAgente = Math.max(1, Math.min(5, parseInt(req.query && req.query.n) || 2));

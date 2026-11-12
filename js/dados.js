@@ -182,6 +182,10 @@
     async mexerTendencia(id, acao) { const { data, error } = await sb.rpc("mexer_tendencia", { p_id: id, p_acao: acao }); if (error) throw error; return data; },
     async criarTendencia(t) { const { error } = await sb.from("tendencias").insert({ titulo: t.titulo, resumo: t.resumo || null, fonte_url: t.fonte_url || null, categoria: t.categoria || null, relevancia: t.relevancia || null, agente: "manual" }); if (error) throw error; },
     async excluirTendencia(id) { const { error } = await sb.from("tendencias").delete().eq("id", id); if (error) throw error; },
+    async listarRoteiros(limite = 100) { const { data } = await sb.from("roteiros").select("*").order("criado_em", { ascending: false }).limit(limite); return data || []; },
+    ouvirRoteiros(cb) { return sb.channel("rot-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "roteiros" }, () => cb()).subscribe(); },
+    async mexerRoteiro(id, status) { const { data, error } = await sb.rpc("mexer_roteiro", { p_id: id, p_status: status }); if (error) throw error; return data; },
+    async excluirRoteiro(id) { const { error } = await sb.from("roteiros").delete().eq("id", id); if (error) throw error; },
     async listarAgentes() { const { data } = await sb.from("agentes").select("*").order("id"); return data || []; },
     ouvirAgentes(cb) { return sb.channel("agentes-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "agentes" }, () => cb()).subscribe(); },
 

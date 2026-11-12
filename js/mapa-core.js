@@ -11,6 +11,7 @@ const TYPES = {
   silenciosa:{label:"Área silenciosa",floor:"f_carpete_verde",d:"Pufes, poltronas, estante"},
   auditorio:{label:"Auditório",floor:"f_madeira",d:"Palco, púlpito e plateia"},
   ti:{label:"Sala de TI",floor:"f_ti",d:"Servidores, 5 computadores com agentes de IA e telão de tendências"},
+  edicao:{label:"Sala de Edição",floor:"f_carpete_azul",d:"Roteirista, diretor de cenas e editor de vídeo (agentes de IA) e telão de roteiros",glass:true},
   copa:{label:"Copa e lazer",floor:"f_ceramica",d:"Café, mesas, jogos"},
   corredor:{label:"Corredor",floor:"f_madeira",d:"Passagem, sem paredes",noWalls:true},
   livre:{label:"Sala vazia",floor:"f_madeira",d:"Sem móveis, você monta"}
@@ -30,13 +31,14 @@ function blankMap(name){ return {v:1,name:name||"Novo escritório",w:40,h:28,roo
 function room(type,name,x,y,w,h,door){ return {id:uid(),type,name,x,y,w,h,floor:null,door:{side:door||"baixo",pos:.5},auto:true}; }
 /* Escritório da Next Co. para 5 pessoas: tudo grande e perto. */
 function templateNext(){
-  const m = {v:1,name:"Escritório Next Co.",w:58,h:32,rooms:[],items:[]};
+  const m = {v:1,name:"Escritório Next Co.",w:68,h:32,rooms:[],items:[]};
   // em cima (portas para o corredor)
   m.rooms.push(room("recepcao","Recepção",2,3,14,11));
   m.rooms.push(room("trabalho","Área de trabalho",16,3,17,11));
-  m.rooms.push(room("ti","TI",33,3,14,11));
-  m.rooms.push(room("copa","Copa e lazer",47,3,9,11));
-  m.rooms.push(room("corredor","Corredor",2,14,54,3,"nenhuma"));
+  m.rooms.push(room("ti","Pesquisa",33,3,14,11));
+  m.rooms.push(room("edicao","Edição",47,3,10,11));
+  m.rooms.push(room("copa","Copa e lazer",57,3,9,11));
+  m.rooms.push(room("corredor","Corredor",2,14,64,3,"nenhuma"));
   // embaixo
   const r1 = room("reuniao","Reunião 1",2,19,10,9,"cima"); r1.door.pos = 0.12; m.rooms.push(r1);
   const r2 = room("reuniao","Reunião 2",12,19,10,9,"cima"); r2.door.pos = 0.12; m.rooms.push(r2);
@@ -161,6 +163,24 @@ function layoutBase(r){
       }
       // fileira de racks embaixo (os que tampam a porta saem sozinhos)
       if (h >= 11) { const nb = Math.min(16, Math.floor((w-0.5)/1.05)); for (let i=0;i<nb;i++) P("rack_servidor", x+0.25+i*1.05, y+h-2.05); }
+      break;
+    }
+    case "edicao": {
+      // telão de roteiros, claquete, 3 mesas com os agentes Pena, Claquete e Corte, ring light e câmera
+      if (w >= 7 && ASSETS.telao_rot) P("telao_rot", cx-3, y-1.85);
+      if (w >= 9 && ASSETS.claquete) P("claquete", x+0.3, y-1.4, {z:"wall"});
+      const n = Math.max(1, Math.min(3, Math.floor((w+1)/4))), span = n*4-1, sx = x + (w-span)/2;
+      for (let k=0;k<3;k++){
+        const i = k % n, j = Math.floor(k / n), tx = sx+i*4, ty = y+2.6+j*3.6;
+        if (tx+3 > x+w+0.01 || ty+2.5 > y+h+0.1) continue;
+        P("mesa_pc", tx, ty);
+        P("monitor", tx+0.5, ty-0.47); P("monitor", tx+1.5, ty-0.47);
+        P("teclado_rgb", tx+1, ty+0.34); P("mouse", tx+2.05, ty+0.22);
+        if (ASSETS["agente_"+(k+6)]) P("agente_"+(k+6), tx+1, ty+1.05, {agente:"agente"+(k+6)});
+      }
+      if (h >= 9 && ASSETS.ring_light) P("ring_light", x+0.2, y+h-2.1);
+      if (h >= 9 && ASSETS.camera_tripe) P("camera_tripe", x+w-1.2, y+h-2.1);
+      if (h >= 9 && w >= 6 && ASSETS.planta) P("planta", x+w-2.4, y+h-1.2);
       break;
     }
     case "copa": {

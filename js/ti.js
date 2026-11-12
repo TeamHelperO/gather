@@ -18,7 +18,8 @@
   }), w: 32, h: 64, label: "Rack de servidor", cat: "TI", pal: true };
 
   // agentes de IA sentados de costas no computador (capuz colorido + fone)
-  const cores = [["#2f6fd8", "#1d4a99"], ["#7b4fd8", "#52309a"], ["#1f9e6e", "#13704d"], ["#d8682f", "#9a4419"], ["#c23a5a", "#86223c"]];
+  const cores = [["#2f6fd8", "#1d4a99"], ["#7b4fd8", "#52309a"], ["#1f9e6e", "#13704d"], ["#d8682f", "#9a4419"], ["#c23a5a", "#86223c"],
+    /* sala de Edição: Pena (roteirista), Claquete (cenas), Corte (editor) */ ["#e0b030", "#a07a14"], ["#3a3f4a", "#22262e"], ["#e04fa0", "#9c2a6c"]];
   cores.forEach(([c1, c2], i) => {
     ASSETS["agente_" + (i + 1)] = { src: nova(32, 40, R => {
       R(9, 31, 14, 3, "#2b2f39"); R(15, 34, 2, 4, "#2b2f39"); R(10, 38, 12, 2, "#1d2028");          // cadeira
