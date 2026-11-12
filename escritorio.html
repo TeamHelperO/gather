@@ -86,6 +86,7 @@ html,body{height:100%;overflow:hidden}
 .acc-sec2{font-weight:700;font-size:13px;margin-top:6px;display:flex;gap:6px;align-items:center}
 .acc-sala{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:10px;flex-wrap:wrap}
 .acc-sala b{min-width:120px}.acc-sala small{color:var(--mut);flex:1}
+.acc-sel{height:38px;border-radius:9px;border:1px solid var(--line);background:var(--chip);padding:0 8px}
 .acc-sala select{height:34px;border-radius:8px;border:1px solid var(--line);background:var(--chip);padding:0 8px}
 .acc-sala .btn{padding:6px 12px}
 .st{font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;white-space:nowrap}
@@ -319,12 +320,18 @@ function verTelaDe(pessoa){
   Projecao.abrirTelaDe(pessoa);
   Dados.registrarAtividade(EMAIL, "acao", `Viu a tela de ${pessoa.nome}`, {sala: P.sala, com: pessoa.nome});
 }
-function abrirTelao(){
+/* cada sala tem o seu telão de tarefas */
+const salaPadrao = () => { const r = S && S.rooms.find(r => r.type === "trabalho"); return r ? r.id : null; };
+const salaDoTelao = it => (it.room && roomById(it.room)) || roomAt(it.x*T + 96, it.y*T + 110) || roomAt(it.x*T + 96, it.y*T + 140);
+let telaoPerto = null;
+function abrirTelao(it){
   if (Telao.aberto) return; keys.clear(); joyV = null; if (P) P.path = null;
-  Dados.registrarAtividade(EMAIL, "telao", "Abriu o telão da equipe");
-  Telao.abrir({ email: EMAIL, nome: user.nome, aoFechar: atualizarTarefas });
+  if (!it || !it.k) it = telaoPerto || teloes.find(t => { const r = salaDoTelao(t); return r && r.name === P.sala; }) || teloes[0];
+  const r = it && salaDoTelao(it);
+  Dados.registrarAtividade(EMAIL, "telao", `Abriu o telão${r ? " de " + r.name : ""}`, {sala: r ? r.name : null});
+  Telao.abrir({ email: EMAIL, nome: user.nome, aoFechar: atualizarTarefas, sala: r ? r.id : null, nomeSala: r ? r.name : "", salaPadrao: salaPadrao() });
 }
-document.getElementById("btnTelao").onclick = abrirTelao;
+document.getElementById("btnTelao").onclick = () => abrirTelao(telaoPerto);
 document.getElementById("btnProj").onclick = e => { e.stopPropagation(); Projecao.clicarBotao(); };
 function livre(x, y){ // caixa dos pés (12x6 px) livre?
   for (const [dx, dy] of [[-6,-3],[6,-3],[-6,3],[6,3]]) if (grid.blocked(Math.floor((x+dx)/C16), Math.floor((y+dy)/C16))) return false;
@@ -382,7 +389,7 @@ const up = e => {
     if (dono && dono !== P){ if (dono.tela) { verTelaDe(dono); return; } toast(`${dono.nome} não abriu a tela do computador`); return; } }
   if (TI.clicou(wx, wy)) return;
   if (Projecao.clicou(wx, wy)) return;
-  for (const it of teloes){ if (wx >= it.x*T && wx <= it.x*T + 192 && wy >= it.y*T && wy <= it.y*T + 90){ abrirTelao(); return; } }
+  for (const it of teloes){ if (wx >= it.x*T && wx <= it.x*T + 192 && wy >= it.y*T && wy <= it.y*T + 90){ abrirTelao(it); return; } }
   // clicou num assento? vai até ele e senta
   let alvo = null, bd = 1e9;
   for (const s of assentos){ if (s.ocupante && s.ocupante !== P) continue; const d = Math.hypot(s.sx - wx, s.sy - 4 - wy); if (d < 18 && d < bd){ bd = d; alvo = s; } }
@@ -463,7 +470,8 @@ function loop(now){
     conversasLog[o.nome] = agora;
     Dados.registrarAtividade(EMAIL, "conversa", `Conversou com ${o.nome}${P.sala ? " em " + P.sala : ""}`, {sala: P.sala, com: o.nome});
   });
-  const perto = teloes.some(it => Math.hypot(it.x*T + 96 - P.px, it.y*T + 96 - P.py) < 120);
+  telaoPerto = teloes.find(it => Math.hypot(it.x*T + 96 - P.px, it.y*T + 96 - P.py) < 120) || null;
+  const perto = !!telaoPerto;
   const bt = document.getElementById("btnTelao"); const mostra = perto && !Telao.aberto ? "block" : "none"; if (bt.style.display !== mostra) bt.style.display = mostra;
   for (const a of [P, ...visiveis]){ a.vozReal = now - (a.vozAtiva || -1e9) < 350; if (Voz.ligado) a.falando = a.vozReal; else if (a.vozReal) a.falando = true; }
   checarSala(false);
@@ -498,7 +506,7 @@ function draw(){
   const ligados = new Set(monitoresTI); for (const a of atores) if (a.assento && a.assento.trabalho) for (const m of a.assento.monitores) ligados.add(m.x + "," + m.y);
   ctx.imageSmoothingEnabled = false;
   ctx.setTransform(zoom*DPR, 0, 0, zoom*DPR, c.ox*DPR, c.oy*DPR);
-  drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => Telao.desenharTela(g, it.x*T, it.y*T, tarefas) })))
+  drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => { const r = salaDoTelao(it); Telao.desenharTela(g, it.x*T, it.y*T, r ? Telao.filtrarSala(tarefas, r.id, salaPadrao()) : tarefas, r ? "TELÃO · " + r.name.toUpperCase() : "TELÃO DA EQUIPE"); } })))
     .concat(monitores.map(it => ({ sort: sortKey(it) + 0.01, draw: g => desenharMonitor(g, it, ligados.has(it.x + "," + it.y), t) })))
     .concat(Projecao.desenhaveis()).concat(TI.desenhaveis(t)));
   for (const a of atores) a.balao(ctx, t);

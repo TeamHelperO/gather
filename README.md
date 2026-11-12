@@ -31,7 +31,7 @@ ficam em `js/config.js`. As tabelas têm regras de acesso (RLS): só quem entrou
 - `js/vida.js` – assentos, sentar sozinho, trabalhar no PC e conversas
 - `js/projecao.js` – telão de projeção do auditório: quem está em cima do palco compartilha a tela; aparece no telão do mapa
   para quem está na sala; clicar no telão abre a janela maior com tela cheia (também registra a arte do item)
-- `js/montaria.js` – patinete, skate ou cavalo para andar mais rápido no corredor (desce sozinho ao entrar numa sala)
+- `js/montaria.js` – patinete, skate ou patins para andar mais rápido no corredor (desce sozinho ao entrar numa sala)
 - `js/palco.js` – moderação do auditório: quem está no palco muta/desmuta todos e atende a fila de ✋ mãos levantadas
 - `js/ti.js` – sala de TI (racks, 5 computadores com agentes de IA) e painel de tendências de mercado (travar/destravar, pega/não pega e por quem)
 - `js/acesso.js` – papéis (admin/usuário), senha e salas restritas; painel de administração no menu (só admin)

@@ -16,7 +16,8 @@
 (async () => {
   const EMAIL = await Dados.exigirSessao("index.html"); if (!EMAIL) return;
   const u = await Dados.getUsuario(EMAIL);
-  Telao.abrir({ email: EMAIL, nome: u.nome, telaCheia: true });
+  const q = new URLSearchParams(location.search);
+  Telao.abrir({ email: EMAIL, nome: u.nome, telaCheia: true, sala: q.get("sala") || null, nomeSala: q.get("nome") || "", salaPadrao: q.get("padrao") || null });
 })();
 </script>
 </body>

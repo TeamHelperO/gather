@@ -12,6 +12,7 @@ window.Acesso = (function () {
 
   async function iniciar(o) {
     opt = o;
+    try { usuarios = await Dados.listarUsuarios(); } catch (e) {}
     await recarregar();
     Dados.ouvirRegras(recarregar);
   }
@@ -22,7 +23,7 @@ window.Acesso = (function () {
   }
   const admin = () => Dados.ehAdmin();
   const regraDe = sala => sala && regras.get(sala.id);
-  const temRegra = r => r && (r.tem_senha || r.restrita);
+  const temRegra = r => r && (r.tem_senha || r.restrita);  // (palestrante não bloqueia a entrada)
 
   function podeEntrar(sala) {
     const r = regraDe(sala);
@@ -32,6 +33,10 @@ window.Acesso = (function () {
     if (r.tem_senha && liberadas.has(sala.id)) return true;
     return false;
   }
+  /* palestrante fixo (priorizar): só essa pessoa usa o palco do auditório. null = qualquer um no palco */
+  function palestranteDe(sala) { const r = sala && regras.get(sala.id || sala); return (r && r.palestrante) || null; }
+  function podePalestrar(ator, sala) { const p = palestranteDe(sala); return !p || (ator && ator.id === p); }
+  function nomeDe(id) { const u = usuarios.find(u => u.id === id); return u ? u.nome : "o palestrante"; }
   /* estado para mostrar no mapa: null | "senha" | "restrita" */
   function selo(sala) { const r = regraDe(sala); if (!temRegra(r)) return null; return r.tem_senha ? "senha" : "restrita"; }
 
@@ -77,8 +82,9 @@ window.Acesso = (function () {
   function renderAdmin(editando) {
     const corpo = modal && modal.querySelector(".acc-corpo"); if (!corpo) return;
     const salas = opt.salas().filter(s => s.type !== "corredor");
-    const estado = s => { const r = regraDe(s); if (!temRegra(r)) return `<span class="st livre">🔓 Livre</span>`;
-      const quem = (r.permitidos || []).length; return `<span class="st ${r.restrita ? "rest" : "senha"}">${r.restrita ? `🔒 Restrita · ${quem} pessoa${quem === 1 ? "" : "s"}` : ""}${r.restrita && r.tem_senha ? " + " : ""}${r.tem_senha ? "🔑 Senha" : ""}</span>`; };
+    const estado = s => { const r = regraDe(s); const pal = r && r.palestrante ? `<span class="st senha">🎤 ${esc(nomeDe(r.palestrante))}</span>` : "";
+      if (!temRegra(r)) return pal || `<span class="st livre">🔓 Livre</span>`;
+      const quem = (r.permitidos || []).length; return `<span class="st ${r.restrita ? "rest" : "senha"}">${r.restrita ? `🔒 Restrita · ${quem} pessoa${quem === 1 ? "" : "s"}` : ""}${r.restrita && r.tem_senha ? " + " : ""}${r.tem_senha ? "🔑 Senha" : ""}</span>${pal}`; };
     corpo.innerHTML = `
       <div class="acc-sec">Salas <small>(admin entra em todas)</small></div>
       ${salas.map(s => editando === s.id ? formSala(s) : `<div class="acc-sala"><b>${esc(s.name)}</b><small>${esc((TYPES[s.type] || {}).label || s.type)}</small>${estado(s)}<button class="btn" data-editar="${esc(s.id)}">Editar</button></div>`).join("")}
@@ -95,6 +101,9 @@ window.Acesso = (function () {
       <input type="password" name="senha" placeholder="${r.tem_senha ? "Nova senha (deixe vazio para manter)" : "Definir senha (opcional)"}" autocomplete="new-password">
       ${r.tem_senha ? `<label class="ck"><input type="checkbox" name="tirar"> Remover a senha</label>` : ""}
       <div class="acc-mut">Com senha, quem souber a senha também entra. Pessoas marcadas entram sem senha.</div>
+      ${s.type === "auditorio" ? `<div class="acc-sec2">🎤 Priorizar palestrante</div>
+        <select name="palestrante" class="acc-sel"><option value="">Qualquer pessoa que subir no palco</option>${usuarios.map(u => `<option value="${esc(u.id)}" ${r.palestrante === u.id ? "selected" : ""}>Só ${esc(u.nome)}</option>`).join("")}</select>
+        <div class="acc-mut">Com um palestrante definido, outras pessoas podem subir no palco, mas não compartilham a tela nem controlam os microfones.</div>` : ""}
       <div class="acc-row"><button type="button" class="btn" data-cancelar>Cancelar</button><button class="btn pri">Salvar</button></div></form>`;
   }
   async function aoClicarAdmin(e) {
@@ -107,7 +116,7 @@ window.Acesso = (function () {
     e.preventDefault();
     const fd = new FormData(f), senha = fd.get("senha") || "", tirar = !!fd.get("tirar");
     try {
-      await Dados.definirRegraSala({ mapaId: opt.mapaId, salaId: f.dataset.sala, restrita: !!fd.get("restrita"), permitidos: fd.getAll("p"), senha: tirar ? "" : senha, trocarSenha: tirar || !!senha });
+      await Dados.definirRegraSala({ mapaId: opt.mapaId, salaId: f.dataset.sala, restrita: !!fd.get("restrita"), permitidos: fd.getAll("p"), senha: tirar ? "" : senha, trocarSenha: tirar || !!senha, palestrante: fd.get("palestrante") || null });
       await recarregar(); renderAdmin(); opt.toast("Regras da sala salvas");
     } catch (err) { opt.toast("Não foi possível salvar: " + (err.message || err)); }
   });
@@ -118,5 +127,5 @@ window.Acesso = (function () {
   });
 
   function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); }
-  return { iniciar, podeEntrar, tentou, selo, abrirAdmin, recarregar, get aberto() { return !!modal; } };
+  return { iniciar, podeEntrar, tentou, selo, abrirAdmin, recarregar, palestranteDe, podePalestrar, nomeDe, get aberto() { return !!modal; } };
 })();

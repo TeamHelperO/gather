@@ -109,12 +109,15 @@ window.Telao = (function () {
   let estado = null;
   function abrir(opts) {
     injetarCSS();
-    estado = { email: opts.email, cheia: !!opts.telaCheia, aoFechar: opts.aoFechar, filtro: "todas", tarefas: [], usuarios: [], nome: opts.nome || "" };
+    // cada sala tem o seu telão: só as tarefas daquela sala (sem sala = sala padrão, a Área de trabalho)
+    estado = { email: opts.email, cheia: !!opts.telaCheia, aoFechar: opts.aoFechar, filtro: "todas", tarefas: [], usuarios: [], nome: opts.nome || "",
+      sala: opts.sala || null, nomeSala: opts.nomeSala || "", salaPadrao: opts.salaPadrao || null };
+    const tvURL = "telao.html" + (estado.sala ? `?sala=${encodeURIComponent(estado.sala)}&nome=${encodeURIComponent(estado.nomeSala)}&padrao=${encodeURIComponent(estado.salaPadrao || "")}` : "");
     const raiz = document.createElement("div"); raiz.className = "tl" + (estado.cheia ? " cheia" : "");
     raiz.innerHTML = `<div class="tl-box">
-      <div class="tl-head"><h2>📊 TELÃO DA EQUIPE</h2><div class="tl-sum" id="tlSum"></div><div class="tl-sp"></div>
+      <div class="tl-head"><h2>📊 ${estado.nomeSala ? "TELÃO · " + esc(estado.nomeSala).toUpperCase() : "TELÃO DA EQUIPE"}</h2><div class="tl-sum" id="tlSum"></div><div class="tl-sp"></div>
         <button class="tl-btn w" data-nova>+ Nova tarefa</button>
-        ${estado.cheia ? `<a class="tl-btn g" href="escritorio.html" style="text-decoration:none">← Escritório</a>` : `<a class="tl-btn g" href="telao.html" target="_blank" rel="noopener" style="text-decoration:none" title="Abrir em tela cheia (TV)">⛶</a><button class="tl-btn x" data-fechar aria-label="Fechar">×</button>`}
+        ${estado.cheia ? `<a class="tl-btn g" href="escritorio.html" style="text-decoration:none">← Escritório</a>` : `<a class="tl-btn g" href="${tvURL}" target="_blank" rel="noopener" style="text-decoration:none" title="Abrir em tela cheia (TV)">⛶</a><button class="tl-btn x" data-fechar aria-label="Fechar">×</button>`}
       </div>
       <div class="tl-fil" id="tlFil"></div>
       <div class="tl-board" id="tlBoard"></div>
@@ -138,7 +141,7 @@ window.Telao = (function () {
   }
   async function recarregar() {
     if (!estado) return; estado.pendente = false;
-    estado.tarefas = await Dados.listarTarefas();
+    estado.tarefas = filtrarSala(await Dados.listarTarefas(), estado.sala, estado.salaPadrao);
     if (!estado) return;
     estado.usuarios = await Dados.listarUsuarios();
     desenhar();
@@ -186,7 +189,7 @@ window.Telao = (function () {
   /* ---------- formulário ---------- */
   function editar(t, status) {
     const novo = !t;
-    const d = t ? JSON.parse(JSON.stringify(t)) : { titulo: "", descricao: "", responsavel: "", prazo: "", status: status || "a_fazer", etapas: [], progressoManual: 0 };
+    const d = t ? JSON.parse(JSON.stringify(t)) : { titulo: "", descricao: "", responsavel: "", prazo: "", status: status || "a_fazer", etapas: [], progressoManual: 0, sala: estado.sala || null };
     d.etapas = d.etapas || [];
     const m = estado.raiz.querySelector("#tlModal");
     const opts = estado.usuarios.map(u => `<option value="${esc(u.email)}">${esc(u.nome)}</option>`).join("");
@@ -304,14 +307,17 @@ window.Telao = (function () {
   }
 
   /* ---------- tela do telão no mapa (dados reais) ---------- */
-  function desenharTela(g, x, y, tarefas) {
+  /* tarefas de uma sala (as que não têm sala ficam na sala padrão) */
+  function filtrarSala(lista, sala, padrao) { if (!sala) return lista; return lista.filter(t => (t.sala || padrao || null) === sala); }
+  function desenharTela(g, x, y, tarefas, titulo) {
     // área da tela do sprite M38 (192x96): x 6..185, y 6..82
     g.save();
     g.fillStyle = "#121a2b"; g.fillRect(x + 6, y + 6, 180, 77);
     g.fillStyle = "#3d5afe"; g.fillRect(x + 6, y + 6, 180, 9);
     g.fillStyle = "#ffffff"; g.font = "bold 7px system-ui,sans-serif"; g.textBaseline = "middle";
     const sm = resumo(tarefas);
-    g.fillText("TELÃO DA EQUIPE", x + 10, y + 10.5);
+    let tt0 = titulo || "TELÃO DA EQUIPE"; while (g.measureText(tt0).width > 140 && tt0.length > 4) tt0 = tt0.slice(0, -2); if (tt0 !== (titulo || "TELÃO DA EQUIPE")) tt0 += "…";
+    g.fillText(tt0, x + 10, y + 10.5);
     g.textAlign = "right"; g.fillText(sm.total ? sm.media + "%" : "", x + 182, y + 10.5); g.textAlign = "left";
     const ativos = tarefas.filter(t => t.status !== "feito").sort((a, b) => nivel(b) - nivel(a) || progresso(b) - progresso(a)).slice(0, 5);
     if (!ativos.length) {
@@ -331,5 +337,5 @@ window.Telao = (function () {
     g.restore();
   }
 
-  return { abrir, fechar, progresso, nivel, resumo, desenharTela, get aberto() { return !!estado; } };
+  return { abrir, fechar, progresso, nivel, resumo, desenharTela, filtrarSala, get aberto() { return !!estado; } };
 })();

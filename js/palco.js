@@ -14,13 +14,15 @@ window.Palco = (function () {
   const eu = () => opt.eu();
   const salaAud = a => { const r = roomAt(a.px, a.py - 4); return r && r.type === "auditorio" ? r : null; };
   const noPalco = a => Projecao.salaNoPalco(a);
+  // palco que a pessoa pode usar (com palestrante fixo, só ele)
+  const palcoUsavel = a => { const p = noPalco(a); return p && Acesso.podePalestrar(a, p.id) ? p : null; };
 
   /* palestrante que manda na sala (o que mexeu por último, entre quem está no palco agora) */
   function moderador(sala) {
     let m = null;
     for (const o of opt.outros()) {
       if (!o.visto || !o.mod || o.mod.sala !== sala.id) continue;
-      const p = noPalco(o); if (!p || p.id !== sala.id) continue;
+      const p = palcoUsavel(o); if (!p || p.id !== sala.id) continue;
       if (!m || (o.mod.t || 0) > (m.mod.t || 0)) m = o;
     }
     return m;
@@ -28,7 +30,7 @@ window.Palco = (function () {
 
   function atualizar() {
     if (!opt) return;
-    const e = eu(), palco = noPalco(e), aud = salaAud(e);
+    const e = eu(), palco = palcoUsavel(e), aud = salaAud(e);
     // --- palestrante ---
     if (palco && palco.type === "auditorio") {
       if (!mod || mod.sala !== palco.id) mod = { sala: palco.id, mudo: false, libera: [], cala: [], atendidos: {}, t: 0 };
@@ -59,10 +61,10 @@ window.Palco = (function () {
 
   /* ---------------- ações ---------------- */
   function levantarMao() {
-    const e = eu(); if (!salaAud(e) || noPalco(e)) { opt.toast("Levantar a mão funciona na plateia do auditório"); return; }
+    const e = eu(); if (!salaAud(e) || palcoUsavel(e)) { opt.toast("Levantar a mão funciona na plateia do auditório"); return; }
     maoT = maoT ? null : Date.now();
     opt.toast(maoT ? "✋ Mão levantada: o palestrante vai ver seu pedido" : "Mão abaixada");
-    atualizarBotoes(e, noPalco(e), salaAud(e));
+    atualizarBotoes(e, palcoUsavel(e), salaAud(e));
   }
   const mexe = fn => { if (!mod) return; fn(mod); mod.t = Date.now(); renderPainel(); };
   function mutarTodos() { mexe(m => { m.mudo = true; m.libera = []; m.cala = []; }); opt.toast("🔇 Plateia mutada"); }
@@ -78,7 +80,7 @@ window.Palco = (function () {
   /* ---------------- interface ---------------- */
   function plateia() { // quem está no auditório (fora do palco)
     if (!mod) return [];
-    return opt.outros().filter(o => o.visto && (() => { const a = salaAud(o); return a && a.id === mod.sala && !noPalco(o); })());
+    return opt.outros().filter(o => o.visto && (() => { const a = salaAud(o); return a && a.id === mod.sala && !palcoUsavel(o); })());
   }
   function fila() { // mãos levantadas, em ordem de pedido (quem já foi atendido depois de pedir sai)
     return plateia().filter(o => o.mao && !(mod.atendidos[o.id] >= o.mao)).sort((a, b) => a.mao - b.mao);

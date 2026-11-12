@@ -37,7 +37,7 @@
   }
   const paraUsuario = (p) => p && ({ id: p.id, email: p.email, nome: p.nome, papel: p.papel || "usuario", avatar: p.avatar, posicao: p.posicao, prefs: p.prefs || {}, criadoEm: p.criado_em, ultimoAcesso: p.ultimo_acesso });
   const paraTarefa = (r) => ({ id: r.id, titulo: r.titulo, descricao: r.descricao || "", responsavel: r.responsavel || "", prazo: r.prazo || "", status: r.status,
-    etapas: r.etapas || [], progressoManual: r.progresso_manual ?? 0, ordem: r.ordem, historico: r.historico || [], criadoPor: r.criado_por, criadoEm: r.criado_em, atualizadoEm: r.atualizado_em });
+    etapas: r.etapas || [], progressoManual: r.progresso_manual ?? 0, ordem: r.ordem, sala: r.sala ?? null, historico: r.historico || [], criadoPor: r.criado_por, criadoEm: r.criado_em, atualizadoEm: r.atualizado_em });
   const daTarefa = (t) => ({ id: t.id, titulo: t.titulo, descricao: t.descricao || null, responsavel: t.responsavel || null, prazo: t.prazo || null, status: t.status || "a_fazer",
     etapas: t.etapas || [], progresso_manual: t.etapas && t.etapas.length ? null : (+t.progressoManual || 0), ordem: t.ordem ?? 0, historico: t.historico || [], atualizado_em: agora() });
 
@@ -145,7 +145,9 @@
       const t = { ...tarefa, id: tarefa.id || "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) };
       t.historico = (t.historico || []).concat([{ quando: agora(), email: this.sessao(), acao: acao || (nova ? "criou" : "editou") }]).slice(-50);
       const linha = daTarefa(t); if (nova) linha.criado_por = usuarioAuth.id;
-      const { data, error } = await sb.from("tarefas").upsert(linha).select().single();
+      if (t.sala !== undefined) linha.sala = t.sala || null;
+      let { data, error } = await sb.from("tarefas").upsert(linha).select().single();
+      if (error && /sala/.test(error.message || "")) { delete linha.sala; ({ data, error } = await sb.from("tarefas").upsert(linha).select().single()); } // banco ainda sem a coluna
       if (error) throw error;
       await this.registrarAtividade(null, "tarefa", `${acao || (nova ? "Criou a tarefa" : "Editou a tarefa")}: ${t.titulo}`, { tarefa: t.id });
       return paraTarefa(data);
@@ -164,8 +166,10 @@
     /* ---------- regras de acesso das salas (só admin altera) ---------- */
     async listarRegras(mapaId = "principal") { const { data } = await sb.from("regras_salas").select("*").eq("mapa_id", mapaId); return data || []; },
     ouvirRegras(cb) { return sb.channel("regras-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "regras_salas" }, () => cb()).subscribe(); },
-    async definirRegraSala({ mapaId = "principal", salaId, restrita, permitidos, senha, trocarSenha }) {
-      const { error } = await sb.rpc("definir_regra_sala", { p_mapa: mapaId, p_sala: salaId, p_restrita: !!restrita, p_permitidos: permitidos || [], p_senha: senha || null, p_trocar_senha: !!trocarSenha });
+    async definirRegraSala({ mapaId = "principal", salaId, restrita, permitidos, senha, trocarSenha, palestrante }) {
+      const args = { p_mapa: mapaId, p_sala: salaId, p_restrita: !!restrita, p_permitidos: permitidos || [], p_senha: senha || null, p_trocar_senha: !!trocarSenha, p_palestrante: palestrante || null };
+      let { error } = await sb.rpc("definir_regra_sala", args);
+      if (error && !palestrante && /function|schema cache/i.test(error.message || "")) { delete args.p_palestrante; ({ error } = await sb.rpc("definir_regra_sala", args)); }
       if (error) throw error;
       await this.registrarAtividade(null, "admin", `Mudou as regras de acesso de uma sala`, { sala: salaId });
     },

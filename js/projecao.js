@@ -52,9 +52,10 @@ window.Projecao = (function () {
     return r && salasComTelao().has(r.id) ? r : null;
   }
   // chave da transmissão: id da sala (telão do auditório) ou "mesa:<id da pessoa>" (tela do computador da mesa)
+  const podePalestrar = (a, salaId) => !window.Acesso || Acesso.podePalestrar(a, salaId);
   const apresentador = chave => (String(chave).startsWith("mesa:")
     ? opt.outros().find(o => o.visto && o.id === chave.slice(5) && o.tela)
-    : opt.outros().find(o => o.visto && o.proj === chave)) || null;
+    : opt.outros().find(o => o.visto && o.proj === chave && podePalestrar(o, chave))) || null;
   const naMesa = a => !!(a && a.assento && a.assento.trabalho);
   const ice = () => (window.Voz && Voz.iceServers) || CONFIG.ICE || [];
   const podeCompartilhar = () => !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
@@ -63,11 +64,21 @@ window.Projecao = (function () {
   async function compartilhar() {
     const eu = opt.eu(), r = salaNoPalco(eu), mesa = !r && naMesa(eu);
     if (!r && !mesa) { opt.toast("Suba no palco do auditório, ou sente numa mesa de trabalho, para compartilhar a tela"); return; }
+    if (r && !podePalestrar(eu, r.id)) { opt.toast(`🎤 Só ${Acesso.nomeDe(Acesso.palestranteDe(r.id))} pode apresentar neste auditório`); return; }
     const outro = r && apresentador(r.id);
     if (outro) { opt.toast(`${outro.nome} já está apresentando`); return; }
     if (!podeCompartilhar()) { opt.toast("Compartilhar tela só funciona no computador (Chrome, Edge, Firefox ou Safari)"); return; }
     let stream;
-    try { stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 15, max: 30 } }, audio: true }); }
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 15, max: 30 } },
+        // só o som do que roda no computador: sem microfone e sem o áudio desta página (as vozes da chamada), para não dar eco
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false, restrictOwnAudio: true },
+        systemAudio: "include", selfBrowserSurface: "exclude", surfaceSwitching: "include", monitorTypeSurfaces: "include",
+      });
+      // garante que nenhuma faixa de microfone entre na transmissão
+      for (const t of stream.getAudioTracks()) if (/microfone|microphone|mic\b/i.test(t.label || "")) { stream.removeTrack(t); t.stop(); }
+    }
     catch (e) { if (e && e.name !== "NotAllowedError") opt.toast("Não foi possível compartilhar a tela"); return; }
     const v = stream.getVideoTracks()[0];
     if (v && "contentHint" in v) v.contentHint = "detail";
@@ -199,6 +210,7 @@ window.Projecao = (function () {
     let mostra = false, txt = "", ativo = true;
     if (share) { mostra = true; txt = share.tipo === "mesa" ? `⏹ Fechar minha tela${share.viewers.size ? ` (${share.viewers.size} vendo)` : ""}` : `⏹ Parar de compartilhar${share.viewers.size ? ` (${share.viewers.size} vendo)` : ""}`; }
     else if (!r && naMesa(eu)) { mostra = true; txt = podeCompartilhar() ? "🖥️ Deixar colegas verem minha tela" : "🖥️ Mostrar tela (só no computador)"; }
+    else if (r && !podePalestrar(eu, r.id)) { mostra = true; txt = `🎤 Palestrante: ${Acesso.nomeDe(Acesso.palestranteDe(r.id))}`; ativo = false; }
     else if (r) {
       mostra = true;
       const ap = apresentador(r.id);
