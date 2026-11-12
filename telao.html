@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Telão da equipe – Next Co.</title>
+<link rel="stylesheet" href="css/base.css">
+<style>body{background:#121a2b}</style>
+</head>
+<body>
+<script src="js/dados.js"></script>
+<script src="js/telao.js"></script>
+<script>
+const EMAIL = Dados.exigirSessao("index.html");
+if (EMAIL) Dados.getUsuario(EMAIL).then(u => Telao.abrir({ email: EMAIL, nome: u.nome, telaCheia: true }));
+</script>
+</body>
+</html>

@@ -47,6 +47,7 @@ html,body{height:100%;overflow:hidden}
 <div class="emotes pill">
   <button data-emote="5">👋 Acenar</button><button data-emote="6">💃 Dançar</button><button data-emote="4">🪑 Sentar/levantar</button>
 </div>
+<button class="pill" id="btnTelao" style="display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:70px;z-index:12;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe">📊 Abrir telão</button>
 <div id="hint">Setas/WASD ou clique para andar · pare perto de uma cadeira para sentar</div>
 <div id="joy"><div id="knob"></div></div>
 <aside id="menu" class="sheet hidden"></aside>
@@ -57,14 +58,15 @@ html,body{height:100%;overflow:hidden}
 <script src="js/mapa-core.js"></script>
 <script src="js/avatar.js"></script>
 <script src="js/vida.js"></script>
+<script src="js/telao.js"></script>
 <script>
 const EMAIL = Dados.exigirSessao("index.html");
-window.OCULTAR_PESSOAS = true; // no escritório só aparecem pessoas de verdade (e os colegas de teste)
+window.OCULTAR_PESSOAS = true; // no escritório só aparecem pessoas de verdade
 let S = null, grid = null, user = null, assentos = [];
 const mapaId = Dados.mapaAtualId();
 const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
 let DPR = 1, VW = 0, VH = 0, zoom = innerWidth <= 760 ? 1.6 : 2;
-let P = null; const bots = []; let comBots = true;
+let P = null, tarefas = [], teloes = []; const outros = []; // outras pessoas (entram aqui quando houver modo com várias pessoas)
 const keys = new Set(); let joyV = null;
 
 function resize(){ DPR = Math.min(devicePixelRatio || 1, 2); VW = innerWidth; VH = innerHeight; cv.width = VW*DPR; cv.height = VH*DPR; }
@@ -81,31 +83,25 @@ async function boot(){
   S = Dados.lerMapaLocal(mapaId) || templateNext();
   grid = buildBlocked();
   assentos = construirAssentos();
+  teloes = allItems().filter(i => i.k === "telao");
+  await atualizarTarefas(); setInterval(atualizarTarefas, 10000);
   const sheet = await Avatar.montar(user.avatar);
   P = new Ator({ id: "eu", nome: user.nome, sheet, x: 0, y: 0 });
   const m = document.getElementById("mini").getContext("2d"); m.imageSmoothingEnabled = false; m.drawImage(sheet, 8, 4, 16, 16, 0, 0, 32, 32);
   spawn();
-  comBots = Dados.getPref(EMAIL, "colegasTeste", true);
-  if (comBots) await criarBots();
   document.getElementById("load").remove();
   if (matchMedia("(pointer:coarse)").matches) { document.getElementById("joy").style.display = "block"; document.getElementById("hint").textContent = "Use o controle ou toque no chão para andar"; }
   setTimeout(() => document.getElementById("hint").style.opacity = 0, 8000);
   checarSala(true);
   last = performance.now(); requestAnimationFrame(loop);
 }
-function carregarImg(src){ return new Promise((ok, err) => { const im = new Image(); im.onload = () => ok(im); im.onerror = err; im.src = src; }); }
-async function criarBots(){
-  const n = Math.min(6, NOMES_BOTS.length);
-  for (let i = 0; i < n; i++){
-    const sheet = await carregarImg(`assets/npcs/npc${i+1}.png`);
-    const p = pontoLivreAleatorio(grid) || [P.x, P.y];
-    const b = new Ator({ id: "bot" + i, nome: NOMES_BOTS[i], sheet, x: p[0], y: p[1], bot: true, timer: Math.random()*3, ficaConversa: 0 });
-    const livres = assentos.filter(s => s.trabalho && !s.ocupante);
-    if (i < 3 && livres.length){ const s = livres[Math.floor(Math.random()*livres.length)]; b.x = s.sx; b.y = s.sy + 10; b.sentar(s); b.volta = {x: s.sx, y: s.sy + 22}; b.timer = 10 + Math.random()*30; }
-    bots.push(b);
-  }
+async function atualizarTarefas(){ tarefas = await Dados.listarTarefas(); }
+function abrirTelao(){
+  if (Telao.aberto) return; keys.clear(); joyV = null; if (P) P.path = null;
+  Dados.registrarAtividade(EMAIL, "telao", "Abriu o telão da equipe");
+  Telao.abrir({ email: EMAIL, nome: user.nome, aoFechar: atualizarTarefas });
 }
-function removerBots(){ for (const b of bots) b.levantar(); bots.length = 0; }
+document.getElementById("btnTelao").onclick = abrirTelao;
 function livre(x, y){ // caixa dos pés (12x6 px) livre?
   for (const [dx, dy] of [[-6,-3],[6,-3],[-6,3],[6,3]]) if (grid.blocked(Math.floor((x+dx)/C16), Math.floor((y+dy)/C16))) return false;
   return x > 8 && y > 8 && x < S.w*T-8 && y < S.h*T-8;
@@ -124,7 +120,7 @@ function spawn(){
 
 /* ---------- entrada ---------- */
 const DIRKEYS = {ArrowUp:[0,-1],w:[0,-1],W:[0,-1],ArrowDown:[0,1],s:[0,1],S:[0,1],ArrowLeft:[-1,0],a:[-1,0],A:[-1,0],ArrowRight:[1,0],d:[1,0],D:[1,0]};
-addEventListener("keydown", e => { if (e.target.matches("input,select,textarea")) return; if (DIRKEYS[e.key]) { keys.add(e.key); if (P) { P.path = null; P.emote = null; } e.preventDefault(); }
+addEventListener("keydown", e => { if (e.target.matches("input,select,textarea") || Telao.aberto) return; if (DIRKEYS[e.key]) { keys.add(e.key); if (P) { P.path = null; P.emote = null; } e.preventDefault(); }
   if (e.key === "1") emote(5); if (e.key === "2") emote(6); if (e.key === "3") sentarPerto(); });
 addEventListener("keyup", e => keys.delete(e.key));
 addEventListener("blur", () => keys.clear());
@@ -143,6 +139,7 @@ const up = e => {
   if (pularUp > 0){ pularUp--; return; }
   if (!had || !grid || !P) return;
   const [wx, wy] = toWorld(e.clientX, e.clientY);
+  for (const it of teloes){ if (wx >= it.x*T && wx <= it.x*T + 192 && wy >= it.y*T && wy <= it.y*T + 90){ abrirTelao(); return; } }
   // clicou num assento? vai até ele e senta
   let alvo = null, bd = 1e9;
   for (const s of assentos){ if (s.ocupante && s.ocupante !== P) continue; const d = Math.hypot(s.sx - wx, s.sy - 4 - wy); if (d < 18 && d < bd){ bd = d; alvo = s; } }
@@ -206,18 +203,14 @@ function loop(now){
       Dados.registrarAtividade(EMAIL, "acao", s.trabalho ? `Sentou para trabalhar${P.sala ? " em " + P.sala : ""}` : `Sentou${s.sala ? " em " + s.sala : ""}`, {sala: s.sala});
     }
   }
-  // colegas
-  for (const b of bots){
-    pensarBot(b, grid, assentos, P, bots, dt);
-    const [bx, by] = b.assento ? [0, 0] : seguirCaminho(b);
-    if (!b.assento) moverAtor(b, dt, bx, by, null, 70); else b.moving = false;
-  }
-  atualizarConversas([P, ...bots], dt, (a, o) => {
+  atualizarConversas([P, ...outros], dt, (a, o) => {
     if (a !== P) return;
     const agora = Date.now(); if (conversasLog[o.nome] && agora - conversasLog[o.nome] < 60000) return;
     conversasLog[o.nome] = agora;
     Dados.registrarAtividade(EMAIL, "conversa", `Conversou com ${o.nome}${P.sala ? " em " + P.sala : ""}`, {sala: P.sala, com: o.nome});
   });
+  const perto = teloes.some(it => Math.hypot(it.x*T + 96 - P.px, it.y*T + 96 - P.py) < 120);
+  const bt = document.getElementById("btnTelao"); const mostra = perto && !Telao.aberto ? "block" : "none"; if (bt.style.display !== mostra) bt.style.display = mostra;
   checarSala(false);
   if (sujo && now - ultimoSave > 4000){ salvarPos(); ultimoSave = now; }
   if (marca){ marca.t -= dt*1.5; if (marca.t <= 0) marca = null; }
@@ -244,10 +237,10 @@ function cam(){
 }
 function draw(){
   ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle = "#16141f"; ctx.fillRect(0, 0, cv.width, cv.height);
-  const c = cam(), atores = [P, ...bots];
+  const c = cam(), atores = [P, ...outros];
   ctx.imageSmoothingEnabled = false;
   ctx.setTransform(zoom*DPR, 0, 0, zoom*DPR, c.ox*DPR, c.oy*DPR);
-  drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })));
+  drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => Telao.desenharTela(g, it.x*T, it.y*T, tarefas) }))));
   for (const a of atores) a.balao(ctx, t);
   if (marca){ ctx.strokeStyle = `rgba(61,90,254,${marca.t})`; ctx.lineWidth = 2/zoom*1.5; ctx.beginPath(); ctx.ellipse(marca.x, marca.y, 10*(1.6-marca.t*.6), 5*(1.6-marca.t*.6), 0, 0, Math.PI*2); ctx.stroke(); }
   // nomes (tela)
@@ -255,8 +248,8 @@ function draw(){
   for (const a of atores){
     const sx = a.px*zoom + c.ox, top = a.assento ? a.assento.sy - 40 : a.y - 45, sy = (top - 2)*zoom + c.oy;
     if (sx < -60 || sx > VW + 60 || sy < -40 || sy > VH + 40) continue;
-    const txt = a.bot ? a.nome + " · teste" : a.nome;
-    ctx.font = a.bot ? "600 11px system-ui,sans-serif" : "700 12px system-ui,sans-serif"; const w = ctx.measureText(txt).width + 12;
+    const txt = a.nome;
+    ctx.font = "700 12px system-ui,sans-serif"; const w = ctx.measureText(txt).width + 12;
     ctx.fillStyle = a === P ? "rgba(61,90,254,.92)" : "rgba(20,16,32,.72)"; ctx.beginPath(); ctx.roundRect(sx - w/2, sy - 19, w, 17, 6); ctx.fill();
     ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(txt, sx, sy - 10.5); ctx.textAlign = "left";
   }
@@ -267,22 +260,22 @@ const menu = document.getElementById("menu");
 document.getElementById("eu").onclick = async () => {
   if (!menu.classList.contains("hidden")) { menu.classList.add("hidden"); return; }
   const acts = await Dados.listarAtividades(EMAIL, 40);
-  const ico = {cadastro:"✨", entrou:"🚪", saiu:"👋", avatar:"🧍", sala:"📍", acao:"🎉", editor:"🛠️", conversa:"💬"};
+  const ico = {cadastro:"✨", entrou:"🚪", saiu:"👋", avatar:"🧍", sala:"📍", acao:"🎉", editor:"🛠️", conversa:"💬", tarefa:"✅", telao:"📊"};
   menu.innerHTML = `<h3>${esc(user.nome)} <button class="x" data-close aria-label="Fechar">×</button></h3>
     <div style="color:var(--mut);font-size:13px;margin:-6px 0 8px">${esc(user.email)}</div>
     <a class="mi" href="avatar.html">🧍 Editar meu personagem</a>
+    <button class="mi" data-telao>📊 Telão da equipe</button>
     <a class="mi" href="editor.html">🛠️ Editor de salas</a>
-    <label class="mi" style="cursor:pointer"><input type="checkbox" id="optBots" ${comBots ? "checked" : ""} style="width:18px;height:18px;accent-color:var(--brand)"> Mostrar colegas de teste</label>
     <button class="mi" data-exp>💾 Baixar meus dados (JSON)</button>
     <button class="mi" data-sair>🚪 Sair</button>
     <div class="sep"></div>
     <div style="font-weight:700;margin:8px 0 4px">O que eu fiz</div>
     ${acts.map(a => `<div class="act"><div class="ico">${ico[a.tipo]||"•"}</div><div><b>${esc(a.detalhe||a.tipo)}</b><small>${new Date(a.quando).toLocaleString("pt-BR")}</small></div></div>`).join("") || `<p style="color:var(--mut)">Nada ainda.</p>`}`;
-  menu.querySelector("#optBots").onchange = async e => { comBots = e.target.checked; await Dados.setPref(EMAIL, "colegasTeste", comBots); if (comBots) await criarBots(); else removerBots(); };
   menu.classList.remove("hidden");
 };
 menu.onclick = async e => {
   if (e.target.closest("[data-close]")) menu.classList.add("hidden");
+  if (e.target.closest("[data-telao]")) { menu.classList.add("hidden"); abrirTelao(); }
   if (e.target.closest("[data-sair]")) { salvarPos(); await Dados.sair(); location.href = "index.html"; }
   if (e.target.closest("[data-exp]")) {
     const dados = { usuario: await Dados.getUsuario(EMAIL), atividades: await Dados.listarAtividades(EMAIL, 1000) };

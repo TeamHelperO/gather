@@ -39,3 +39,33 @@ create table mapas (
   atualizado_em   timestamptz not null default now(),
   atualizado_por  text references usuarios(email)
 );
+
+create table tarefas (
+  id               text primary key,
+  titulo           text not null,
+  descricao        text,
+  responsavel      text,                              -- e-mail de um usuário ou nome livre
+  prazo            date,
+  status           text not null default 'a_fazer',   -- a_fazer, andamento, bloqueado, feito
+  progresso_manual smallint,                          -- usado quando a tarefa não tem etapas
+  ordem            integer not null default 0,        -- posição dentro da coluna do telão
+  criado_por       text references usuarios(email),
+  criado_em        timestamptz not null default now(),
+  atualizado_em    timestamptz not null default now()
+);
+
+create table tarefa_etapas (
+  id         text primary key,
+  tarefa_id  text not null references tarefas(id) on delete cascade,
+  texto      text not null,
+  feito      boolean not null default false,
+  ordem      integer not null default 0
+);
+
+create table tarefa_historico (
+  id         bigserial primary key,
+  tarefa_id  text not null references tarefas(id) on delete cascade,
+  email      text references usuarios(email),
+  acao       text not null,
+  quando     timestamptz not null default now()
+);

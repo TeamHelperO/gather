@@ -16,6 +16,8 @@
                                 posicao: { mapa, x, y, direcao } } },
      atividades: { "<email>": [ { tipo, detalhe, sala, quando } ] },
      mapas:      { "<id>": { name, w, h, rooms:[...], items:[...], updatedAt, atualizadoPor } },
+     tarefas:    { "<id>": { id, titulo, descricao, responsavel, prazo, status, etapas:[{id,texto,feito}],
+                             progressoManual, ordem, criadoPor, criadoEm, atualizadoEm, historico:[...] } },
      mapaAtual:  "principal"
    }
    ============================================================ */
@@ -31,7 +33,7 @@
         const bruto = localStorage.getItem(CHAVE);
         if (bruto) return JSON.parse(bruto);
       } catch (e) {}
-      return migrarAntigo({ versao: 1, usuarios: {}, atividades: {}, mapas: {}, mapaAtual: "principal" });
+      return migrarAntigo({ versao: 1, usuarios: {}, atividades: {}, mapas: {}, tarefas: {}, mapaAtual: "principal" });
     },
     gravar(db) {
       try { localStorage.setItem(CHAVE, JSON.stringify(db)); return true; }
@@ -134,6 +136,30 @@
     },
     async getMapa(id) { return this.lerMapaLocal(id || this.mapaAtualId()); },
     async listarMapas() { const m = armazenamento.ler().mapas; return Object.keys(m).map(id => ({ id, name: m[id].name, updatedAt: m[id].updatedAt })); },
+
+    /* ---- tarefas do telão (compartilhadas pela equipe) ---- */
+    async listarTarefas() { const t = armazenamento.ler().tarefas || {}; return Object.values(t).sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0)); },
+    async salvarTarefa(tarefa, email, acao) {
+      const db = armazenamento.ler(); db.tarefas = db.tarefas || {};
+      const nova = !tarefa.id || !db.tarefas[tarefa.id];
+      const t = { ...tarefa, id: tarefa.id || "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        atualizadoEm: agora(), criadoEm: tarefa.criadoEm || agora(), criadoPor: tarefa.criadoPor || email || null };
+      t.historico = (t.historico || []).concat([{ quando: agora(), email: email || null, acao: acao || (nova ? "criou" : "editou") }]).slice(-50);
+      db.tarefas[t.id] = t; armazenamento.gravar(db);
+      if (email) await this.registrarAtividade(email, "tarefa", `${acao || (nova ? "Criou a tarefa" : "Editou a tarefa")}: ${t.titulo}`, { tarefa: t.id });
+      return t;
+    },
+    async salvarOrdem(lista) { // [{id, status, ordem}]
+      const db = armazenamento.ler(); db.tarefas = db.tarefas || {};
+      for (const o of lista) if (db.tarefas[o.id]) { db.tarefas[o.id].status = o.status; db.tarefas[o.id].ordem = o.ordem; }
+      return armazenamento.gravar(db);
+    },
+    async excluirTarefa(id, email) {
+      const db = armazenamento.ler(); const t = db.tarefas && db.tarefas[id]; if (!t) return false;
+      delete db.tarefas[id]; armazenamento.gravar(db);
+      if (email) await this.registrarAtividade(email, "tarefa", `Excluiu a tarefa: ${t.titulo}`);
+      return true;
+    },
 
     /* ---- backup / migração para o banco ---- */
     async exportarTudo() { return JSON.stringify(armazenamento.ler(), null, 2); },

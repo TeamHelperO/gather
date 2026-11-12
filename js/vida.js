@@ -108,46 +108,6 @@ function atualizarConversas(atores, dt, aoComecar){
     const turno = Math.floor((a.falaT + (a.id < a.conversa.id ? 0 : 1.6)) / 1.6) % 2; a.falando = turno === 0; }
 }
 
-/* ---------- colegas de teste (bots) ---------- */
-const NOMES_BOTS = ["Bruno", "Ana", "Carla", "Eva", "Diego", "Gabi", "Júlia", "Hugo"]; // na ordem de assets/npcs/npc1..8.png
-function pontoLivreAleatorio(grid){
-  for (let k = 0; k < 200; k++){
-    const r = S.rooms[Math.floor(Math.random()*S.rooms.length)]; if (!r) break;
-    const x = (r.x + 0.5 + Math.random()*(r.w - 1))*T, y = (r.y + 0.5 + Math.random()*(r.h - 1))*T;
-    if (!grid.blocked(Math.floor(x/C16), Math.floor(y/C16))) return [x, y];
-  }
-  return null;
-}
-function irPara(a, grid, x, y){
-  const p = findPath(grid, Math.floor(a.x/C16), Math.floor(a.y/C16), Math.floor(x/C16), Math.floor(y/C16));
-  a.path = p && p.length ? p : null; return !!a.path;
-}
-function pensarBot(a, grid, assentos, jogador, bots, dt){
-  // para quando você chega perto e fica parado
-  if (jogador && !jogador.moving && Math.hypot(jogador.px - a.px, jogador.py - a.py) < DIST_CONVERSA - 4){
-    if (!a.assento){ a.path = null; a.alvoAssento = null; } a.timer = Math.max(a.timer, 2); return; }
-  // dois colegas que se cruzam às vezes param para conversar
-  if (a.ficaConversa > 0){ a.ficaConversa -= dt; return; }
-  if (a.path && !a.assento) for (const b of bots){
-    if (b === a || b.assento || !b.path || b.ficaConversa > 0) continue;
-    if (Math.hypot(b.x - a.x, b.y - a.y) < 34 && Math.random() < 0.02){
-      a.path = b.path = null; a.alvoAssento = b.alvoAssento = null; a.ficaConversa = b.ficaConversa = 4 + Math.random()*5; a.timer = b.timer = 0; return; }
-  }
-  a.timer -= dt;
-  if (a.path || a.timer > 0) return;
-  if (a.assento){ a.levantar(); a.timer = 1 + Math.random()*2; return; }
-  if (a.alvoAssento){ const s = a.alvoAssento; a.alvoAssento = null;
-    if (!s.ocupante && Math.hypot(s.sx - a.x, s.sy + 6 - a.y) < s.r + 20){ a.sentar(s); a.timer = s.trabalho ? 25 + Math.random()*35 : 10 + Math.random()*15; return; } }
-  const r = Math.random(), livres = assentos.filter(s => !s.ocupante);
-  let alvo = null;
-  if (r < 0.6) alvo = livres.filter(s => s.trabalho); else if (r < 0.85) alvo = livres.filter(s => !s.trabalho);
-  if (alvo && alvo.length){
-    const s = alvo[Math.floor(Math.random()*alvo.length)];
-    if (irPara(a, grid, s.sx, s.sy + 6)){ a.alvoAssento = s; return; }
-  }
-  const p = pontoLivreAleatorio(grid); if (p) irPara(a, grid, p[0], p[1]);
-  a.timer = 2 + Math.random()*4;
-}
 function moverAtor(a, dt, vx, vy, livre, vel){
   const mag = Math.hypot(vx, vy);
   a.moving = mag > 0.01;
