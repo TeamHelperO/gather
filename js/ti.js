@@ -17,12 +17,23 @@
     R(4, 61, 4, 2, "#0c0e13"); R(24, 61, 4, 2, "#0c0e13");
   }), w: 32, h: 64, label: "Rack de servidor", cat: "TI", pal: true };
 
+  // máquina de café de pé (32x64): os agentes vão até ela tomar um café
+  ASSETS.maquina_cafe = { src: nova(32, 64, R => {
+    R(3, 4, 26, 58, "#1b1e25"); R(4, 5, 24, 56, "#2c313c"); R(4, 5, 24, 2, "#454c5b"); R(27, 5, 1, 56, "#1f232b");   // corpo
+    R(7, 9, 18, 9, "#10141a"); R(8, 10, 16, 7, "#3a2a1c"); R(9, 11, 6, 2, "#e8c27a"); R(9, 14, 10, 1, "#a0703c");      // visor com o café
+    R(7, 20, 4, 3, "#d9772e"); R(13, 20, 4, 3, "#3fbf5f"); R(19, 20, 4, 3, "#2fd4e8");                                   // botões
+    R(7, 26, 18, 18, "#14171d"); R(8, 27, 16, 16, "#0d1015"); R(14, 27, 4, 4, "#5a6170"); R(15, 31, 2, 3, "#5a6170");   // nicho e bico
+    R(12, 37, 8, 6, "#f2efe8"); R(12, 37, 8, 1, "#ffffff"); R(13, 38, 6, 1, "#6b3f22"); R(20, 39, 2, 3, "#f2efe8");      // xícara
+    R(8, 43, 16, 2, "#5a6170"); R(7, 48, 18, 10, "#232831"); R(9, 50, 14, 1, "#454c5b"); R(9, 53, 14, 1, "#454c5b");      // bandeja e porta
+    R(3, 60, 26, 3, "#0c0e13"); R(5, 62, 4, 2, "#0c0e13"); R(23, 62, 4, 2, "#0c0e13");
+  }), w: 32, h: 64, label: "Máquina de café (de pé)", cat: "Copa", pal: true };
+
   // agentes de IA sentados de costas no computador (capuz colorido + fone)
   const cores = [["#2f6fd8", "#1d4a99"], ["#7b4fd8", "#52309a"], ["#1f9e6e", "#13704d"], ["#d8682f", "#9a4419"], ["#c23a5a", "#86223c"],
     /* sala de Edição: Pena (roteirista), Claquete (cenas), Corte (editor) */ ["#e0b030", "#a07a14"], ["#3a3f4a", "#22262e"], ["#e04fa0", "#9c2a6c"]];
   cores.forEach(([c1, c2], i) => {
     // com o gerador de personagens carregado, os agentes ficam no mesmo estilo das pessoas
-    if (window.AvatarPixel) { ASSETS["agente_" + (i + 1)] = { src: AvatarPixel.agente(c1, ["#2b2626", "#4a3022", "#7a4b2a", "#e0b860", "#d9772e", "#2b2626", "#8e2f2a", "#d96aa7"][i]).toDataURL(), w: 32, h: 40, label: "Agente de IA " + (i + 1), cat: "TI", pal: true }; return; }
+    if (window.AvatarPixel) { ASSETS["agente_" + (i + 1)] = { src: AvatarPixel.agente(...AvatarPixel.AGENTE_CORES[i]).toDataURL(), w: 32, h: 40, label: "Agente de IA " + (i + 1), cat: "TI", pal: true }; return; }
     ASSETS["agente_" + (i + 1)] = { src: nova(32, 40, R => {
       R(9, 31, 14, 3, "#2b2f39"); R(15, 34, 2, 4, "#2b2f39"); R(10, 38, 12, 2, "#1d2028");          // cadeira
       R(7, 20, 18, 12, c2); R(8, 19, 16, 12, c1); R(6, 22, 3, 8, c2); R(23, 22, 3, 8, c2);              // corpo/braços

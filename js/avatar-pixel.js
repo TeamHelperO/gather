@@ -270,9 +270,9 @@
   }
 
   /* ---------- folha completa ---------- */
-  function folha(av) {
+  function folha(av, coresFixas) {
     av = Object.assign({}, window.Avatar ? Avatar.PADRAO : {}, av || {});
-    const cores = coresDe(av), c = document.createElement("canvas"); c.width = 6 * FW; c.height = 7 * FH;
+    const cores = coresFixas || coresDe(av), c = document.createElement("canvas"); c.width = 6 * FW; c.height = 7 * FH;
     const g = c.getContext("2d");
     const q = (pose, col, row, esp) => figura(av, cores, pose).para(g, col * FW, row * FH, esp);
     for (let f = 0; f < 5; f++) {
@@ -297,11 +297,20 @@
   function agente(corCapuz, corCabelo, w = 32, h = 40) {
     const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d");
     g.fillStyle = "#2b2f39"; g.fillRect(9, 30, 14, 3); g.fillRect(15, 33, 2, 4); g.fillRect(10, 37, 12, 2);
-    const av = { pele: "3", cabelo: { estilo: "curto", cor: "preto" }, cima: { estilo: "moletom" }, baixo: { estilo: "calca" }, fone: { estilo: "sim" } };
-    figura(av, { pele: "#d09a6a", cabelo: corCabelo, roupa: corCapuz, baixo: "#2b2f39", calcado: "#2b2f39" }, { vista: "b", sentado: true, digitar: 1 }).para(g, 0, -6);
+    figura(AGENTE_AV, { pele: "#d09a6a", cabelo: corCabelo, roupa: corCapuz, baixo: "#2b2f39", calcado: "#2b2f39" }, { vista: "b", sentado: true, digitar: 1 }).para(g, 0, -6);
     // encosto da cadeira na frente das costas
     g.fillStyle = "#1d2028"; g.fillRect(10, 25, 12, 7); g.fillStyle = "#2b2f39"; g.fillRect(10, 25, 12, 1); g.fillRect(11, 26, 1, 5);
     return c;
   }
-  window.AvatarPixel = { folha, retrato, figura, coresDe, agente, FW, FH };
+  // cores de cada agente (capuz, cabelo): agente_1…agente_8
+  const AGENTE_CORES = [["#2f6fd8", "#2b2626"], ["#7b4fd8", "#4a3022"], ["#1f9e6e", "#7a4b2a"], ["#d8682f", "#e0b860"], ["#c23a5a", "#d9772e"],
+    ["#e0b030", "#2b2626"], ["#3a3f4a", "#8e2f2a"], ["#e04fa0", "#d96aa7"]];
+  const AGENTE_AV = { pele: "3", cabelo: { estilo: "curto", cor: "preto" }, cima: { estilo: "moletom" }, baixo: { estilo: "calca" }, calcado: { estilo: "tenis" },
+    fone: { estilo: "sim" }, chapeu: { estilo: "nenhum" }, joia: { estilo: "nenhum" }, oculos: { estilo: "nenhum" } };
+  // folha completa (andar, virar…) do agente n, com o mesmo capuz, cabelo e fone do sprite sentado
+  function agenteFolha(n) {
+    const [capuz, cabelo] = AGENTE_CORES[(n - 1 + AGENTE_CORES.length) % AGENTE_CORES.length];
+    return folha(AGENTE_AV, { pele: "#d09a6a", cabelo, roupa: capuz, baixo: "#2b2f39", calcado: "#2b2f39", chapeu: "#2f2b2e" });
+  }
+  window.AvatarPixel = { folha, retrato, figura, coresDe, agente, agenteFolha, AGENTE_CORES, FW, FH };
 })();

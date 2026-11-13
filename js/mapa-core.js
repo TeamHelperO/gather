@@ -148,8 +148,11 @@ function layoutBase(r){
     case "ti": {
       // racks de servidor na parede de cima e telão de tendências
       const temTelao = w >= 10 && ASSETS.telao_tend;
-      const nr = Math.max(0, Math.min(8, Math.floor((w - (temTelao ? 7.5 : 0.6)) / 1.05)));
-      for (let i=0;i<nr;i++) P("rack_servidor", x+0.25+i*1.05, y-1.3);
+      // canto de café dos agentes (máquina de café e bebedouro) no começo da parede
+      const copinha = w >= 8 && ASSETS.maquina_cafe ? 2.2 : 0;
+      if (copinha) { P("maquina_cafe", x+0.25, y-1.3); P("bebedouro", x+1.3, y-0.1); }
+      const nr = Math.max(0, Math.min(8, Math.floor((w - copinha - (temTelao ? 7.5 : 0.6)) / 1.05)));
+      for (let i=0;i<nr;i++) P("rack_servidor", x+copinha+0.25+i*1.05, y-1.3);
       if (temTelao) P("telao_tend", x+w-6.4, y-1.85);
       // 5 computadores, cada um com um agente de IA
       const n = Math.max(1, Math.min(5, Math.floor((w+1)/4))), span = n*4-1, sx = x + (w-span)/2;
@@ -169,6 +172,7 @@ function layoutBase(r){
       // telão de roteiros, claquete, 3 mesas com os agentes Pena, Claquete e Corte, ring light e câmera
       if (w >= 7 && ASSETS.telao_rot) P("telao_rot", cx-3, y-1.85);
       if (w >= 9 && ASSETS.claquete) P("claquete", x+0.3, y-1.4, {z:"wall"});
+      if (w >= 9 && ASSETS.maquina_cafe) { P("maquina_cafe", x+w-1.25, y-1.3); P("bebedouro", x+w-2.3, y-0.1); }
       const n = Math.max(1, Math.min(3, Math.floor((w+1)/4))), span = n*4-1, sx = x + (w-span)/2;
       for (let k=0;k<3;k++){
         const i = k % n, j = Math.floor(k / n), tx = sx+i*4, ty = y+2.6+j*3.6;
