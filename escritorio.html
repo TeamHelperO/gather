@@ -283,6 +283,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 <script src="js/montaria.js"></script>
 <script src="js/telao.js"></script>
 <script src="js/sala.js"></script>
+<script src="js/sessao-unica.js"></script>
 <script src="js/voz.js"></script>
 <script>
 /* ícones da barra (Lucide) */
@@ -344,6 +345,8 @@ async function boot(){
   TI.iniciar({ eu: () => P, toast, aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
   Edicao.iniciar({ eu: () => P, toast, aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
   conectarSala();
+  // a mesma conta só fica aberta em um lugar: entrar em outro aparelho/aba derruba este
+  SessaoUnica.iniciar({ aoCair(){ try { Sala.sair(); } catch (e) {} try { Voz.desligar(); } catch (e) {} try { Projecao.parar && Projecao.parar(false); } catch (e) {} keys.clear(); joyV = null; } });
   document.getElementById("load").remove();
   ligarAudioAuto();
   if (matchMedia("(pointer:coarse)").matches) { document.getElementById("joy").style.display = "block"; document.getElementById("hint").textContent = "Use o controle ou toque no chão para andar"; }
@@ -671,6 +674,7 @@ let last = 0, marca = null, sujo = false, ultimoSave = 0, t = 0;
 const VEL = 120, conversasLog = {};
 let dtQuadro = 0.016;
 function loop(now){
+  if (SessaoUnica.derrubada) return; // conta aberta em outro lugar: para tudo
   const dt = Math.min(0.05, (now - last)/1000); last = now; t += dt; dtQuadro = dt;
   // você
   let vx = 0, vy = 0;

@@ -82,6 +82,7 @@ details summary{cursor:pointer;font-weight:700;font-size:16px;margin-top:18px}
 <script src="js/vendor/supabase.js"></script>
 <script src="js/config.js"></script>
 <script src="js/dados.js"></script>
+<script src="js/sessao-unica.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -119,6 +120,7 @@ async function entrar(id, errEl) {
   const eu = await Dados.getUsuario(EMAIL);
   if (!eu.avatar) { location.href = "avatar.html"; return; }
   $("eu").textContent = eu.nome || "";
+  SessaoUnica.iniciar({ soOutrosAparelhos: true }); // entrar aqui derruba a conta aberta em outro aparelho
   // veio por um convite (?sala=…)?
   let convite = Dados.salaDaUrl(); try { convite = convite || localStorage.getItem("nextco_sala_convite"); localStorage.removeItem("nextco_sala_convite"); } catch (e) {}
   if (convite) { $("idSala").value = convite; return entrar(convite, $("errEntrar")); }
