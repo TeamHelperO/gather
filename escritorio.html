@@ -40,6 +40,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
   .emotes.hud #btnAudio span{display:inline}
   #sala.hud small{display:none}
 }
+.sala-espaco{background:#3d5afe;color:#fff;border-radius:999px;padding:2px 9px;font-size:12px;margin-right:8px;white-space:nowrap;max-width:46vw;overflow:hidden;text-overflow:ellipsis}
 #miniMapa{position:fixed;left:8px;bottom:max(12px,env(safe-area-inset-bottom));z-index:9;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.35);cursor:crosshair;touch-action:none}
 @media (pointer:coarse){#miniMapa{top:104px;bottom:auto}}
 @media (max-width:900px) and (pointer:fine){#miniMapa{bottom:70px}}
@@ -524,6 +525,9 @@ async function boot(){
   Minimapa.iniciar({ irPara: (x, y) => andarAte(x, y, 48), bloqueado: () => Telao.aberto || TI.aberto || Edicao.aberto || Acesso.aberto });
   document.getElementById("bMapa").onclick = () => Minimapa.alternar();
   setTimeout(() => Tour.iniciar({ eu: () => P, modoSala: () => modoSala, vista: v => { if ((v === "3d") !== !!quer3d) document.getElementById("b3d").click(); } }), 1800);
+  // o endereço sempre mostra o ID do espaço (sem ?sala, o aparelho entrava no último espaço visitado sem avisar)
+  try { const u = new URL(location.href); if (u.searchParams.get("sala") !== idPublico()) { u.searchParams.set("sala", idPublico()); history.replaceState(null, "", u.pathname + u.search + u.hash); } } catch (e) {}
+  if (!EH_NEXT) toast(`Você está no espaço "${infoEspaco.nome}" (ID ${idPublico()}). O escritório da Next é o ID nextco.`);
   Configuracoes.iniciar({ mapaId, ehNext: EH_NEXT, toast, user: () => user, info: () => infoEspaco, modoSala: () => modoSala, idPublico,
     souDono: () => souDonoDaSala(), ehAdminGeral: () => Dados.ehAdmin(), outros: () => outros.filter(o => o.visto),
     em3d: () => em3d(), alternar3d: () => document.getElementById("b3d").click(), trocarVista: () => trocarVista(),
@@ -1020,7 +1024,9 @@ function checarSala(first){
   if (nome === P.sala && !first) return;
   P.sala = nome;
   const z = Voz.zona(P), regra = z.tipo === "fechada" ? "todos da sala se ouvem" : z.tipo === "silencio" ? "sem áudio" : "ouve quem está perto";
-  const el = document.getElementById("sala"); el.innerHTML = ICONE("map-pin", 17) + `<span>${nome.replace(/[<>&]/g, "")}</span><small>· ${regra}</small>`;
+  // fora da sala oficial da Next, mostra também em qual espaço (e ID) a pessoa está, para não confundir duas cópias parecidas
+  const espaco = EH_NEXT ? "" : `<b class="sala-espaco" title="Espaço ${String(infoEspaco.nome || "").replace(/[<>&"]/g, "")} · ID ${idPublico()}">${String(infoEspaco.nome || mapaId).replace(/[<>&]/g, "")} · ${idPublico()}</b>`;
+  const el = document.getElementById("sala"); el.innerHTML = espaco + ICONE("map-pin", 17) + `<span>${nome.replace(/[<>&]/g, "")}</span><small>· ${regra}</small>`;
   if (!first) Dados.registrarAtividade(EMAIL, "sala", `Entrou em ${nome}`, {sala: nome});
 }
 /* câmera: enquadra a sala inteira quando ela cabe na tela (com o HUD em volta) e anda suave */

@@ -180,10 +180,16 @@ window.Projecao = (function () {
     try {
       if (msg.tipo === "quero") return aoPedido(msg);
       if (msg.tipo === "oferta") return aoOferta(msg);
-      if (msg.tipo === "resposta") { const pc = share && share.viewers.get(msg.from); if (pc) await pc.setRemoteDescription(msg.sdp); return; }
+      if (msg.tipo === "resposta") {
+        const pc = share && share.viewers.get(msg.from); if (!pc) return;
+        await pc.setRemoteDescription(msg.sdp);
+        for (const c of pc._pendentes || []) await pc.addIceCandidate(c).catch(() => {}); pc._pendentes = []; // endereços que chegaram antes da resposta
+        return;
+      }
       if (msg.tipo === "ice") {
         const pcShare = share && share.viewers.get(msg.from);
-        if (pcShare) { await pcShare.addIceCandidate(msg.candidato).catch(() => {}); return; }
+        // quem apresenta: o endereço de quem assiste pode chegar antes da resposta ser aplicada; guarda e aplica depois (antes se perdia e a tela ficava carregando)
+        if (pcShare) { if (pcShare.remoteDescription) await pcShare.addIceCandidate(msg.candidato).catch(() => {}); else (pcShare._pendentes = pcShare._pendentes || []).push(msg.candidato); return; }
         const v = vendo.get(msg.sala);
         if (v && v.pc) { if (v.pc.remoteDescription) await v.pc.addIceCandidate(msg.candidato).catch(() => {}); else v.pendentes.push(msg.candidato); }
         return;
