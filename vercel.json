@@ -18,6 +18,10 @@
     {
       "path": "/api/relatorio",
       "schedule": "0 11 * * 1"
+    },
+    {
+      "path": "/api/respostas",
+      "schedule": "0 20 * * 1-5"
     }
   ],
   "headers": [

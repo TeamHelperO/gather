@@ -260,18 +260,19 @@ window.TI = (function () {
   /* ---------- aba Prospecção: empresas encontradas + e-mail para aprovar ---------- */
   function corpoProsp(adm) {
     if (prosp == null) return `<p class="tend-vazio">Para usar a prospecção, rode o arquivo <b>rodar_no_supabase_5.sql</b> no Supabase (SQL Editor).</p>`;
-    const cont = { revisar: 0, sem_email: 0, enviado: 0, descartado: 0 }; prosp.forEach(p => { if (p.status in cont) cont[p.status]++; else if (p.status === "descadastrado") cont.descartado++; });
+    const cont = { revisar: 0, sem_email: 0, enviado: 0, respondeu: 0, descartado: 0 }; prosp.forEach(p => { if (p.status in cont) cont[p.status]++; else if (p.status === "descadastrado") cont.descartado++; });
     const busca = ((painel.querySelector("[data-busca]") || {}).value || "").toLowerCase();
     const lista = prosp.filter(p => (filtroP === "todas" || p.status === filtroP || (filtroP === "descartado" && p.status === "descadastrado")) &&
       (!busca || [p.empresa, p.segmento, p.cidade, p.email, p.site].join(" ").toLowerCase().includes(busca)));
     const pro = agentes.find(a => a.tipo === "prospeccao");
     return `<div class="tend-barra">
-        ${[["revisar", "✍️ Para aprovar"], ["sem_email", "📞 Sem e-mail"], ["enviado", "✅ Enviados"], ["descartado", "🗑 Descartados"], ["todas", "Todas"]].map(([k, l]) => `<button class="tab ${filtroP === k ? "on" : ""}" data-filtrop="${k}">${l}${k !== "todas" ? ` <i>${cont[k]}</i>` : ""}</button>`).join("")}
+        ${[["revisar", "✍️ Para aprovar"], ["sem_email", "📞 Sem e-mail"], ["enviado", "✅ Enviados"], ["respondeu", "💬 Responderam"], ["descartado", "🗑 Descartados"], ["todas", "Todas"]].map(([k, l]) => `<button class="tab ${filtroP === k ? "on" : ""}" data-filtrop="${k}">${l}${k !== "todas" ? ` <i>${cont[k]}</i>` : ""}</button>`).join("")}
         <input data-busca data-chave="buscap" placeholder="Buscar empresa, cidade…" value="${esc(busca)}">
+        ${adm ? `<button class="btn" data-respostas ${lendoRespostas ? "disabled" : ""} title="Lê a caixa de entrada do e-mail do cPanel e transforma respostas em tarefas no telão">${lendoRespostas ? "⏳ Lendo e-mails…" : "📥 Verificar respostas"}</button>` : ""}
         ${adm ? `<button class="btn" data-prospectar ${buscando || !pro ? "disabled" : ""} title="${pro ? esc(pro.nome) + " busca empresas no Google Maps e escreve os e-mails" : "Escolha um agente de prospecção na aba Agentes"}">${buscando ? "⏳ Buscando empresas…" : "▶ Buscar empresas agora"}</button>` : ""}
       </div>
       <div class="tend-lista pr-lista">${lista.length ? lista.map(p => cartaoProsp(p, adm)).join("") : `<p class="tend-vazio">${prosp.length ? "Nada neste filtro." : `Ainda não há empresas. ${adm ? "Clique em <b>▶ Buscar empresas agora</b>." : ""}`}</p>`}</div>
-      <p class="tend-rodape">Nenhum e-mail sai sem alguém clicar em <b>Enviar</b>. Cada empresa recebe no máximo um e-mail, com a opção de pedir para não receber mais.</p>`;
+      <p class="tend-rodape">Nenhum e-mail sai sem alguém clicar em <b>Enviar</b>. Cada empresa recebe no máximo um e-mail, com a opção de pedir para não receber mais. Quem responde vira tarefa no telão para quem enviou; quem pede para sair é descadastrado sozinho.</p>`;
   }
   function cartaoProsp(p, adm) {
     const r = rascP[p.id] || {}, v = (k, d) => k in r ? r[k] : (d ?? ""), k = n => `pr-${p.id}-${n}`;
@@ -281,7 +282,8 @@ window.TI = (function () {
       ${p.site ? `<a href="${esc(seguro(p.site))}" target="_blank" rel="noopener noreferrer">site ↗</a>` : ""}${p.maps_url ? `<a href="${esc(seguro(p.maps_url))}" target="_blank" rel="noopener noreferrer">mapa ↗</a>` : ""}
       ${p.telefone ? `<span>📞 ${esc(p.telefone)}</span>` : ""}</div>`;
     const quem = p.status === "enviado" ? `<div class="tc-quem"><span>✅ Enviado para <b>${esc(p.email)}</b> por <b>${esc(nomeDe(p.enviado_por))}</b> · ${fmtQuando(p.enviado_em)}</span></div>` :
-      p.status === "descadastrado" ? `<div class="tc-quem"><span>🚫 Pediu para não receber e-mails</span></div>` : "";
+      p.status === "descadastrado" ? `<div class="tc-quem"><span>🚫 Pediu para não receber e-mails${p.respondeu_em ? " · " + fmtQuando(p.respondeu_em) : ""}</span></div>` : "";
+    const resposta = p.resposta && (p.status === "respondeu" || p.status === "descadastrado") ? `<div class="pr-resp"><b>💬 Resposta ${p.respondeu_em ? "· " + fmtQuando(p.respondeu_em) : ""}</b><pre>${esc(p.resposta)}</pre></div>` : "";
     return `<article class="tc pr ${p.status}" data-pid="${p.id}">
       <div class="tc-top"><b>${esc(p.empresa)}</b></div>${meta}
       ${p.analise ? `<p class="pr-analise">💡 ${esc(p.analise)}</p>` : ""}
@@ -298,8 +300,9 @@ window.TI = (function () {
           <button class="del" data-pstatus="descartado" title="Descartar">🗑</button></div>`
       : p.status === "sem_email" ? `<p class="pr-dica">Não achei e-mail no site. Dá para chamar pelo telefone/WhatsApp${p.maps_url ? " ou pelo mapa" : ""}.</p>
         ${adm ? `<div class="tc-acoes"><button class="btn" data-addemail>＋ Tenho o e-mail</button><button class="del" data-pstatus="descartado" title="Descartar">🗑</button></div>` : ""}`
-      : `${p.assunto ? `<details><summary>${esc(p.assunto)}</summary><pre class="pr-corpo">${esc(p.corpo || "")}</pre></details>` : ""}${quem}
-        ${adm ? `<div class="tc-acoes">${p.status === "enviado" ? `<button class="btn" data-pstatus="descadastrado" title="Respondeu pedindo para sair">🚫 Pediu para sair</button>` : p.status !== "revisar" ? `<button class="btn" data-pstatus="${p.email ? "revisar" : "sem_email"}">↩ Voltar para aprovação</button>` : ""}</div>` : ""}`}
+      : `${resposta}${p.assunto ? `<details><summary>${p.status === "respondeu" ? "E-mail enviado: " : ""}${esc(p.assunto)}</summary><pre class="pr-corpo">${esc(p.corpo || "")}</pre></details>` : ""}${quem}
+        ${p.status === "respondeu" ? `<div class="tc-quem"><span>Enviado por <b>${esc(nomeDe(p.enviado_por))}</b> para ${esc(p.email)}</span></div><div class="tc-acoes">${p.tarefa_id ? `<button class="btn pri" data-vertarefa="${esc(p.tarefa_id)}">📋 Abrir tarefa no telão</button>` : ""}<a class="btn" style="text-decoration:none;color:inherit" href="mailto:${esc(p.email)}?subject=${encodeURIComponent("Re: " + (p.assunto || ""))}">✉️ Responder</a></div>` : ""}
+        ${adm ? `<div class="tc-acoes">${p.status === "enviado" ? `<button class="btn" data-pstatus="descadastrado" title="Respondeu pedindo para sair">🚫 Pediu para sair</button>` : p.status !== "revisar" && p.status !== "respondeu" ? `<button class="btn" data-pstatus="${p.email ? "revisar" : "sem_email"}">↩ Voltar para aprovação</button>` : ""}</div>` : ""}`}
     </article>`;
   }
   function cartao(t, eu, adm) {
@@ -326,9 +329,11 @@ window.TI = (function () {
   async function aoClicar(e) {
     if (e.target === painel || e.target.closest("[data-fechar]")) return fecharPainel();
     const f = e.target.closest("[data-filtro]"); if (f) { filtro = f.dataset.filtro; return renderPainel(); }
-    const m = e.target.closest("[data-modo]"); if (m) { modo = m.dataset.modo; const b = painel.querySelector("[data-busca]"); if (b) b.value = ""; const l = painel.querySelector(".tend-lista"); if (l) l.scrollTop = 0; return renderPainel(); }
+    const m = e.target.closest("[data-modo]"); if (m) { modo = m.dataset.modo; if (modo === "prosp" && Dados.ehAdmin && Dados.ehAdmin()) verificarRespostas(true); const b = painel.querySelector("[data-busca]"); if (b) b.value = ""; const l = painel.querySelector(".tend-lista"); if (l) l.scrollTop = 0; return renderPainel(); }
     const fp = e.target.closest("[data-filtrop]"); if (fp) { filtroP = fp.dataset.filtrop; return renderPainel(); }
     if (e.target.closest("[data-prospectar]")) return prospectar();
+    if (e.target.closest("[data-respostas]")) return verificarRespostas(false);
+    const vt = e.target.closest("[data-vertarefa]"); if (vt) { fecharPainel(); if (window.abrirTarefaPorId) setTimeout(() => abrirTarefaPorId(vt.dataset.vertarefa), 50); return; }
     const df = e.target.closest("[data-agdesfaz]"); if (df) { delete rascAg[df.dataset.agdesfaz]; return renderPainel(); }
     const pc = e.target.closest("[data-pid]"); if (pc) return acaoProsp(e, pc.dataset.pid);
     if (e.target.closest("[data-rodar]")) return rodarAgentes();
@@ -366,6 +371,22 @@ window.TI = (function () {
     }
     try { await Dados.salvarAgente(id, campos); delete rascAg[id]; opt.toast(`💾 ${campos.nome} salvo`); await recarregar(); }
     catch (err) { opt.toast("Não consegui salvar: " + ((err && err.message) || "")); }
+  }
+  // lê a caixa de entrada atrás de respostas (botão, ou sozinho ao abrir a aba, no máximo a cada 10 min)
+  let lendoRespostas = false;
+  async function verificarRespostas(silencioso) {
+    if (lendoRespostas) return;
+    try { if (silencioso && Date.now() - (+localStorage.getItem("nextco_respostas_em") || 0) < 10 * 60e3) return; localStorage.setItem("nextco_respostas_em", Date.now()); } catch (e) {}
+    lendoRespostas = true; if (!silencioso) renderPainel();
+    try {
+      const token = Dados.token ? await Dados.token() : null;
+      const r = await fetch("/api/respostas", { method: "POST", headers: token ? { Authorization: "Bearer " + token } : {} });
+      const j = await r.json().catch(() => ({}));
+      if (!j.ok) { if (!silencioso) opt.toast("📥 " + (j.erro || "Não consegui ler o e-mail (" + r.status + ")")); }
+      else if (j.respostas || j.saiu) { opt.toast(`📥 ${j.respostas} resposta(s) nova(s)` + (j.respostas ? " · viraram tarefa no telão" : "") + (j.saiu ? ` · ${j.saiu} pediu para sair` : "")); if (j.respostas) filtroP = "respondeu"; }
+      else if (!silencioso) opt.toast("📥 Nenhuma resposta nova");
+    } catch (e) { if (!silencioso) opt.toast("📥 Falha ao ler o e-mail"); }
+    lendoRespostas = false; await recarregar(); renderPainel();
   }
   async function prospectar() {
     if (buscando) return; buscando = true; renderPainel();

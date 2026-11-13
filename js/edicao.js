@@ -112,6 +112,32 @@ window.Edicao = (function () {
   function atualizar() { if (painel && opt && opt.eu && !dentroDaEdicao()) { fecharPainel(); opt.toast("Você saiu da Edição: os roteiros foram fechados"); } }
 
   const tocando = () => painel && [...painel.querySelectorAll("video")].some(v => !v.paused && !v.ended);
+  /* roteiro aprovado → tarefa "Publicar" no telão da sala de Edição (com o vídeo e as etapas) */
+  const marca = id => `[roteiro:${id}]`;
+  async function tarefaDoRoteiro(r) {
+    if (!r) return;
+    try {
+      const todas = await Dados.listarTarefas();
+      if (todas.some(t => (t.descricao || "").includes(marca(r.id)))) return; // já existe
+      const sala = (typeof S !== "undefined" && S ? S.rooms : []).find(x => x.type === "edicao");
+      const prazo = new Date(Date.now() + 2 * 864e5); prazo.setMinutes(prazo.getMinutes() - prazo.getTimezoneOffset());
+      await Dados.salvarTarefa({ titulo: ("🎬 Publicar: " + (r.titulo || "vídeo")).slice(0, 120), status: "a_fazer", responsavel: Dados.sessao ? Dados.sessao() : "",
+        prazo: prazo.toISOString().slice(0, 10), progressoManual: 0, ordem: 0, sala: sala ? sala.id : null,
+        descricao: `Vídeo aprovado na sala de Edição${r.formato ? " (" + r.formato + ")" : ""}. Abra em Menu → Roteiros para baixar o vídeo.\n${marca(r.id)}`,
+        etapas: ["Baixar e revisar o vídeo final", "Escrever legenda e hashtags", "Agendar ou publicar", "Marcar como Publicado na Edição"].map((texto, k) => ({ id: "e" + k, texto, feito: false })) },
+        null, "Criada ao aprovar o vídeo");
+    } catch (e) { console.warn("tarefa do roteiro:", e); }
+  }
+  // status do roteiro acompanha a tarefa: gravando → em andamento; publicado → feito
+  async function acompanharTarefa(id, status) {
+    if (!/^(gravando|publicado)$/.test(status)) return;
+    try {
+      const t = (await Dados.listarTarefas()).find(t => (t.descricao || "").includes(marca(id))); if (!t) return;
+      const novo = status === "publicado" ? "feito" : "andamento"; if (t.status === novo) return;
+      if (novo === "feito") t.etapas = (t.etapas || []).map(e => ({ ...e, feito: true }));
+      t.status = novo; await Dados.salvarTarefa(t, null, novo === "feito" ? "Concluiu a tarefa (vídeo publicado)" : "Moveu para Em andamento (gravando)");
+    } catch (e) {}
+  }
   function render(forcar) {
     if (!painel) return;
     if (!forcar && (gravacao || tocando())) { renderPendente = true; return; }
@@ -202,7 +228,7 @@ window.Edicao = (function () {
     if (q("[data-aba]")) { aba = q("[data-aba]").dataset.aba; return render(true); }
     if (q("[data-abrir]")) { const id = q("[data-abrir]").dataset.abrir; aberto = aberto === id ? null : id; return render(true); }
     if (q("[data-pedir]")) { const t = tend.find(x => x.id === q("[data-pedir]").dataset.pedir); return t && t.decisao === "pega" && produzir(t, null); }
-    if (q("[data-aprovar]")) { const id = q("[data-aprovar]").dataset.aprovar; try { await Dados.mexerRoteiro(id, "aprovado"); opt.toast("✅ Vídeo aprovado"); Dados.registrarAtividade(null, "acao", "Aprovou vídeo: " + (roteiros.find(x => x.id === id) || {}).titulo, { sala: "Edição" }); } catch (er) { opt.toast("Não consegui aprovar"); } await recarregar(); return render(true); }
+    if (q("[data-aprovar]")) { const id = q("[data-aprovar]").dataset.aprovar; try { await Dados.mexerRoteiro(id, "aprovado"); opt.toast("✅ Vídeo aprovado · virou tarefa no telão da Edição"); tarefaDoRoteiro(roteiros.find(x => x.id === id)); Dados.registrarAtividade(null, "acao", "Aprovou vídeo: " + (roteiros.find(x => x.id === id) || {}).titulo, { sala: "Edição" }); } catch (er) { opt.toast("Não consegui aprovar"); } await recarregar(); return render(true); }
     if (q("[data-recriar]")) return recriar(roteiros.find(x => x.id === q("[data-recriar]").dataset.recriar));
     if (q("[data-copiar]")) { const r = roteiros.find(x => x.id === q("[data-copiar]").dataset.copiar); try { await navigator.clipboard.writeText(textoRoteiro(r)); opt.toast("📋 Roteiro copiado"); } catch (er) { opt.toast("Não consegui copiar"); } return; }
     if (q("[data-excluir]")) { const id = q("[data-excluir]").dataset.excluir; try { await Dados.excluirRoteiro(id); opt.toast("Roteiro excluído"); await recarregar(); } catch (er) { opt.toast("Não consegui excluir"); } return; }
@@ -213,7 +239,7 @@ window.Edicao = (function () {
     if (e.target.matches("[data-voz]")) { comVoz = e.target.checked; return; }
     if (e.target.matches("[data-ver-desc]")) { verDescartados = e.target.checked; return render(true); }
     if (e.target.matches("[data-status]")) {
-      try { await Dados.mexerRoteiro(e.target.dataset.status, e.target.value); opt.toast("Status: " + STATUS[e.target.value]); }
+      try { await Dados.mexerRoteiro(e.target.dataset.status, e.target.value); opt.toast("Status: " + STATUS[e.target.value]); acompanharTarefa(e.target.dataset.status, e.target.value); }
       catch (er) { opt.toast("Não consegui mudar o status"); }
       recarregar();
     }
