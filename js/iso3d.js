@@ -97,6 +97,16 @@ function movel(it, sala) {
   else if (k === "pufe") { prof = 0.5; add(cilindro(0.24, 0.4, "#d0463c", 0, 0, 0, 16)); }
   else if (k === "pulpito") { prof = 0.6; add(caixaM(0.7, 1.1, 0.5, "#8a5a32", 0, 0, 0)); add(caixaM(0.3, 0.3, 0.01, "#1d1d1f", 0, 0.55, 0.26, false)); }
   else if (k === "f_palco" || k === "palco_frente") { g.add(caixaM(1, 0.3, 1, "#7f3636", 0, 0, 0)); g.userData.chao = true; prof = 1; }
+  else if (/^agente_\d$/.test(k) && window.AvatarPixel && AvatarPixel.agenteFolha) { // agente sentado: cadeira de verdade e pose de frente, de lado ou de costas conforme a câmera
+    const folha = AvatarPixel.agenteFolha(parseInt(k.split("_")[1]) || 1), tex = {};
+    for (const [d, col] of [[0, 0], [3, 2], [1, 4], [2, 5]]) { const c = document.createElement("canvas"); c.width = 32; c.height = 48; c.getContext("2d").drawImage(folha, col * 32, 4 * 48, 32, 48, 0, 0, 32, 48);
+      const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace; tex[d] = t; }
+    const m = new THREE.SpriteMaterial({ map: tex[3], alphaTest: 0.5 }), sp = new THREE.Sprite(m);
+    sp.center.set(0.5, 3 / 48); sp.scale.set(32 / T * GENTE, 48 / T * GENTE, 1); sp.position.y = 0.06; add(sp);
+    // cadeira: o agente olha para a mesa (para cima no 2D), o encosto fica do lado de fora
+    add(caixaM(0.48, 0.08, 0.46, "#3a3f4a", 0, 0.42, 0)); add(cilindro(0.04, 0.42, "#2b2f39", 0, 0, 0)); add(caixaM(0.48, 0.5, 0.07, "#3a3f4a", 0, 0.5, 0.2));
+    g.userData.billboard = true; g.userData.vistas = { tex, mat: m, olha: 3 }; prof = 0.5;
+  }
   else if (/^agente_\d$/.test(k) || /^npc_/.test(k) || k === "pet") { // pixel art em pé, sempre de frente para a câmera
     const sp = spriteDe(IMG[k], a.w, a.h); sp.scale.multiplyScalar(GENTE); add(sp); g.userData.billboard = true; prof = 0.4;
   }
@@ -215,7 +225,14 @@ function montar(S) {
     const cx = it.x + a.w / T / 2;
     if (g.userData.parede) { const r = sala || roomAt(it.x * T + 16, it.y * T + a.h + 40); g.position.set(cx, g.userData.alturaParede, (r ? r.y : it.y + 2) + 0.09); }
     else if (g.userData.chao) g.position.set(cx, 0.04, it.y + a.h / T / 2);
-    else if (g.userData.billboard) { g.position.set(cx, 0.06, it.y + a.h / T - 0.1); cartazes.push(g); }
+    else if (g.userData.billboard) {
+      let z = it.y + a.h / T - 0.1;
+      if (g.userData.vistas) { // senta encostado na mesa que está logo acima no 2D
+        const m = allItems().find(o => MESAS3D.test(o.k) && ASSETS[o.k] && cx > o.x && cx < o.x + ASSETS[o.k].w / T && o.y + ASSETS[o.k].h / T > it.y - 0.6 && o.y + ASSETS[o.k].h / T < it.y + a.h / T + 0.2);
+        if (m) z = m.y + ASSETS[m.k].h / T - 0.05 + 0.4;
+      }
+      g.position.set(cx, 0.06, z); cartazes.push(g);
+    }
     else if (g.userData.sobreMesa && mesaSob(it)) { const [x, z] = naMesa(it, mesaSob(it)); g.position.set(x, 0, z); }
     else { const base = it.y + a.h / T; g.position.set(cx, g.userData.sobreMesa ? 0 : 0.08, base - g.userData.prof / 2 - 0.05); }
     girarComoNoEditor(g, it);
@@ -334,12 +351,19 @@ function direcaoVista(d) {
   const sx = vx * rx + vz * rz, sd = -(vx * fx + vz * fz);
   return Math.abs(sx) > Math.abs(sd) ? (sx < 0 ? 1 : 2) : (sd > 0 ? 0 : 3);
 }
+function direcaoVistaEm(d, x, z) {
+  if (!fp()) return direcaoVista(d);
+  const cam = camAtual(), dx = x - cam.position.x, dz = z - cam.position.z, L = Math.hypot(dx, dz) || 1; // de onde você olha para ela
+  const [vx, vz] = VET[d] || VET[0], fx = dx / L, fz = dz / L, rx = -fz, rz = fx;
+  const sx = vx * rx + vz * rz, sd = -(vx * fx + vz * fz);
+  return Math.abs(sx) > Math.abs(sd) ? (sx < 0 ? 1 : 2) : (sd > 0 ? 0 : 3);
+}
 function desenharPessoa(a, t) {
   const s = spriteDaPessoa(a), g = s.g;
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, 64, 80); g.imageSmoothingEnabled = false;
   g.setTransform(1, 0, 0, 1, 32 - Math.round(a.px), 68 - Math.round(a.py));
   const d = a.dir; if (!a.assento) a.dir = direcaoVista(d);
-  else a.vistaSentado = direcaoVista(a.assento.dir ?? (a.assento.face === "costas" ? 3 : 0)); // sentado: de frente, de costas ou de lado conforme você gira em volta
+  else a.vistaSentado = direcaoVistaEm(a.assento.dir ?? (a.assento.face === "costas" ? 3 : 0), a.px / T, a.py / T); // sentado: de frente, de costas ou de lado conforme você gira em volta
   try { a.draw(g, t); } finally { a.dir = d; a.vistaSentado = undefined; }
   s.tex.needsUpdate = true;
   s.sp.position.set(a.px / T, a.assento ? 0.12 : 0.08, a.py / T);
@@ -422,7 +446,8 @@ const Iso3D = {
     for (const [a, s] of pessoas) if (!vivos.has(a)) { cena.remove(s.sp, s.sombra); s.tex.dispose(); pessoas.delete(a); }
     const perto = (x, z) => fp() && Math.hypot(x - alvo.x, z - alvo.z) < 1.4; // na 1ª pessoa, quem está colado na câmera some para não tapar a vista
     for (const a of atores) { desenharPessoa(a, t); const s = pessoas.get(a), some = fp() && (a === P || perto(a.px / T, a.py / T)); s.sp.visible = !some; if (some) s.sombra.visible = false; }
-    for (const g of cartazes) { const ag = g.userData.item && g.userData.item.agente; const v = !perto(g.position.x, g.position.z) && !(ag && window.AGENTES_FORA && AGENTES_FORA.has(ag)); if (g.visible !== v) g.visible = v; }
+    for (const g of cartazes) { const ag = g.userData.item && g.userData.item.agente; const v = !perto(g.position.x, g.position.z) && !(ag && window.AGENTES_FORA && AGENTES_FORA.has(ag)); if (g.visible !== v) g.visible = v;
+      const vs = g.userData.vistas; if (vs && v) { const t = vs.tex[direcaoVistaEm(vs.olha, g.position.x, g.position.z)]; if (vs.mat.map !== t) { vs.mat.map = t; vs.mat.needsUpdate = true; } } }
     const temVideo = window.Projecao && (Projecao.apresentando || document.querySelector("video[autoplay]"));
     atualizarTelas(desenhaveis, performance.now(), !!temVideo);
     animarPortas(atores, dt);
