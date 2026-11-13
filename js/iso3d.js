@@ -62,6 +62,9 @@ function movel(it, sala) {
   const k = it.k, w = a.w / T, g = new THREE.Group();
   let prof = Math.max(0.35, Math.min(1.2, Math.min(a.h * 0.45, 26) / T + 0.25));
   const add = m => (g.add(m), m);
+  // sino e cafeteira ficam em cima de uma mesa; se não houver mesa embaixo, ganham um balcãozinho
+  const semMesa = () => { const cx = it.x * T + a.w / 2, cy = it.y * T + a.h - 4; return !allItems().some(m => m !== it && /^(mesa|balcao)/.test(m.k) && ASSETS[m.k] && cx > m.x * T && cx < m.x * T + ASSETS[m.k].w && cy > m.y * T - 8 && cy < m.y * T + ASSETS[m.k].h + 4); };
+  if ((k === "sino" || k === "cafeteira") && semMesa()) add(caixaM(0.5, 0.74, 0.45, "#e9e4da", 0, 0, 0));
   if (/^mesa_pc$|^mesa$/.test(k)) { prof = 1.1; add(caixaM(w - 0.05, 0.07, prof, "#c08850", 0, 0.72, 0)); for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) add(caixaM(0.06, 0.72, 0.06, "#6b5a4a", x * (w / 2 - 0.12), 0, z * (prof / 2 - 0.1))); add(caixaM(0.5, 0.4, prof - 0.2, "#a8743f", w / 2 - 0.35, 0.3, 0)); }
   else if (k === "mesa_copa") { prof = 1.4; add(cilindro(0.7, 0.06, "#f2efe8", 0, 0.7, 0, 20)); add(cilindro(0.07, 0.7, "#6b6672", 0, 0, 0)); add(bola(0.09, "#e5484d", -0.2, 0.82, 0.1)); }
   else if (k === "monitor") { prof = 0.3; add(caixaM(0.06, 0.18, 0.06, "#2b2f39", 0, 0.78, 0)); add(caixaM(0.6, 0.38, 0.04, "#1d2028", 0, 0.92, 0)); const pl = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.34), materialTela(it, TELAS.monitor)); pl.position.set(0, 1.11, 0.025); add(pl); g.userData.sobreMesa = true; }
@@ -85,15 +88,22 @@ function movel(it, sala) {
   else if (k === "bebedouro") { prof = 0.45; add(caixaM(0.42, 0.95, 0.4, "#e9ecf2", 0, 0, 0)); add(cilindro(0.17, 0.42, mat("#8fd0ff", { transparent: true, opacity: 0.7, roughness: 0.1 }), 0, 0.95, 0, 16)); add(caixaM(0.06, 0.04, 0.06, "#3d6fd6", -0.08, 0.7, 0.22, false)); add(caixaM(0.06, 0.04, 0.06, "#e5484d", 0.08, 0.7, 0.22, false)); }
   else if (k === "ring_light") { prof = 0.4; add(cilindro(0.03, 1.5, "#2b2f39", 0, 0, 0)); const r = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.05, 8, 24), brilho("#fff6d8", 2)); r.position.set(0, 1.6, 0); add(r); }
   else if (k === "camera_tripe") { prof = 0.5; for (const ang of [0, 2.1, 4.2]) { const l = caixaM(0.03, 1.2, 0.03, "#3b414e", Math.cos(ang) * 0.18, 0, Math.sin(ang) * 0.18); l.rotation.z = Math.cos(ang) * 0.15; l.rotation.x = -Math.sin(ang) * 0.15; add(l); } add(caixaM(0.4, 0.26, 0.3, "#1d2028", 0, 1.2, 0)); add(cilindro(0.08, 0.12, "#15181f", 0, 1.27, 0.2)); }
+  else if (/^mesa_reuniao/.test(k)) { prof = Math.max(1, a.h / T * 0.75); add(caixaM(w - 0.2, 0.07, prof, "#8a5a32", 0, 0.72, 0)); for (const x of [-1, 1]) add(caixaM(0.12, 0.72, prof * 0.6, "#4a3828", x * (w / 2 - 0.5), 0, 0)); }
+  else if (k === "relogio_ponto") { prof = 0.35; add(caixaM(0.08, 1.15, 0.08, "#2b2f39", 0, 0, 0)); add(caixaM(0.32, 0.4, 0.12, "#1d2028", 0, 1.1, 0)); add(caixaM(0.24, 0.16, 0.01, brilho("#3fbf5f", 1.3), 0, 1.3, 0.065, false)); }
+  else if (k === "sino") { prof = 0.2; add(cilindro(0.07, 0.08, "#e8b83a", 0, 0.74, 0)); add(bola(0.03, "#e8b83a", 0, 0.85, 0)); g.userData.sobreMesa = true; }
+  else if (k === "cafeteira") { prof = 0.3; add(caixaM(0.25, 0.35, 0.25, "#2c313c", 0, 0.74, 0)); add(cilindro(0.05, 0.08, "#f2efe8", 0, 0.76, 0.06)); g.userData.sobreMesa = true; }
+  else if (k === "caixa_som") { prof = 0.45; add(caixaM(0.5, 1.1, 0.42, "#1d2028", 0, 0, 0)); add(cilindro(0.15, 0.02, "#3b414e", 0, 0.35, 0.215)); add(cilindro(0.08, 0.02, "#3b414e", 0, 0.8, 0.215)); }
+  else if (k === "megafone") { prof = 0.3; add(cilindro(0.03, 1.0, "#2b2f39", 0, 0, 0)); add(caixaM(0.2, 0.18, 0.3, "#e5484d", 0, 1.0, 0)); }
+  else if (k === "pufe") { prof = 0.5; add(cilindro(0.24, 0.4, "#d0463c", 0, 0, 0, 16)); }
   else if (k === "pulpito") { prof = 0.6; add(caixaM(0.7, 1.1, 0.5, "#8a5a32", 0, 0, 0)); add(caixaM(0.3, 0.3, 0.01, "#1d1d1f", 0, 0.55, 0.26, false)); }
   else if (k === "f_palco" || k === "palco_frente") { g.add(caixaM(1, 0.3, 1, "#7f3636", 0, 0, 0)); g.userData.chao = true; prof = 1; }
   else if (/^agente_\d$/.test(k) || /^npc_/.test(k) || k === "pet") { // pixel art em pé, sempre de frente para a câmera
-    const sp = spriteDe(IMG[k], a.w, a.h); add(sp); g.userData.billboard = true; prof = 0.4;
+    const sp = spriteDe(IMG[k], a.w, a.h); sp.scale.multiplyScalar(GENTE); add(sp); g.userData.billboard = true; prof = 0.4;
   }
   else if (NA_PAREDE.test(k)) {
     const tela = /^(telao|telao_tend|telao_rot|tv|projecao)/.test(k);
     if (tela) {
-      const ww = a.w / T, hh = a.h / T;
+      const f = Math.min(1, (PE_DIREITO - 0.35 - 0.75) / (a.h / T)), ww = a.w / T * f, hh = a.h / T * f;
       const pl = new THREE.Mesh(new THREE.PlaneGeometry(ww, hh), materialTela(it)); pl.position.set(0, hh / 2, 0.05); add(pl);
       add(caixaM(ww * 0.98, hh * 0.9, 0.06, "#15161d", 0, hh * 0.05, 0));
       g.userData.alturaParede = 0.75;
@@ -102,7 +112,7 @@ function movel(it, sala) {
     g.userData.parede = true; prof = 0.1;
   }
   else { // genérico: caixa na cor do desenho 2D
-    const h = Math.max(0.3, Math.min(1.6, a.h / T * 0.75)); add(caixaM(Math.max(0.3, w - 0.15), h, Math.min(prof, 0.9), corMedia(k), 0, 0, 0));
+    const h = Math.max(0.3, Math.min(1.1, a.h / T * 0.6)); add(caixaM(Math.max(0.3, w - 0.15), h, Math.min(prof, 0.9), corMedia(k), 0, 0, 0));
   }
   g.userData.prof = prof; return g;
 }
@@ -140,7 +150,9 @@ function atualizarTelas(desenhaveis, agora, rapido) {
 /* ---------- montagem ---------- */
 const paredes = [], cartazes = []; // cartazes: agentes, NPCs e pets em pixel art
 const solidos = [], tetos = [], portas3d = []; // caixas no chão (colisão no 3D), tetos (só na 1ª pessoa) e portas que abrem
-const SEM_BATER = /^(cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$|teclado|mouse$|notebook$|gabinete$|projecao$|cafeteira$)/;
+const PE_DIREITO = 3.6; // mesma altura de parede e teto em todas as salas; telões grandes diminuem para caber
+const GENTE = 1.27; // o desenho da pessoa tem ~1,35 tile; ×1,27 ≈ 1,72 m, na escala dos móveis (1 tile = 1 m)
+const SEM_BATER = /^(cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$|teclado|mouse$|notebook$|gabinete$|projecao$|sino$)/;
 let objetos = null;
 function montar(S) {
   if (objetos) { cena.remove(objetos); objetos.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
@@ -225,11 +237,7 @@ function montar(S) {
   montarPortas();
 }
 /* pé-direito padrão de todas as salas: 3,6 m, ou mais se algum telão/projeção da parede passar disso */
-function alturaParedes() {
-  let alto = 0;
-  for (const it of allItems()) { if (!NA_PAREDE.test(it.k) || !/^(telao|telao_tend|telao_rot|tv|projecao|quadro_branco)/.test(it.k)) continue; const a = ASSETS[it.k]; if (a) alto = Math.max(alto, 0.75 + a.h / T); }
-  return Math.max(3.6, Math.ceil((alto + 0.35) * 10) / 10);
-}
+function alturaParedes() { return PE_DIREITO; }
 /* portas de verdade nos vãos: abrem sozinhas quando alguém chega perto */
 function montarPortas() {
   const vistas = new Set(), lista = portas3d.splice(0), ALT = alturaParedes(), AP = 2.15;
@@ -291,7 +299,7 @@ function spriteDaPessoa(a) {
   const c = document.createElement("canvas"); c.width = 64; c.height = 80;
   const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.colorSpace = THREE.SRGBColorSpace;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, alphaTest: 0.4 }));
-  sp.center.set(0.5, 12 / 80); sp.scale.set(64 / T, 80 / T, 1); sp.renderOrder = 2; sp.userData.ator = a;
+  sp.center.set(0.5, 12 / 80); sp.scale.set(64 / T * GENTE, 80 / T * GENTE, 1); sp.renderOrder = 2; sp.userData.ator = a;
   const sombra = new THREE.Mesh(new THREE.CircleGeometry(0.28, 16), new THREE.MeshBasicMaterial({ color: 0x140f1e, transparent: true, opacity: 0.28, depthWrite: false }));
   sombra.rotation.x = -Math.PI / 2;
   cena.add(sp, sombra);
@@ -373,7 +381,7 @@ const Iso3D = {
       const kOlhar = 1 - Math.exp(-(dt || 0.016) * 22); yaw += (yawAlvo - yaw) * kOlhar; pitch += (pitchAlvo - pitch) * kOlhar;
       const fov = Math.max(42, Math.min(88, 70 / Math.pow(Math.max(0.6, zoom) / 1.4, 0.35)));
       if (Math.abs(camFP.fov - fov) > 0.3) { camFP.fov = fov; camFP.updateProjectionMatrix(); }
-      const olho = P.assento ? 1.18 : 1.55;
+      const olho = P.assento ? 1.2 : 1.6;
       camFP.position.set(alvo.x, olho, alvo.z);
       camFP.lookAt(alvo.x - Math.sin(yaw) * Math.cos(pitch), olho + Math.sin(pitch), alvo.z - Math.cos(yaw) * Math.cos(pitch)); camFP.updateMatrixWorld();
       // luz apagada na sala em que você está: o ambiente escurece, só as telas brilham
