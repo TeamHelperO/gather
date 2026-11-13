@@ -89,6 +89,12 @@ window.Telao = (function () {
 .tl-f input,.tl-f select,.tl-f textarea{border:1px solid var(--line,#e4dfd5);background:var(--chip,#f3f1ec);color:inherit;border-radius:10px;padding:9px 11px;font:inherit}
 .tl-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 .tl-f input,.tl-f select{min-width:0;width:100%}
+.tl-resps{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:46px;padding:6px 8px;border:1px solid var(--line,#e4dfd5);border-radius:11px;background:var(--chip,#f3f1ec)}
+.tl-resps input{flex:1;min-width:120px;border:0!important;background:transparent!important;padding:4px!important;height:auto!important;outline:none}
+.tl-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 4px 3px 3px;border-radius:999px;background:var(--panel,#fff);border:1px solid var(--line,#e4dfd5);font-size:13px;font-weight:650}
+.tl-chip .av{width:22px;height:22px;border-radius:50%;color:#fff;display:grid;place-items:center;font-size:10px;font-weight:800;flex:none}
+.tl-chip button{width:20px;height:20px;border-radius:50%;line-height:1;font-size:15px;color:var(--mut,#6b6760)}.tl-chip button:hover{background:var(--line,#e4dfd5)}
+.tl-card .avs{display:inline-flex}.tl-card .avs .av+.av{margin-left:-7px;box-shadow:0 0 0 2px var(--panel,#fff)}
 .tl-et{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line,#e4dfd5)}
 .tl-et input[type=checkbox]{width:20px;height:20px;accent-color:#3fbf5f;flex:none}
 .tl-et span{flex:1;word-break:break-word}
@@ -147,13 +153,15 @@ window.Telao = (function () {
     desenhar();
   }
   function nomeResp(r) { if (!r) return ""; const u = estado.usuarios.find(u => u.email === r); return u ? u.nome : r; }
-  function minha(t) { return t.responsavel && (t.responsavel === estado.email || t.responsavel === estado.nome || nomeResp(t.responsavel) === estado.nome); }
+  // vários responsáveis por tarefa: guardados no mesmo campo, separados por ";" (e-mail de usuário ou nome livre)
+  const respsDe = t => String((t && t.responsavel) || "").split(";").map(x => x.trim()).filter(Boolean);
+  function minha(t) { return respsDe(t).some(r => r === estado.email || r === estado.nome || nomeResp(r) === estado.nome); }
   function desenhar() {
     const r = estado.raiz, ts = estado.tarefas, sm = resumo(ts);
     r.querySelector("#tlSum").innerHTML = `<b>${sm.media}%</b> concluído · ${sm.ativas} abertas · ${sm.escalonadas ? `<b>⚠ ${sm.escalonadas} escalonada${sm.escalonadas > 1 ? "s" : ""}</b>` : "nada escalonado"}`;
     const fil = [["todas", "Todas"], ["minhas", "Minhas"], ["escalonadas", "⚠ Escalonadas"], ["semdono", "Sem responsável"]];
     r.querySelector("#tlFil").innerHTML = fil.map(([k, l]) => `<button data-fil="${k}" class="${estado.filtro === k ? "on" : ""}">${l}</button>`).join("");
-    const passa = t => estado.filtro === "todas" || (estado.filtro === "minhas" && minha(t)) || (estado.filtro === "escalonadas" && nivel(t) > 0) || (estado.filtro === "semdono" && !t.responsavel);
+    const passa = t => estado.filtro === "todas" || (estado.filtro === "minhas" && minha(t)) || (estado.filtro === "escalonadas" && nivel(t) > 0) || (estado.filtro === "semdono" && !respsDe(t).length);
     r.querySelector("#tlBoard").innerHTML = STATUS.map(st => {
       const lista = ts.filter(t => (t.status || "a_fazer") === st.id && passa(t));
       return `<section class="tl-col" data-st="${st.id}"><h4><i style="background:${st.cor}"></i>${st.nome}<span>${lista.length}</span></h4>
@@ -162,13 +170,14 @@ window.Telao = (function () {
     }).join("");
   }
   function cartao(t) {
-    const p = progresso(t), n = nivel(t), atr = diasAtraso(t), resp = nomeResp(t.responsavel);
+    const p = progresso(t), n = nivel(t), atr = diasAtraso(t), resps = respsDe(t).map(nomeResp);
+    const textoResp = resps.length <= 2 ? resps.join(" e ") : `${resps.slice(0, 2).join(", ")} +${resps.length - 2}`;
     const cor = p >= 100 ? "#3fbf5f" : n >= 2 ? "#e5484d" : n === 1 ? "#f2a33a" : "#3d5afe";
     const et = t.etapas && t.etapas.length ? `☑ ${t.etapas.filter(e => e.feito).length}/${t.etapas.length}` : "";
     return `<div class="tl-card ${n ? "n" + n : ""}" data-id="${t.id}">
       <div class="alca" title="Arrastar" aria-label="Arrastar">⠿</div>
       <div class="t">${esc(t.titulo)}</div>
-      <div class="meta">${resp ? `<span class="av" style="background:${corNome(resp)}">${esc(iniciais(resp))}</span><span>${esc(resp)}</span>` : `<span>Sem responsável</span>`}
+      <div class="meta">${resps.length ? `<span class="avs" title="${esc(resps.join(", "))}">${resps.slice(0, 3).map(n => `<span class="av" style="background:${corNome(n)}">${esc(iniciais(n))}</span>`).join("")}</span><span>${esc(textoResp)}</span>` : `<span>Sem responsável</span>`}
         ${t.prazo ? `<span class="${atr > 0 ? "atr" : ""}">· ${atr > 0 ? `atrasada ${atr}d` : "até " + fmtData(t.prazo)}</span>` : ""}${et ? `<span>· ${et}</span>` : ""}</div>
       <div class="meta" style="margin-top:6px"><div class="bar" style="flex:1;margin:0"><i style="width:${p}%;background:${cor}"></i></div><span class="pc">${p}%</span></div>
       ${n ? `<div class="esc">⚠ ${NIVEL[n]}</div>` : ""}
@@ -193,13 +202,20 @@ window.Telao = (function () {
     d.etapas = d.etapas || [];
     const m = estado.raiz.querySelector("#tlModal");
     const opts = estado.usuarios.map(u => `<option value="${esc(u.email)}">${esc(u.nome)}</option>`).join("");
+    const addResp = v => {
+      v = String(v || "").trim().replace(/[;,]+$/, ""); if (!v) return;
+      const u = estado.usuarios.find(u => u.email === v || u.nome === v), val = u ? u.email : v.replace(/;/g, " ");
+      const l = respsDe(d); if (!l.includes(val)) l.push(val); d.responsavel = l.join(";");
+    };
     const render = () => {
       const p = progresso(d);
       m.innerHTML = `<form class="tl-form" autocomplete="off">
         <h3>${novo ? "Nova tarefa" : "Editar tarefa"}<button type="button" class="tl-btn" data-x style="background:none;font-size:22px">×</button></h3>
         <div class="tl-f"><label>Tarefa</label><input name="titulo" required maxlength="120" value="${esc(d.titulo)}" placeholder="Ex.: Campanha Black Friday do cliente X"></div>
         <div class="tl-row">
-          <div class="tl-f"><label>Responsável</label><input name="responsavel" list="tlUsers" value="${esc(nomeResp(d.responsavel))}" placeholder="Nome ou e-mail"><datalist id="tlUsers">${opts}</datalist></div>
+          <div class="tl-f"><label>Responsáveis</label>
+            <div class="tl-resps">${respsDe(d).map((r, i) => `<span class="tl-chip"><span class="av" style="background:${corNome(nomeResp(r))}">${esc(iniciais(nomeResp(r)))}</span>${esc(nomeResp(r))}<button type="button" data-rmresp="${i}" aria-label="Tirar ${esc(nomeResp(r))}">×</button></span>`).join("")}
+              <input name="responsavel" list="tlUsers" placeholder="${respsDe(d).length ? "+ adicionar" : "Nome ou e-mail e Enter"}"></div><datalist id="tlUsers">${opts}</datalist></div>
           <div class="tl-f"><label>Prazo</label><input name="prazo" type="date" value="${esc(d.prazo || "")}"></div>
         </div>
         <div class="tl-row">
@@ -217,8 +233,12 @@ window.Telao = (function () {
       </form>`;
       const f = m.querySelector("form");
       const ler = () => { d.titulo = f.titulo.value; d.descricao = f.descricao.value; d.prazo = f.prazo.value; d.status = f.status.value;
-        const rv = f.responsavel.value.trim(); const u = estado.usuarios.find(u => u.email === rv || u.nome === rv); d.responsavel = u ? u.email : rv;
+        addResp(f.responsavel.value);
         if (f.progressoManual) d.progressoManual = +f.progressoManual.value; };
+      // responsáveis: escolher da lista (ou digitar e Enter) adiciona; × tira
+      f.responsavel.onkeydown = e => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); ler(); render(); m.querySelector("[name=responsavel]").focus(); } };
+      f.responsavel.onchange = () => { if (estado.usuarios.some(u => u.email === f.responsavel.value)) { ler(); render(); m.querySelector("[name=responsavel]").focus(); } };
+      m.querySelectorAll("[data-rmresp]").forEach(b => b.onclick = () => { ler(); const l = respsDe(d); l.splice(+b.dataset.rmresp, 1); d.responsavel = l.join(";"); render(); });
       if (f.progressoManual) f.progressoManual.oninput = e => { m.querySelector("#tlPv").textContent = e.target.value + "%"; };
       f.status.onchange = () => { ler(); render(); };
       f.prazo.onchange = () => { ler(); render(); };
