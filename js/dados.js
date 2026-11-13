@@ -157,6 +157,10 @@
     ouvirAvisos(cb) { const eu = this.meuId(); return sb.channel("avisos-" + eu).on("postgres_changes", { event: "INSERT", schema: "public", table: "avisos", filter: `para=eq.${eu}` }, p => cb(p.new)).subscribe(); },
     async comentarTarefa(id, texto) { const { data, error } = await sb.rpc("comentar_tarefa", { p_tarefa: id, p_texto: texto }); if (error) throw error; return data; },
 
+    /* ---------- presença (minutos por estado, por dia) ---------- */
+    async registrarPresenca(mapa, estado) { const { error } = await sb.rpc("registrar_presenca", { p_mapa: mapa, p_estado: estado }); return !error; },
+    async listarPresenca(mapa, desdeDia) { const { data, error } = await sb.from("presenca_dia").select("*").eq("mapa_id", mapa).gte("dia", desdeDia).order("dia"); if (error) return null; return data || []; },
+
     /* ---------- salas virtuais: cada uma é um mapa com um ID curto (o mapa "principal" é o escritório da Next Co.) ---------- */
     normalizarSala(id) {
       id = String(id || "").trim().toLowerCase().replace(/^.*[?&]sala=/, "").replace(/[^a-z0-9_-]/g, "");

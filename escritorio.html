@@ -184,6 +184,35 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 .av-i:hover{background:var(--chip)}.av-i b{font-weight:600;font-size:13.5px;display:block}.av-i small{color:var(--mut);font-size:11.5px;text-transform:capitalize}
 .av-i.novo{background:#3d5afe12}.av-i.novo b{font-weight:800}
 @media (max-width:760px){.soc-st span{display:none}.soc-st,.soc-ic{padding:8px 9px}.soc-chat{top:58px;bottom:76px}.ag-form .row3{grid-template-columns:1fr 1fr}}
+/* ---------- painel do gestor ---------- */
+.gs-win{width:min(980px,100%)}
+.gs-corpo{padding:12px 18px 18px}
+.gs-abas,.gs-per{display:flex;gap:4px}
+.gs-abas button,.gs-per button{padding:7px 12px;border-radius:999px;background:var(--chip);font-weight:700;font-size:13px}
+.gs-abas button.on,.gs-per button.on{background:var(--brand);color:#fff}
+.gs-barra{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}.gs-barra .btn{padding:7px 12px;font-size:13px}
+.gs-on{flex:1;color:var(--mut);font-size:13px;font-weight:650}
+.gs-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.gs-cards div{background:var(--chip);border-radius:12px;padding:12px;text-align:center}.gs-cards b{display:block;font-size:22px}.gs-cards small{color:var(--mut);font-size:12px}
+.gs-leg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin:4px 0 8px}.gs-leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.gs-tab{width:100%;border-collapse:collapse;font-size:13px}
+.gs-tab th{text-align:left;color:var(--mut);font-weight:700;font-size:12px;padding:6px 6px;border-bottom:1px solid var(--line)}
+.gs-tab td{padding:7px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.gs-tab td:first-child{display:flex;align-items:center;gap:8px}
+.gs-n{display:flex;flex-direction:column}.gs-n small{color:var(--mut);font-size:11.5px;display:flex;align-items:center;gap:4px}
+.gs-bar{width:30%}.gs-bar>div{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--chip)}.gs-bar i,.gs-col i{display:block}
+.gs-alerta{background:#e5484d14}.gs-alerta .gs-n small{color:#e5484d;font-weight:700}
+.gs-dias{display:flex;align-items:flex-end;gap:6px;height:150px;padding:8px 0}
+.gs-dia{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px}
+.gs-dia small{color:var(--mut);font-size:11px;text-transform:uppercase}
+.gs-col{width:100%;display:flex;flex-direction:column-reverse;border-radius:6px 6px 2px 2px;overflow:hidden;min-height:2px;background:var(--chip)}
+.gs-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.gs-cols section{background:var(--chip);border-radius:12px;padding:10px;max-height:260px;overflow:auto}.gs-cols h4{margin:0 0 6px;font-size:13.5px}
+.gs-t{background:var(--panel);border-radius:9px;padding:7px 9px;margin-top:6px;cursor:pointer;border:1px solid var(--line)}.gs-t:hover{border-color:var(--brand)}
+.gs-t b{display:block;font-size:13px}.gs-t small{color:var(--mut);font-size:11.5px}
+.gs-nada{color:var(--mut);font-size:12.5px;margin:6px 0}
+.gs-obs{color:var(--mut);font-size:12px;margin:12px 0 0}
+@media (max-width:760px){.gs-cards{grid-template-columns:1fr 1fr}.gs-cols{grid-template-columns:1fr}.gs-tab{display:block;overflow:auto}.gs-bar{display:none}}
 .sala-info{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--chip);margin:0 0 8px}
 .sala-info>div{flex:1;min-width:0}.sala-info small{display:block;color:var(--mut);font-size:12px}
 .sala-info code,.cfg-sala code{font:700 12.5px ui-monospace,Menlo,monospace;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
@@ -362,6 +391,8 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 <script src="js/sala.js"></script>
 <script src="js/sessao-unica.js"></script>
 <script src="js/social.js"></script>
+<script src="js/relatorio-core.js"></script>
+<script src="js/gestor.js"></script>
 <script src="js/voz.js"></script>
 <script>
 /* ícones da barra (Lucide) */
@@ -432,6 +463,9 @@ async function boot(){
     presencaMudou: () => Sala.atualizarPresenca({ id: P.id, nome: user.nome, avatar: user.avatar, status: Social.status }),
     mutar: () => { if (Voz.ligado && Voz.micAberto) { Voz.alternarMic(); atualizarBotaoAudio(); } }, micMudo: () => Voz.ligado && !Voz.micAberto,
     aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; }, bloqueado: () => Telao.aberto || TI.aberto || Edicao.aberto || Acesso.aberto });
+  Gestor.iniciar({ mapaId, toast, outros: () => outros.filter(o => o.visto), salaAtual: () => { const id = salaAtualId(); return id ? roomById(id) : null; },
+    tarefas: () => tarefas, abrirTarefa: abrirTarefaPorId, ehNext: EH_NEXT, ehAdmin: () => Dados.ehAdmin(), podeVerEquipe: () => souDonoDaSala(), nomeSala: () => infoEspaco.nome,
+    aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
   SessaoUnica.iniciar({ aoCair(){ try { Sala.sair(); } catch (e) {} try { Voz.desligar(); } catch (e) {} try { Projecao.parar && Projecao.parar(false); } catch (e) {} keys.clear(); joyV = null; } });
   document.getElementById("load").remove();
   ligarAudioAuto();
@@ -1004,6 +1038,8 @@ document.getElementById("eu").onclick = async () => {
     <div class="sala-info"><div><b>${esc(infoEspaco.nome)}</b><small>ID da sala: <code>${esc(idPublico())}</code> · ${({ "2d": "só 2D", "3d": "só 3D", ambos: "2D e 3D" })[modoSala]}</small></div><button class="btn" data-convite>Copiar convite</button></div>
     <a class="mi" href="salas.html">🔁 Trocar de sala / criar sala</a>
     ${souDonoDaSala() && !EH_NEXT ? `<button class="mi" data-cfgsala>⚙️ Configurar esta sala (nome, 2D/3D)</button>` : ""}
+    <button class="mi" data-meutempo>📊 Meu tempo</button>
+    ${souDonoDaSala() ? `<button class="mi" data-gestor>📈 Painel do gestor (presença e relatório)</button>` : ""}
     <a class="mi" href="avatar.html">🧍 Editar meu personagem</a>
     <button class="mi" data-telao>📊 Telão da equipe</button>
     <button class="mi" data-cfgaudio>🎚️ Áudio: microfone, saída e volumes</button>
@@ -1026,6 +1062,8 @@ menu.onclick = async e => {
   if (e.target.closest("[data-convite]")) { const b = e.target.closest("[data-convite]"); const link = location.origin + location.pathname + "?sala=" + idPublico();
     navigator.clipboard.writeText(`Entre na sala "${infoEspaco.nome}": ${link}  (ID: ${idPublico()})`).then(() => { b.textContent = "Copiado ✓"; setTimeout(() => b.textContent = "Copiar convite", 1500); }); }
   if (e.target.closest("[data-cfgsala]")) { abrirConfigSala(); return; }
+  if (e.target.closest("[data-meutempo]")) { menu.classList.add("hidden"); Gestor.abrirMeuTempo(); return; }
+  if (e.target.closest("[data-gestor]")) { menu.classList.add("hidden"); Gestor.abrirPainel(); return; }
   if (e.target.closest("[data-salvarsala]")) { salvarConfigSala(); return; }
   if (e.target.closest("[data-cfgaudio]")) { menu.classList.add("hidden"); abrirConfigAudio(); }
   if (e.target.closest("[data-tend]")) { menu.classList.add("hidden"); TI.abrirPainel(); }
