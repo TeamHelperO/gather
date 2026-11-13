@@ -44,6 +44,11 @@ window.TI = (function () {
   const fmtQuando = d => { const dt = new Date(d), min = Math.round((Date.now() - dt) / 60000); return min < 1 ? "agora" : min < 60 ? `há ${min} min` : min < 1440 ? `há ${Math.round(min / 60)} h` : dt.toLocaleDateString("pt-BR"); };
   const nomeDe = id => (id && pessoas[id]) || "alguém";
   const meuId = () => Dados.meuId();
+  // sala da Next (IA da Next, prospecção) ou sala de cliente (IA própria do cliente, só pesquisa)
+  const mapaAtual = () => window.mapaIdAtual || "principal";
+  const ehNext = () => mapaAtual() === "principal";
+  const podeMexer = () => ehNext() ? Dados.ehAdmin() : !!((window.souDonoDaSala && souDonoDaSala()) || Dados.ehAdmin());
+  const idAgente = id => !id || ehNext() || String(id).includes(":") ? id : mapaAtual() + ":" + id;
 
   async function iniciar(o) {
     opt = o;
@@ -53,11 +58,11 @@ window.TI = (function () {
     setInterval(recarregar, 60000);
   }
   async function recarregar() {
-    const [t, a, u, p] = await Promise.all([Dados.listarTendencias(150), Dados.listarAgentes(), Dados.listarUsuarios(), Dados.listarProspects ? Dados.listarProspects() : null]);
+    const [t, a, u, p] = await Promise.all([Dados.listarTendencias(150), Dados.listarAgentes(), Dados.listarUsuarios(), (ehNext() && Dados.listarProspects) ? Dados.listarProspects() : null]);
     tend = t; agentes = a; pessoas = Object.fromEntries(u.map(p => [p.id, p.nome])); prosp = p;
     if (painel) renderPainel();
   }
-  const agenteInfo = id => agentes.find(a => a.id === id) || { id, nome: id, status: "parado" };
+  const agenteInfo = id => agentes.find(a => a.id === idAgente(id)) || agentes.find(a => a.id === id) || { id, nome: id, status: "parado" };
   const online = a => a.visto_em && Date.now() - new Date(a.visto_em) < 15 * 60000;
 
   /* ---------------- desenho no mapa ---------------- */
@@ -175,7 +180,8 @@ window.TI = (function () {
     if (rodando) return; rodando = true; renderPainel();
     try {
       const token = Dados.token ? await Dados.token() : null;
-      const r = await fetch("/api/agentes", { method: "POST", headers: token ? { Authorization: "Bearer " + token } : {} });
+      const r = ehNext() ? await fetch("/api/agentes", { method: "POST", headers: token ? { Authorization: "Bearer " + token } : {} })
+        : await fetch("/api/agentes-sala", { method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) }, body: JSON.stringify({ mapa: mapaAtual() }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || j.erro) opt.toast("🤖 " + (j.erro || "Não consegui rodar os agentes (" + r.status + ")"));
       else {
@@ -189,7 +195,7 @@ window.TI = (function () {
   function escFechar(e) { if (e.key === "Escape") fecharPainel(); }
   function renderPainel() {
     if (!painel) return;
-    const adm = Dados.ehAdmin(), eu = meuId();
+    const adm = podeMexer(), eu = meuId();
     const cont = { pendente: 0, pega: 0, nao_pega: 0 }; tend.forEach(t => cont[t.decisao]++);
     const busca = (painel.querySelector("[data-busca]") || {}).value || "";
     const lista = tend.filter(t => (filtro === "todas" || t.decisao === filtro) && (!busca || (t.titulo + " " + (t.resumo || "") + " " + (t.categoria || "")).toLowerCase().includes(busca.toLowerCase())));
@@ -203,8 +209,8 @@ window.TI = (function () {
       <div class="tend-top"><b>🔎 Sala de Pesquisa</b>
         <div class="tend-agentes">${daPesquisa.map(a => `<span class="ag ${online(a) ? "on" : ""} ${a.ativo === false ? "off" : ""}" title="${esc(a.detalhe || "")}">${a.tipo === "prospeccao" ? "📨" : "🤖"} ${esc(a.nome)} <small>${a.ativo === false ? "desligado" : online(a) ? esc(a.status) : "parado"}</small></span>`).join("")}</div>
         <button class="tend-x" data-fechar aria-label="Fechar">✕</button></div>
-      <div class="tend-modos">${[["tend", "📈 Tendências"], ["prosp", `📨 Prospecção${nP ? ` <i>${nP}</i>` : ""}`], ["agentes", "⚙️ Agentes"]].map(([k, l]) => `<button class="${modo === k ? "on" : ""}" data-modo="${k}">${l}</button>`).join("")}</div>
-      ${modo === "agentes" ? corpoAgentes(daPesquisa, adm) : modo === "prosp" ? corpoProsp(adm) : corpoTend(adm, cont, busca, lista, eu)}`;
+      <div class="tend-modos">${[["tend", "📈 Tendências"], ...(ehNext() ? [["prosp", `📨 Prospecção${nP ? ` <i>${nP}</i>` : ""}`]] : []), ["agentes", "⚙️ Agentes"]].map(([k, l]) => `<button class="${modo === k ? "on" : ""}" data-modo="${k}">${l}</button>`).join("")}</div>
+      ${modo === "agentes" ? corpoAgentes(daPesquisa, adm) : modo === "prosp" && ehNext() ? corpoProsp(adm) : corpoTend(adm, cont, busca, lista, eu)}`;
     const l = win.querySelector(".tend-lista"); if (l) l.scrollTop = rolagem;
     if (fChave) { const el = win.querySelector(`[data-chave="${CSS.escape(fChave)}"]`); if (el) { el.focus(); if (fSel) try { el.setSelectionRange(fSel[0], fSel[1]); } catch (e) {} } }
   }
@@ -213,7 +219,7 @@ window.TI = (function () {
       <div class="tend-barra">
         ${[["pendente", "🆕 Para avaliar"], ["pega", "✅ Pega"], ["nao_pega", "❌ Não pega"], ["todas", "Todas"]].map(([k, l]) => `<button class="tab ${filtro === k ? "on" : ""}" data-filtro="${k}">${l}${k !== "todas" ? ` <i>${cont[k]}</i>` : ""}</button>`).join("")}
         <input data-busca data-chave="busca" placeholder="Buscar…" value="${esc(busca)}">
-        ${adm ? `<button class="btn" data-rodar ${rodando ? "disabled" : ""} title="Os agentes de pesquisa pedem tendências à IA da NVIDIA agora">${rodando ? "⏳ Agentes trabalhando…" : "▶ Rodar agentes"}</button><button class="btn pri" data-nova>＋ Nova</button>` : ""}
+        ${adm ? `<button class="btn" data-rodar ${rodando ? "disabled" : ""} title="${ehNext() ? "Os agentes de pesquisa pedem tendências à IA da Next agora" : "Os agentes pedem tendências à IA configurada em Configurações → IA e agentes"}">${rodando ? "⏳ Agentes trabalhando…" : "▶ Rodar agentes"}</button><button class="btn pri" data-nova>＋ Nova</button>` : ""}
       </div>
       ${adm && painel.dataset.nova ? `<form class="tend-form" data-form>
         <input name="titulo" placeholder="Título da tendência" required maxlength="200">
@@ -222,12 +228,13 @@ window.TI = (function () {
         <select name="relevancia"><option value="">Relevância</option>${[5, 4, 3, 2, 1].map(n => `<option value="${n}">${"★".repeat(n)}</option>`).join("")}</select>
         <button class="btn pri">Salvar</button><button type="button" class="btn" data-cancelar>Cancelar</button></div></form>` : ""}
       <div class="tend-lista">${lista.length ? lista.map(t => cartao(t, eu, adm)).join("") : `<p class="tend-vazio">${tend.length ? "Nada neste filtro." : "Ainda não há tendências. Assim que os agentes publicarem, elas aparecem aqui em tempo real."}</p>`}</div>
-      <p class="tend-rodape">Só as tendências marcadas como <b>✅ Pega</b> seguem para a sala de Edição.</p>`;
+      <p class="tend-rodape">${ehNext() ? "Só as tendências marcadas como <b>✅ Pega</b> seguem para a sala de Edição." : "As tendências vêm da IA da sua sala (Configurações → IA e agentes) ou da sua IA conectada por MCP."}</p>`;
   }
 
   /* ---------- aba Agentes: nome, foco e instruções de cada pesquisador ---------- */
   function corpoAgentes(lista, adm) {
-    if (!lista.length) return `<p class="tend-vazio">Nenhum agente encontrado.</p>`;
+    if (!lista.length) return ehNext() ? `<p class="tend-vazio">Nenhum agente encontrado.</p>`
+      : `<p class="tend-vazio">Esta sala ainda não tem agentes.${adm ? `<br><br><button class="btn pri" data-criaragentes>＋ Criar os 5 agentes de pesquisa</button>` : " Peça ao dono da sala para criá-los."}</p>`;
     const semMigracao = !lista.some(a => "tipo" in a);
     const dis = adm && !semMigracao ? "" : "disabled";
     const v = (a, k, padrao) => { const r = rascAg[a.id]; return r && k in r ? r[k] : padrao; };
@@ -238,7 +245,7 @@ window.TI = (function () {
           <div class="tc-top"><b>${pro ? "📨" : "🤖"} ${esc(v(a, "nome", a.nome))}</b><span class="chip">${a.id}</span></div>
           <label>Nome<input name="nome" data-chave="${k("nome")}" maxlength="30" value="${esc(v(a, "nome", a.nome))}" ${dis}></label>
           <div class="row2">
-            <label>Função<select name="tipo" data-chave="${k("tipo")}" ${dis}><option value="pesquisa" ${!pro ? "selected" : ""}>Pesquisa de tendências</option><option value="prospeccao" ${pro ? "selected" : ""}>Prospecção de clientes</option></select></label>
+            <label>Função<select name="tipo" data-chave="${k("tipo")}" ${dis}><option value="pesquisa" ${!pro ? "selected" : ""}>Pesquisa de tendências</option>${ehNext() ? `<option value="prospeccao" ${pro ? "selected" : ""}>Prospecção de clientes</option>` : ""}</select></label>
             <label>Categoria<input name="categoria" data-chave="${k("categoria")}" maxlength="40" value="${esc(v(a, "categoria", a.categoria || ""))}" ${dis}></label>
           </div>
           <label>${pro ? "Que tipo de empresa procurar" : "O que pesquisar"}<textarea name="foco" data-chave="${k("foco")}" rows="2" ${dis}>${esc(v(a, "foco", a.foco || ""))}</textarea></label>
@@ -338,6 +345,7 @@ window.TI = (function () {
     const df = e.target.closest("[data-agdesfaz]"); if (df) { delete rascAg[df.dataset.agdesfaz]; return renderPainel(); }
     const pc = e.target.closest("[data-pid]"); if (pc) return acaoProsp(e, pc.dataset.pid);
     if (e.target.closest("[data-rodar]")) return rodarAgentes();
+    if (e.target.closest("[data-criaragentes]")) { try { await Dados.agentesSalaCriar(mapaAtual()); opt.toast("🤖 Agentes criados"); } catch (err) { opt.toast(traduz(err)); } return recarregar(); }
     if (e.target.closest("[data-nova]")) { painel.dataset.nova = painel.dataset.nova ? "" : "1"; return renderPainel(); }
     if (e.target.closest("[data-cancelar]")) { painel.dataset.nova = ""; return renderPainel(); }
     const card = e.target.closest("[data-id]"); if (!card) return;
@@ -370,7 +378,8 @@ window.TI = (function () {
         assinatura: String(fd.get("assinatura") || "").trim(), por_rodada: Math.max(1, Math.min(8, +fd.get("por_rodada") || 5)) };
       if (fd.get("segmentos") == null) campos.config = { segmentos: [], cidades: [], por_rodada: 5, ...(a.config || {}) };
     }
-    try { await Dados.salvarAgente(id, campos); delete rascAg[id]; opt.toast(`💾 ${campos.nome} salvo`); await recarregar(); }
+    if (!ehNext()) { delete campos.tipo; delete campos.config; }
+    try { await (ehNext() ? Dados.salvarAgente(id, campos) : Dados.salvarAgenteSala(id, campos)); delete rascAg[id]; opt.toast(`💾 ${campos.nome} salvo`); await recarregar(); }
     catch (err) { opt.toast("Não consegui salvar: " + ((err && err.message) || "")); }
   }
   // lê a caixa de entrada atrás de respostas (botão, ou sozinho ao abrir a aba, no máximo a cada 10 min)

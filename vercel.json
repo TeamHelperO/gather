@@ -4,6 +4,9 @@
   "functions": {
     "api/agentes.js": {
       "maxDuration": 60
+    },
+    "api/agentes-sala.js": {
+      "maxDuration": 60
     }
   },
   "crons": [
@@ -22,6 +25,10 @@
     {
       "path": "/api/respostas",
       "schedule": "0 20 * * 1-5"
+    },
+    {
+      "path": "/api/agentes-sala",
+      "schedule": "0 12 * * *"
     }
   ],
   "headers": [

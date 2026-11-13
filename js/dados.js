@@ -265,10 +265,10 @@
     async conferirSenhaSala(salaId, senha, mapaId = "principal") { const { data, error } = await sb.rpc("conferir_senha_sala", { p_mapa: mapaId, p_sala: salaId, p_senha: senha }); return !error && data === true; },
 
     /* ---------- tendências de mercado (sala de TI) ---------- */
-    async listarTendencias(limite = 100) { const { data } = await sb.from("tendencias").select("*").order("criado_em", { ascending: false }).limit(limite); return data || []; },
+    async listarTendencias(limite = 100) { let q = sb.from("tendencias").select("*"); const m = (window.mapaIdAtual || "principal"); q = m === "principal" ? q.or("mapa_id.eq.principal,mapa_id.is.null") : q.eq("mapa_id", m); const { data } = await q.order("criado_em", { ascending: false }).limit(limite); return data || []; },
     ouvirTendencias(cb) { return sb.channel("tend-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "tendencias" }, () => cb()).subscribe(); },
     async mexerTendencia(id, acao) { const { data, error } = await sb.rpc("mexer_tendencia", { p_id: id, p_acao: acao }); if (error) throw error; return data; },
-    async criarTendencia(t) { const { error } = await sb.from("tendencias").insert({ titulo: t.titulo, resumo: t.resumo || null, fonte_url: t.fonte_url || null, categoria: t.categoria || null, relevancia: t.relevancia || null, agente: "manual" }); if (error) throw error; },
+    async criarTendencia(t) { const { error } = await sb.from("tendencias").insert({ titulo: t.titulo, resumo: t.resumo || null, fonte_url: t.fonte_url || null, categoria: t.categoria || null, relevancia: t.relevancia || null, agente: "manual", ...((window.mapaIdAtual || "principal") !== "principal" ? { mapa_id: (window.mapaIdAtual || "principal") } : {}) }); if (error) throw error; },
     async excluirTendencia(id) { const { error } = await sb.from("tendencias").delete().eq("id", id); if (error) throw error; },
     async listarRoteiros(limite = 100) { const { data } = await sb.from("roteiros").select("*").order("criado_em", { ascending: false }).limit(limite); return data || []; },
     ouvirRoteiros(cb) { return sb.channel("rot-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "roteiros" }, () => cb()).subscribe(); },
@@ -283,7 +283,14 @@
     },
     async urlVideo(caminho) { const { data, error } = await sb.storage.from("videos").createSignedUrl(caminho, 3600); if (error) throw error; return data.signedUrl; },
     async excluirRoteiro(id) { const { error } = await sb.from("roteiros").delete().eq("id", id); if (error) throw error; },
-    async listarAgentes() { const { data } = await sb.from("agentes").select("*").order("id"); return data || []; },
+    async listarAgentes() { const m = (window.mapaIdAtual || "principal"); let q = sb.from("agentes").select("*"); q = m === "principal" ? q.or("mapa_id.eq.principal,mapa_id.is.null") : q.eq("mapa_id", m); const { data, error } = await q.order("id"); if (error && m === "principal") { const r = await sb.from("agentes").select("*").order("id"); return r.data || []; } return data || []; },
+    // IA da sala virtual (modelo SaaS): a sala da Next não passa por aqui
+    async iaSalaInfo(m) { const { data, error } = await sb.rpc("ia_sala_info", { p_mapa: m }); if (error) throw error; return data; },
+    async iaSalaSalvar(m, c) { const { error } = await sb.rpc("ia_sala_salvar", { p_mapa: m, p_base: c.base_url || "", p_modelo: c.modelo || "", p_chave: c.chave || "", p_apagar_chave: !!c.apagar }); if (error) throw error; },
+    async iaSalaMcp(m, hash, fim) { const { error } = await sb.rpc("ia_sala_mcp", { p_mapa: m, p_hash: hash || "", p_final: fim || "" }); if (error) throw error; },
+    async agentesSalaCriar(m) { const { data, error } = await sb.rpc("agentes_sala_criar", { p_mapa: m }); if (error) throw error; return data; },
+    async salvarAgenteSala(id, campos) { const { error } = await sb.rpc("salvar_agente_sala", { p_id: id, p_campos: campos }); if (error) throw error; },
+    async tokenAtual() { const { data } = await sb.auth.getSession(); return data && data.session ? data.session.access_token : null; },
     async salvarAgente(id, campos) { const { error } = await sb.from("agentes").update(campos).eq("id", id); if (error) throw error; },
     async listarProspects(n = 400) { const { data, error } = await sb.from("prospects").select("*").order("criado_em", { ascending: false }).limit(n); if (error) return null; return data || []; },
     ouvirProspects(cb) { return sb.channel("prosp-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "prospects" }, () => cb()).subscribe(); },
