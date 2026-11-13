@@ -12,6 +12,15 @@ const ASSENTOS_DEF = {
   poltrona:        { pts: [[16, 22]], face: "frente", r: 30 },
   pufe:            { pts: [[16, 16]], face: "frente", r: 28 },
 };
+// para onde a pessoa sentada olha (0 baixo, 1 esquerda, 2 direita, 3 cima), contando o "Girar 90°"/"Espelhar" do editor
+const DIR_ASSENTO = { cadeira_cima: 3, cadeira_baixo: 0, cadeira_esq: 1, cadeira_dir: 2, cadeira_plateia: 3, sofa: 0, poltrona: 0, pufe: 0 };
+function direcaoDoAssento(it){
+  const giro = [3, 2, 0, 1]; let d = DIR_ASSENTO[it.k] ?? 0;
+  const passos = Math.round((((it.rot || 0) % 360) + 360) % 360 / 90);
+  d = giro[(giro.indexOf(d) + passos) % 4];
+  if (it.flip && (d === 1 || d === 2)) d = 3 - d;
+  return d;
+}
 function construirAssentos(){
   const itens = allItems(), out = [];
   const mesas = itens.filter(i => i.k === "mesa" || i.k === "mesa_pc");
@@ -22,10 +31,16 @@ function construirAssentos(){
     const mesa = it.k === "cadeira_cima" ? mesas.find(m => it.x + 0.5 >= m.x - 0.1 && it.x + 0.5 <= m.x + lw(m) + 0.1 && it.y - m.y > lh(m) - 0.7 && it.y - m.y < lh(m) + 0.3) : null;
     const trabalho = !!mesa;
     const monitores = mesa ? itens.filter(o => EQUIP.test(o.k) && o.x >= mesa.x - 0.1 && o.x <= mesa.x + lw(mesa) - 0.4 && o.y >= mesa.y - 1 && o.y <= mesa.y + 0.5) : [];
+    const dir = direcaoDoAssento(it), face = dir === 3 ? "costas" : "frente";
     d.pts.forEach(([px, py], i) => {
-      const sx = it.x*T + px, sy = it.y*T + py, sala = roomAt(sx, sy);
-      out.push({ id: `${it.id || it.k + "_" + it.x + "_" + it.y}_${i}`, k: it.k, sx, sy, face: d.face, r: d.r, trabalho, monitores,
-        sort: d.face === "costas" ? base - 1 : base + 1, sala: sala ? sala.name : null, ocupante: null });
+      let sx = it.x*T + px, sy = it.y*T + py;
+      if (it.rot || it.flip){ // gira/espelha o ponto do assento junto com o móvel (em volta do centro, como o 2D desenha)
+        const b = caixa(it), rad = (it.rot || 0) * Math.PI / 180; let dx = px - a.w/2, dy = py - a.h/2; if (it.flip) dx = -dx;
+        sx = b.cx + dx*Math.cos(rad) - dy*Math.sin(rad); sy = b.cy + dx*Math.sin(rad) + dy*Math.cos(rad);
+      }
+      const sala = roomAt(sx, sy);
+      out.push({ id: `${it.id || it.k + "_" + it.x + "_" + it.y}_${i}`, k: it.k, sx, sy, face, dir, r: d.r, trabalho, monitores,
+        sort: face === "costas" ? base - 1 : base + 1, sala: sala ? sala.name : null, ocupante: null });
     });
   }
   return out;
@@ -43,7 +58,7 @@ class Ator {
   get px(){ return this.assento ? this.assento.sx : this.x; }
   get py(){ return this.assento ? this.assento.sy + 6 : this.y; }
   sentar(s){ if (s.ocupante && s.ocupante !== this) return false; this.levantar(); s.ocupante = this; this.assento = s; this.volta = {x: this.x, y: this.y};
-    this.path = null; this.emote = null; this.dir = s.face === "costas" ? 3 : 0; return true; }
+    this.path = null; this.emote = null; this.dir = s.dir ?? (s.face === "costas" ? 3 : 0); return true; }
   levantar(){ const s = this.assento; if (!s) return; s.ocupante = null; this.assento = null; this.saiuDe = s; if (this.volta){ this.x = this.volta.x; this.y = this.volta.y; this.volta = null; } }
   olharPara(o){ if (this.assento) return; const dx = o.px - this.px, dy = o.py - this.py;
     this.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 1 : 2) : (dy < 0 ? 3 : 0); }
@@ -54,7 +69,10 @@ class Ator {
     if (this.assento){
       const s = this.assento; row = 4;
       const fala = this.conversa && this.falando;
-      if (s.face === "costas") col = 2 + ((this.assento.trabalho && !fala) ? Math.floor(t*5) % 2 : 0);
+      // vista: no 3D vem da câmera (vistaSentado); no 2D, para onde o assento olha
+      const v = this.vistaSentado ?? s.dir ?? (s.face === "costas" ? 3 : 0);
+      if (v === 3) col = 2 + ((this.assento.trabalho && !fala) ? Math.floor(t*5) % 2 : 0);
+      else if (v === 1 || v === 2) col = sh.width >= 6*32 ? (v === 1 ? 4 : 5) : 0;
       else col = 0 + (fala ? Math.floor(t*3) % 2 : 0);
       x = s.sx - 16; y = s.sy - 40;
     } else if (this.montaria && window.Montaria) {

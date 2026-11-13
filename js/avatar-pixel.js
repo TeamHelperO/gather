@@ -284,6 +284,7 @@
     }
     q({ vista: "f", sentado: true, expr: "neutra" }, 0, 4); q({ vista: "f", sentado: true, expr: "sorriso" }, 1, 4);
     q({ vista: "b", sentado: true, digitar: 1 }, 2, 4); q({ vista: "b", sentado: true, digitar: 2 }, 3, 4);
+    q({ vista: "l", sentado: true }, 4, 4); q({ vista: "l", sentado: true }, 5, 4, true); // sentado de lado (esquerda, direita)
     for (let f = 0; f < 4; f++) q({ vista: "f", acenar: f + 1, expr: "sorriso" }, f, 5);
     for (let f = 0; f < 6; f++) q({ vista: "f", dancar: f + 1, bob: f % 2 ? -1 : 0, expr: f % 3 === 2 ? "sorriso" : "gargalhada", andar: [1, 0, 3, 0, 1, 3][f] }, f, 6);
     return c;

@@ -67,13 +67,13 @@ function movel(it, sala) {
   if ((k === "sino" || k === "cafeteira") && semMesa()) add(caixaM(0.5, 0.74, 0.45, "#e9e4da", 0, 0, 0));
   if (/^mesa_pc$|^mesa$/.test(k)) { prof = 1.1; add(caixaM(w - 0.05, 0.07, prof, "#c08850", 0, 0.72, 0)); for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) add(caixaM(0.06, 0.72, 0.06, "#6b5a4a", x * (w / 2 - 0.12), 0, z * (prof / 2 - 0.1))); add(caixaM(0.5, 0.4, prof - 0.2, "#a8743f", w / 2 - 0.35, 0.3, 0)); }
   else if (k === "mesa_copa") { prof = 1.4; add(cilindro(0.7, 0.06, "#f2efe8", 0, 0.7, 0, 20)); add(cilindro(0.07, 0.7, "#6b6672", 0, 0, 0)); add(bola(0.09, "#e5484d", -0.2, 0.82, 0.1)); }
-  else if (k === "monitor") { prof = 0.3; add(caixaM(0.06, 0.18, 0.06, "#2b2f39", 0, 0.78, 0)); add(caixaM(0.6, 0.38, 0.04, "#1d2028", 0, 0.92, 0)); const pl = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.34), materialTela(it, TELAS.monitor)); pl.position.set(0, 1.11, 0.025); add(pl); g.userData.sobreMesa = true; }
-  else if (k === "gabinete") { prof = 0.45; add(caixaM(0.22, 0.48, 0.42, "#16181f", 0, 0.78, 0)); add(caixaM(0.02, 0.4, 0.3, brilho("#c84bff", 1.6), 0.115, 0.82, 0, false)); g.userData.sobreMesa = true; }
+  else if (k === "monitor") { prof = 0.3; add(caixaM(0.22, 0.02, 0.16, "#2b2f39", 0, 0.79, 0)); add(caixaM(0.06, 0.2, 0.05, "#2b2f39", 0, 0.8, -0.03)); add(caixaM(0.78, 0.47, 0.04, "#1d2028", 0, 0.96, 0)); const pl = new THREE.Mesh(new THREE.PlaneGeometry(0.73, 0.42), materialTela(it, TELAS.monitor)); pl.position.set(0, 1.195, 0.025); add(pl); g.userData.sobreMesa = true; }
+  else if (k === "gabinete") { prof = 0.5; add(caixaM(0.24, 0.52, 0.48, "#16181f", 0, 0.79, 0)); add(caixaM(0.02, 0.44, 0.36, brilho("#c84bff", 1.6), 0.125, 0.83, 0, false)); g.userData.sobreMesa = true; }
   else if (/^teclado|^mouse$|^notebook$/.test(k)) { prof = 0.25; if (k === "notebook") { add(caixaM(0.5, 0.03, 0.34, "#c9ccd6", 0, 0.79, 0)); add(caixaM(0.5, 0.32, 0.02, "#c9ccd6", 0, 0.8, -0.16)); const pl = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.26), materialTela(it, TELAS.notebook)); pl.position.set(0, 0.97, -0.145); add(pl); } else add(caixaM(k === "mouse" ? 0.08 : 0.5, 0.03, k === "mouse" ? 0.12 : 0.17, k === "mouse" ? "#2b2f39" : brilho("#ff5ad1", 0.5), 0, 0.79, 0)); g.userData.sobreMesa = true; }
   else if (/^cadeira_/.test(k)) {
     prof = 0.5; const cor = k === "cadeira_plateia" ? "#7a2f3a" : "#3a3f4a";
     add(caixaM(0.48, 0.08, 0.46, cor, 0, 0.42, 0)); add(cilindro(0.04, 0.42, "#2b2f39", 0, 0, 0)); const enc = add(caixaM(0.48, 0.5, 0.07, cor, 0, 0.5, -0.2));
-    const rot = { cadeira_baixo: Math.PI, cadeira_cima: 0, cadeira_esq: -Math.PI / 2, cadeira_dir: Math.PI / 2, cadeira_plateia: Math.PI }[k] ?? 0; g.rotation.y = rot; void enc;
+    const rot = { cadeira_baixo: 0, cadeira_cima: Math.PI, cadeira_esq: -Math.PI / 2, cadeira_dir: Math.PI / 2, cadeira_plateia: Math.PI }[k] ?? 0; g.rotation.y = rot; void enc;
   }
   else if (k === "sofa" || k === "poltrona") { prof = 0.9; const cor = k === "sofa" ? "#3f5fd6" : "#e08a3a"; add(caixaM(w - 0.1, 0.36, prof, cor, 0, 0.05, 0)); add(caixaM(w - 0.1, 0.45, 0.2, cor, 0, 0.35, -prof / 2 + 0.1)); add(caixaM(0.18, 0.5, prof, cor, -w / 2 + 0.14, 0.05, 0)); add(caixaM(0.18, 0.5, prof, cor, w / 2 - 0.14, 0.05, 0)); }
   else if (/^planta/.test(k)) { prof = 0.5; const gr = k === "planta_grande"; add(cilindro(0.2, 0.32, "#c96a3a", 0, 0, 0)); add(bola(gr ? 0.42 : 0.3, "#3f9a4a", 0, gr ? 0.85 : 0.6, 0)); add(bola(gr ? 0.3 : 0.2, "#56b85c", 0.12, gr ? 1.15 : 0.82, 0.05)); }
@@ -216,7 +216,9 @@ function montar(S) {
     if (g.userData.parede) { const r = sala || roomAt(it.x * T + 16, it.y * T + a.h + 40); g.position.set(cx, g.userData.alturaParede, (r ? r.y : it.y + 2) + 0.09); }
     else if (g.userData.chao) g.position.set(cx, 0.04, it.y + a.h / T / 2);
     else if (g.userData.billboard) { g.position.set(cx, 0.06, it.y + a.h / T - 0.1); cartazes.push(g); }
+    else if (g.userData.sobreMesa && mesaSob(it)) { const [x, z] = naMesa(it, mesaSob(it)); g.position.set(x, 0, z); }
     else { const base = it.y + a.h / T; g.position.set(cx, g.userData.sobreMesa ? 0 : 0.08, base - g.userData.prof / 2 - 0.05); }
+    girarComoNoEditor(g, it);
     if (it.rot) g.rotation.y += -it.rot * Math.PI / 180; if (it.flip) g.scale.x *= -1;
     g.traverse(o => { o.userData.item = it; });
     objetos.add(g);
@@ -235,6 +237,26 @@ function montar(S) {
     solidos.push({ x0: caixaTmp.min.x + 0.03, z0: caixaTmp.min.z + 0.03, x1: caixaTmp.max.x - 0.03, z1: caixaTmp.max.z - 0.03 });
   }
   montarPortas();
+}
+/* mesa embaixo de um item (monitor, gabinete, teclado…) e onde ele fica em cima dela no 3D */
+const MESAS3D = /^(mesa|mesa_pc|mesa_reuniao\d*|balcao)$/;
+const profMesa = m => /^mesa_reuniao/.test(m.k) ? Math.max(1, ASSETS[m.k].h / T * 0.75) : 1.1;
+function mesaSob(it) {
+  if (it._mesa !== undefined) return it._mesa;
+  const a = ASSETS[it.k], cx = it.x * T + a.w / 2, by = it.y * T + a.h;
+  return (it._mesa = allItems().find(m => MESAS3D.test(m.k) && ASSETS[m.k] && cx >= m.x * T - 4 && cx <= m.x * T + ASSETS[m.k].w + 4 && by >= m.y * T - 12 && by <= m.y * T + ASSETS[m.k].h + 10) || null);
+}
+function naMesa(it, m) {
+  const a = ASSETS[it.k], am = ASSETS[m.k], pr = profMesa(m), z1 = m.y + am.h / T - 0.05, z0 = z1 - pr;
+  const f = Math.max(0, Math.min(1, (it.y * T + a.h - m.y * T) / am.h)); // no 2D: mais para cima = mais para o fundo da mesa
+  const x = Math.max(m.x + 0.25, Math.min(m.x + am.w / T - 0.25, it.x + a.w / T / 2));
+  return [x, z0 + 0.22 + f * Math.max(0, pr - 0.44)];
+}
+/* "Girar 90°" e "Espelhar" do editor valem também no 3D (sentido horário visto de cima, como no 2D) */
+function girarComoNoEditor(g, it) {
+  const r = ((it.rot || 0) % 360 + 360) % 360;
+  if (r) g.rotation.y -= r * Math.PI / 180;
+  if (it.flip) g.scale.x *= -1;
 }
 /* pé-direito padrão de todas as salas: 3,6 m, ou mais se algum telão/projeção da parede passar disso */
 function alturaParedes() { return PE_DIREITO; }
@@ -317,7 +339,8 @@ function desenharPessoa(a, t) {
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, 64, 80); g.imageSmoothingEnabled = false;
   g.setTransform(1, 0, 0, 1, 32 - Math.round(a.px), 68 - Math.round(a.py));
   const d = a.dir; if (!a.assento) a.dir = direcaoVista(d);
-  try { a.draw(g, t); } finally { a.dir = d; }
+  else a.vistaSentado = direcaoVista(a.assento.dir ?? (a.assento.face === "costas" ? 3 : 0)); // sentado: de frente, de costas ou de lado conforme você gira em volta
+  try { a.draw(g, t); } finally { a.dir = d; a.vistaSentado = undefined; }
   s.tex.needsUpdate = true;
   s.sp.position.set(a.px / T, a.assento ? 0.12 : 0.08, a.py / T);
   s.sombra.position.set(a.px / T, 0.1, a.py / T); s.sombra.visible = !a.assento;
