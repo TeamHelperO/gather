@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Salas – Escritório Virtual</title>
+<link rel="stylesheet" href="css/base.css">
+<style>
+body{display:grid;place-items:center;min-height:100vh;padding:20px;background:#16141f url("assets/splash.png") center/cover no-repeat;image-rendering:pixelated}
+body::before{content:"";position:fixed;inset:0;background:rgba(18,14,30,.6)}
+.card{position:relative;width:100%;max-width:560px;padding:24px;image-rendering:auto}
+.logo{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.logo span{width:40px;height:40px;border-radius:10px;background:var(--brand);display:grid;place-items:center;color:#fff;font-weight:900;font-size:20px}
+.logo .eu{margin-left:auto;font-size:13px;color:var(--mut)}
+h2{font-size:16px;margin:20px 0 8px}
+.linha{display:flex;gap:8px}.linha input{flex:1;height:46px;border-radius:11px;border:1px solid var(--line);background:var(--chip);padding:0 14px;font-size:17px;letter-spacing:.5px}
+.lista{display:flex;flex-direction:column;gap:6px}
+.sala{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--chip);text-align:left;width:100%}
+.sala:hover{border-color:var(--brand)}
+.sala b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sala code,.id{font:700 13px ui-monospace,Menlo,monospace;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:2px 7px}
+.modo{font-size:11px;font-weight:800;padding:2px 7px;border-radius:999px;background:#3d5afe22;color:var(--brand)}
+.x{color:var(--mut);padding:2px 6px;border-radius:6px}.x:hover{background:var(--line)}
+.opcoes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.opcoes label{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px;border:2px solid var(--line);border-radius:12px;cursor:pointer;font-weight:700;font-size:14px;text-align:center}
+.opcoes label small{font-weight:400;color:var(--mut);font-size:11.5px}
+.opcoes input{display:none}.opcoes label:has(input:checked){border-color:var(--brand);background:#3d5afe14}
+.field select{height:46px;border-radius:11px;border:1px solid var(--line);background:var(--chip);padding:0 12px;font-size:15px}
+.vazio{color:var(--mut);font-size:13px;margin:0}
+.ok{text-align:center}.ok .grande{font:900 34px ui-monospace,Menlo,monospace;letter-spacing:4px;margin:10px 0;padding:10px;border:2px dashed var(--brand);border-radius:14px}
+.sep{height:1px;background:var(--line);margin:18px 0 0}
+details summary{cursor:pointer;font-weight:700;font-size:16px;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="logo"><span>N</span><div><b>Escritório virtual</b><div style="font-size:12px;color:var(--mut)">Entre numa sala pelo ID ou crie a sua</div></div><div class="eu" id="eu"></div></div>
+
+  <div id="principal">
+    <h2>Entrar com o ID da sala</h2>
+    <form class="linha" id="fEntrar"><input id="idSala" placeholder="ex.: k7m2qa" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="80"><button class="btn pri">Entrar</button></form>
+    <div class="err" id="errEntrar"></div>
+
+    <div id="blocoMinhas" style="display:none"><h2>Salas que eu criei</h2><div class="lista" id="minhas"></div></div>
+    <div id="blocoRecentes"><h2>Entrei recentemente</h2><div class="lista" id="recentes"></div></div>
+
+    <div class="sep"></div>
+    <details id="dCriar">
+      <summary>➕ Criar uma sala nova</summary>
+      <form id="fCriar">
+        <div class="field"><label for="nomeSala">Nome da sala</label><input id="nomeSala" maxlength="40" placeholder="Ex.: Agência Aurora" required></div>
+        <div class="field"><label>Como as pessoas vão ver a sala</label>
+          <div class="opcoes">
+            <label><input type="radio" name="modo" value="2d">2D<small>Visão de cima, leve, roda em qualquer aparelho</small></label>
+            <label><input type="radio" name="modo" value="3d">3D<small>Primeira pessoa, mais imersivo</small></label>
+            <label><input type="radio" name="modo" value="ambos" checked>2D e 3D<small>Cada pessoa escolhe</small></label>
+          </div>
+        </div>
+        <div class="field"><label for="modelo">Começar com</label>
+          <select id="modelo">
+            <option value="completo">Escritório completo (recepção, trabalho, reuniões, auditório, copa…)</option>
+            <option value="pequeno">Escritório pequeno (recepção, trabalho, reunião e copa)</option>
+            <option value="vazio">Vazio (você monta no editor)</option>
+          </select></div>
+        <div class="err" id="errCriar"></div>
+        <button class="btn pri" style="width:100%" id="bCriar">Criar sala</button>
+      </form>
+    </details>
+  </div>
+
+  <div id="criada" class="ok" style="display:none">
+    <div style="font-size:40px">🎉</div>
+    <h2 style="margin:4px 0">Sala criada!</h2>
+    <p class="vazio">Passe este ID para a equipe entrar:</p>
+    <div class="grande" id="novoId"></div>
+    <div class="linha" style="justify-content:center;flex-wrap:wrap">
+      <button class="btn" id="copiarId">Copiar ID</button><button class="btn" id="copiarLink">Copiar link de convite</button>
+    </div>
+    <button class="btn pri" style="width:100%;margin-top:12px" id="entrarNova">Entrar na sala</button>
+  </div>
+</div>
+<script src="js/vendor/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/dados.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const MODO = { "2d": "2D", "3d": "3D", ambos: "2D + 3D" };
+const ir = id => { location.href = "escritorio.html?sala=" + encodeURIComponent(id); };
+
+/* modelos de sala (as salas se mobíliam sozinhas pelo tipo) */
+const rid = () => Math.random().toString(36).slice(2, 9);
+const sala = (type, name, x, y, w, h, door = "baixo", pos = 0.5) => ({ id: rid(), type, name, x, y, w, h, floor: null, door: { side: door, pos }, auto: true });
+const MODELOS = {
+  completo: () => ({ v: 1, w: 68, h: 32, items: [], rooms: [
+    sala("recepcao", "Recepção", 2, 3, 14, 11), sala("trabalho", "Área de trabalho", 16, 3, 17, 11), sala("trabalho", "Área de trabalho 2", 33, 3, 14, 11),
+    sala("reuniao", "Reunião 3", 47, 3, 10, 11), sala("copa", "Copa e lazer", 57, 3, 9, 11), sala("corredor", "Corredor", 2, 14, 64, 3, "nenhuma"),
+    sala("reuniao", "Reunião 1", 2, 19, 10, 9, "cima", 0.12), sala("reuniao", "Reunião 2", 12, 19, 10, 9, "cima", 0.12),
+    sala("auditorio", "Auditório", 22, 19, 14, 11, "cima"), sala("silenciosa", "Área silenciosa", 36, 19, 12, 9, "cima") ] }),
+  pequeno: () => ({ v: 1, w: 46, h: 30, items: [], rooms: [
+    sala("recepcao", "Recepção", 2, 3, 13, 10), sala("trabalho", "Área de trabalho", 15, 3, 17, 10), sala("copa", "Copa", 32, 3, 10, 10),
+    sala("corredor", "Corredor", 2, 13, 40, 3, "nenhuma"), sala("reuniao", "Reunião", 2, 18, 11, 9, "cima", 0.12), sala("silenciosa", "Área silenciosa", 13, 18, 12, 9, "cima") ] }),
+  vazio: () => ({ v: 1, w: 40, h: 28, items: [], rooms: [sala("livre", "Sala principal", 4, 4, 30, 18)] }),
+};
+
+function linhaSala(s, podeTirar) {
+  return `<div class="sala" role="button" tabindex="0" data-ir="${esc(s.id)}"><b>${esc(s.nome || s.id)}</b>${s.modo ? `<span class="modo">${MODO[s.modo] || ""}</span>` : ""}<code>${esc(s.id === "principal" ? "nextco" : s.id)}</code>${podeTirar ? `<button class="x" data-tirar="${esc(s.id)}" title="Tirar da lista">✕</button>` : ""}</div>`;
+}
+async function entrar(id, errEl) {
+  id = Dados.normalizarSala(id); errEl.textContent = "";
+  if (!id) { errEl.textContent = "Digite o ID da sala"; return; }
+  const info = await Dados.infoSala(id).catch(() => null);
+  if (!info) { errEl.textContent = "Não achei nenhuma sala com esse ID. Confira com quem te passou."; return; }
+  Dados.lembrarSala(id, info.nome); ir(id);
+}
+
+(async () => {
+  const EMAIL = await Dados.exigirSessao("index.html"); if (!EMAIL) return;
+  const eu = await Dados.getUsuario(EMAIL);
+  if (!eu.avatar) { location.href = "avatar.html"; return; }
+  $("eu").textContent = eu.nome || "";
+  // veio por um convite (?sala=…)?
+  let convite = Dados.salaDaUrl(); try { convite = convite || localStorage.getItem("nextco_sala_convite"); localStorage.removeItem("nextco_sala_convite"); } catch (e) {}
+  if (convite) { $("idSala").value = convite; return entrar(convite, $("errEntrar")); }
+
+  const rec = Dados.salasRecentes();
+  $("recentes").innerHTML = rec.length ? rec.map(s => linhaSala(s, true)).join("") : `<p class="vazio">Nenhuma ainda. Escritório da Next Co.: ID <b>nextco</b>.</p>`;
+  const minhas = await Dados.minhasSalas().catch(() => []);
+  if (minhas.length) { $("blocoMinhas").style.display = ""; $("minhas").innerHTML = minhas.map(s => linhaSala(s, false)).join(""); }
+  $("idSala").focus();
+})();
+
+$("fEntrar").onsubmit = e => { e.preventDefault(); entrar($("idSala").value, $("errEntrar")); };
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-tirar]"); if (t) { e.stopPropagation(); Dados.esquecerSala(t.dataset.tirar); t.closest(".sala").remove(); return; }
+  const s = e.target.closest("[data-ir]"); if (s) entrar(s.dataset.ir, $("errEntrar"));
+});
+document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches("[data-ir]")) entrar(e.target.dataset.ir, $("errEntrar")); });
+
+let criadaId = null;
+$("fCriar").onsubmit = async e => {
+  e.preventDefault();
+  const nome = $("nomeSala").value.trim(), modo = (document.querySelector("[name=modo]:checked") || {}).value || "ambos";
+  if (!nome) { $("errCriar").textContent = "Dê um nome para a sala"; return; }
+  $("bCriar").disabled = true; $("bCriar").textContent = "Criando…"; $("errCriar").textContent = "";
+  try {
+    criadaId = await Dados.criarSala({ nome, modo, mapa: MODELOS[$("modelo").value]() });
+    Dados.lembrarSala(criadaId, nome);
+    $("principal").style.display = "none"; $("criada").style.display = ""; $("novoId").textContent = criadaId;
+  } catch (err) { $("errCriar").textContent = "Não consegui criar: " + (err.message || err); }
+  $("bCriar").disabled = false; $("bCriar").textContent = "Criar sala";
+};
+const copiar = (txt, b) => navigator.clipboard.writeText(txt).then(() => { const o = b.textContent; b.textContent = "Copiado ✓"; setTimeout(() => b.textContent = o, 1500); });
+$("copiarId").onclick = e => copiar(criadaId, e.target);
+$("copiarLink").onclick = e => copiar(location.origin + location.pathname.replace(/salas\.html$/, "") + "escritorio.html?sala=" + criadaId, e.target);
+$("entrarNova").onclick = () => ir(criadaId);
+</script>
+</body>
+</html>

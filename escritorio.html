@@ -107,6 +107,16 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 .ed-win .tend-barra .tab.on{background:#e04fa0;border-color:#e04fa0}
 .ed-win .tend-barra select{margin-left:auto;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--chip);padding:0 8px;max-width:260px}
 .ed-win .tend-lista{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+.sala-info{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--chip);margin:0 0 8px}
+.sala-info>div{flex:1;min-width:0}.sala-info small{display:block;color:var(--mut);font-size:12px}
+.sala-info code,.cfg-sala code{font:700 12.5px ui-monospace,Menlo,monospace;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+.sala-info .btn{padding:7px 10px;font-size:12.5px;white-space:nowrap}
+.cfg-sala label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:650;color:var(--mut)}
+.cfg-sala input#cfgNome{height:42px;border-radius:10px;border:1px solid var(--line);background:var(--chip);padding:0 12px;font-size:15px;color:var(--ink)}
+.cfg-modos{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.cfg-modos label{align-items:center;padding:10px 6px;border:2px solid var(--line);border-radius:10px;cursor:pointer;color:var(--ink)}
+.cfg-modos label small{font-weight:400;color:var(--mut);font-size:11px}
+.cfg-modos input{display:none}.cfg-modos label:has(input:checked){border-color:var(--brand);background:#3d5afe18}
 #btnLuz.luz-off{background:#2a2f52;color:#ffd966}
 .tend-modos{display:flex;gap:4px;padding:8px 14px 0;border-bottom:1px solid var(--line);background:var(--chip)}
 .tend-modos button{padding:9px 14px;border-radius:10px 10px 0 0;font-weight:700;font-size:13.5px;border:1px solid transparent;border-bottom:0;margin-bottom:-1px;opacity:.75}
@@ -287,7 +297,11 @@ ROTULO(document.getElementById("btnTelao"), "layout-dashboard", "Abrir telão");
 let EMAIL = null;
 window.OCULTAR_PESSOAS = true; // no escritório só aparecem pessoas de verdade
 let S = null, grid = null, user = null, assentos = [];
-const mapaId = "principal";
+// sala virtual: vem do link (?sala=ID) ou da última em que a pessoa entrou; sem nenhuma, escolhe em salas.html
+const mapaId = Dados.salaDaUrl() || Dados.ultimaSala() || "";
+if (!mapaId) location.replace("salas.html");
+const EH_NEXT = mapaId === "principal";
+let modoSala = "ambos", infoEspaco = {};
 const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
 let DPR = 1, VW = 0, VH = 0, zoom = innerWidth <= 760 ? 1.6 : Math.max(1.2, Math.min(2.2, (innerHeight - 150) / 450)); // no PC, a sala inteira cabe na tela
 let P = null, tarefas = [], teloes = [], monitores = []; const outros = []; // outras pessoas (entram aqui quando houver modo com várias pessoas)
@@ -300,14 +314,20 @@ function onAssetsReady(){ buildPatterns(ctx); boot(); }
 if (imgsLeft === 0) onAssetsReady();
 
 async function boot(){
+  try { if (Dados.salaDaUrl()) localStorage.setItem("nextco_sala_convite", Dados.salaDaUrl()); } catch (e) {} // se precisar entrar antes, volta para esta sala
   EMAIL = await Dados.exigirSessao("index.html"); if (!EMAIL) return;
+  try { localStorage.removeItem("nextco_sala_convite"); } catch (e) {}
   Voz.configurar(EMAIL);
   user = await Dados.getUsuario(EMAIL);
   if (!user.avatar) { location.href = "avatar.html"; return; }
   document.getElementById("nome").textContent = user.nome;
   await Acesso.iniciar({ mapaId, toast, salas: () => S ? S.rooms : [] });
   S = await Dados.carregarMapa(mapaId);
-  if (!S) { S = templateNext(); Dados.salvarMapaLocal(mapaId, S); }
+  if (!S && EH_NEXT) { S = templateNext(); Dados.salvarMapaLocal(mapaId, S); }
+  if (!S) { Dados.esquecerSala(mapaId); location.replace("salas.html"); return; }
+  lerEspaco();
+  Dados.lembrarSala(mapaId, infoEspaco.nome);
+  if (modoSala === "3d" && !window.Iso3D) { window.__quero3D = true; window.carregar3D && carregar3D(); }
   grid = buildBlocked();
   assentos = construirAssentos();
   aplicarModo3d();
@@ -331,13 +351,24 @@ async function boot(){
   checarSala(true);
   last = performance.now(); requestAnimationFrame(loop);
 }
-async function atualizarTarefas(){ tarefas = await Dados.listarTarefas(); }
+async function atualizarTarefas(){
+  const l = await Dados.listarTarefas();
+  // fora do escritório da Next, o telão só mostra tarefas criadas nas salas deste mapa
+  tarefas = EH_NEXT ? l : l.filter(t => t.sala && S && S.rooms.some(r => r.id === t.sala));
+}
+function lerEspaco(){
+  infoEspaco = { ...(S.espaco || {}) }; infoEspaco.nome = infoEspaco.nome || (EH_NEXT ? "Escritório Next Co." : S.name || mapaId);
+  modoSala = ["2d", "3d", "ambos"].includes(infoEspaco.modo) ? infoEspaco.modo : "ambos";
+  document.title = infoEspaco.nome + " – Escritório virtual";
+}
+const souDonoDaSala = () => Dados.ehAdmin() || (!!infoEspaco.dono && infoEspaco.dono === Dados.meuId());
+const idPublico = () => EH_NEXT ? "nextco" : mapaId;
 /* ---------- outras pessoas em tempo real ---------- */
 const sheets = {};
 function montarSheet(av){ const k = JSON.stringify(av || {}); return sheets[k] || (sheets[k] = Avatar.montar(av)); }
 function conectarSala(){
   Sala.entrar({
-    id: P.id,
+    id: P.id, canal: EH_NEXT ? "escritorio-principal" : "escritorio-" + mapaId,
     presenca: () => ({ id: P.id, nome: user.nome, avatar: user.avatar }),
     aoEntrar(id, m){ const a = new Ator({ id, nome: m.nome, sheet: null, x: 0, y: 0, visto: false }); outros.push(a);
       montarSheet(m.avatar).then(sh => a.sheet = sh); toast(`${m.nome} entrou no escritório`); },
@@ -377,7 +408,9 @@ function moverOutros(dt){
 }
 function recarregarMapa(novo){
   for (const a of [P, ...outros]) if (a.assento){ a.assento.ocupante = null; a.assento = null; }
-  S = novo; grid = buildBlocked(); assentos = construirAssentos(); Projecao.recalcular();
+  const modoAntes = modoSala;
+  S = novo; lerEspaco(); if (modoSala !== modoAntes && modoSala !== "ambos") toast(`A sala agora é só ${modoSala.toUpperCase()}`);
+  grid = buildBlocked(); assentos = construirAssentos(); Projecao.recalcular();
   teloes = allItems().filter(i => i.k === "telao"); monitores = allItems().filter(i => EQUIP.test(i.k)); marcarMonitoresTI();
   if (!livre(P.x, P.y)) spawn();
   aplicarModo3d();
@@ -433,14 +466,14 @@ function verTelaDe(pessoa){
   Dados.registrarAtividade(EMAIL, "acao", `Viu a tela de ${pessoa.nome}`, {sala: P.sala, com: pessoa.nome});
 }
 /* cada sala tem o seu telão de tarefas */
-const salaPadrao = () => { const r = S && S.rooms.find(r => r.type === "trabalho"); return r ? r.id : null; };
+const salaPadrao = () => { if (!EH_NEXT) return null; const r = S && S.rooms.find(r => r.type === "trabalho"); return r ? r.id : null; };
 const salaDoTelao = it => (it.room && roomById(it.room)) || roomAt(it.x*T + 96, it.y*T + 110) || roomAt(it.x*T + 96, it.y*T + 140);
 let telaoPerto = null, telaoSalaAberta = null;
 /* recursos de cada sala só para quem está dentro dela */
 const salaAtualId = () => { const r = P && roomAt(P.px, P.py - 4); return r ? r.id : null; };
 /* ---------- luz das salas: qualquer pessoa dentro da sala acende ou apaga; todos veem ----------
    Estado combinado pelo canal do escritório (vale a mudança mais recente) e guardado no navegador. */
-const LUZ_KEY = "nextco_luzes";
+const LUZ_KEY = "nextco_luzes" + (EH_NEXT ? "" : "_" + mapaId);
 let luzes = (() => { try { return JSON.parse(localStorage.getItem(LUZ_KEY)) || {}; } catch (e) { return {}; } })();
 const luzApagada = id => !!(id && luzes[id] && luzes[id].acesa === false);
 const salaComLuz = r => !!r && !TYPES[r.type].noWalls;
@@ -531,13 +564,16 @@ cv.addEventListener("pointermove", e => { if (!ptrs.has(e.pointerId)) return;
     const ant = ptrs.get(e.pointerId), dx = e.clientX - ant.x, dy = e.clientY - ant.y;
     if (!arrasto) arrasto = { id: e.pointerId, total: 0 };
     arrasto.total += Math.abs(dx) + Math.abs(dy);
-    if (arrasto.total > 6){ Iso3D.virar(dx*0.0055); Iso3D.inclinar(dy*0.004); }
+    if (arrasto.total > 4){ // mouse: como nos jogos (direita vira à direita); dedo: "puxa" a cena
+      if (e.pointerType === "mouse") { Iso3D.virar(-dx*0.0042); Iso3D.inclinar(-dy*0.0032); }
+      else { Iso3D.virar(dx*0.0065); Iso3D.inclinar(dy*0.0045); }
+    }
   }
   ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY});
   if (pinch && ptrs.size === 2){ const [a,b] = [...ptrs.values()]; zoom = Math.max(0.6, Math.min(4, pinch.z * Math.hypot(a.x-b.x, a.y-b.y) / pinch.d)); } });
 const up = e => {
   const had = ptrs.get(e.pointerId); ptrs.delete(e.pointerId);
-  if (arrasto && arrasto.id === e.pointerId){ const foi = arrasto.total > 6; arrasto = null; if (foi) return; }
+  if (arrasto && arrasto.id === e.pointerId){ const foi = arrasto.total > 4; arrasto = null; if (foi) return; }
   if (pinch){ if (ptrs.size < 2){ pinch = null; pularUp = ptrs.size; } return; }
   if (pularUp > 0){ pularUp--; return; }
   if (!had || !grid || !P) return;
@@ -566,6 +602,9 @@ cv.addEventListener("wheel", e => { e.preventDefault(); zoom = Math.max(0.6, Mat
 /* modo 3D isométrico (mesma lógica, outro desenho) */
 let quer3d = (() => { try { return localStorage.getItem("nextco_modo3d") === "1" || /[?&]3d=1/.test(location.search); } catch (e) { return false; } })();
 function aplicarModo3d(){
+  if (modoSala === "2d") quer3d = false;
+  if (modoSala === "3d") { quer3d = true; if (!window.Iso3D) { window.__quero3D = true; window.carregar3D && carregar3D(); } }
+  document.getElementById("b3d").style.display = modoSala === "ambos" ? "" : "none";
   const ok = quer3d && window.Iso3D && S;
   if (window.Iso3D && S) Iso3D.ligar(!!ok, S);
   document.getElementById("b3d").classList.toggle("on", !!ok); document.getElementById("b3d").textContent = ok ? "2D" : "3D";
@@ -582,7 +621,7 @@ function atualizarBotaoVista(){
 }
 function trocarVista(){ if (!window.Iso3D) return; const v = Iso3D.trocarVista(); atualizarBotaoVista(); toast(v === "1p" ? "👁 Primeira pessoa · arraste a tela para olhar em volta" : "🧊 Visão de cima"); }
 document.getElementById("bVista").onclick = trocarVista;
-document.getElementById("b3d").onclick = () => { quer3d = !quer3d; try { localStorage.setItem("nextco_modo3d", quer3d ? "1" : "0"); } catch (e) {} if (quer3d && !window.Iso3D){ toast("Carregando o 3D…"); window.carregar3D && carregar3D(); } aplicarModo3d(); };
+document.getElementById("b3d").onclick = () => { if (modoSala !== "ambos") return toast(modoSala === "2d" ? "Esta sala é só 2D" : "Esta sala é só 3D"); quer3d = !quer3d; try { localStorage.setItem("nextco_modo3d", quer3d ? "1" : "0"); } catch (e) {} if (quer3d && !window.Iso3D){ toast("Carregando o 3D…"); window.carregar3D && carregar3D(); } aplicarModo3d(); };
 document.getElementById("gEsq").onclick = () => window.Iso3D && Iso3D.girar(-1);
 document.getElementById("gDir").onclick = () => window.Iso3D && Iso3D.girar(1);
 const virando = new Set();
@@ -840,15 +879,18 @@ document.getElementById("eu").onclick = async () => {
   const ico = {cadastro:"✨", entrou:"🚪", saiu:"👋", avatar:"🧍", sala:"📍", acao:"🎉", editor:"🛠️", conversa:"💬", tarefa:"✅", telao:"📊"};
   menu.innerHTML = `<h3>${esc(user.nome)} <button class="x" data-close aria-label="Fechar">×</button></h3>
     <div style="color:var(--mut);font-size:13px;margin:-6px 0 8px">${esc(user.email)} · ${Sala.online} online agora</div>
+    <div class="sala-info"><div><b>${esc(infoEspaco.nome)}</b><small>ID da sala: <code>${esc(idPublico())}</code> · ${({ "2d": "só 2D", "3d": "só 3D", ambos: "2D e 3D" })[modoSala]}</small></div><button class="btn" data-convite>Copiar convite</button></div>
+    <a class="mi" href="salas.html">🔁 Trocar de sala / criar sala</a>
+    ${souDonoDaSala() && !EH_NEXT ? `<button class="mi" data-cfgsala>⚙️ Configurar esta sala (nome, 2D/3D)</button>` : ""}
     <a class="mi" href="avatar.html">🧍 Editar meu personagem</a>
     <button class="mi" data-telao>📊 Telão da equipe</button>
     <button class="mi" data-cfgaudio>🎚️ Áudio: microfone, saída e volumes</button>
-    <button class="mi" data-tend>📈 Tendências de mercado</button>
-    <button class="mi" data-edicao>🎬 Roteiros (Edição)</button>
-    <button class="mi" data-modo3d>🧊 Alternar 2D / 3D</button>
-    <button class="mi" data-vista3d>👁 3D: primeira pessoa / visão de cima</button>
+    ${EH_NEXT ? `<button class="mi" data-tend>📈 Tendências de mercado</button>
+    <button class="mi" data-edicao>🎬 Roteiros (Edição)</button>` : ""}
+    ${modoSala === "ambos" ? `<button class="mi" data-modo3d>🧊 Alternar 2D / 3D</button>` : ""}
+    ${modoSala !== "2d" ? `<button class="mi" data-vista3d>👁 3D: primeira pessoa / visão de cima</button>` : ""}
     ${Dados.ehAdmin() ? `<button class="mi" data-admin>🛡️ Administração: salas, senhas e papéis</button>` : ""}
-    <a class="mi" href="editor.html">🛠️ Editor de salas</a>
+    ${EH_NEXT || souDonoDaSala() ? `<a class="mi" href="editor.html?sala=${encodeURIComponent(mapaId)}">🛠️ Editor do mapa</a>` : ""}
     <button class="mi" data-exp>💾 Baixar meus dados (JSON)</button>
     <button class="mi" data-sair>🚪 Sair</button>
     <div class="sep"></div>
@@ -859,6 +901,10 @@ document.getElementById("eu").onclick = async () => {
 menu.onclick = async e => {
   if (e.target.closest("[data-close]")) menu.classList.add("hidden");
   if (e.target.closest("[data-telao]")) { menu.classList.add("hidden"); abrirTelao(); }
+  if (e.target.closest("[data-convite]")) { const b = e.target.closest("[data-convite]"); const link = location.origin + location.pathname + "?sala=" + idPublico();
+    navigator.clipboard.writeText(`Entre na sala "${infoEspaco.nome}": ${link}  (ID: ${idPublico()})`).then(() => { b.textContent = "Copiado ✓"; setTimeout(() => b.textContent = "Copiar convite", 1500); }); }
+  if (e.target.closest("[data-cfgsala]")) { abrirConfigSala(); return; }
+  if (e.target.closest("[data-salvarsala]")) { salvarConfigSala(); return; }
   if (e.target.closest("[data-cfgaudio]")) { menu.classList.add("hidden"); abrirConfigAudio(); }
   if (e.target.closest("[data-tend]")) { menu.classList.add("hidden"); TI.abrirPainel(); }
   if (e.target.closest("[data-edicao]")) { menu.classList.add("hidden"); Edicao.abrirPainel(); }
@@ -964,6 +1010,26 @@ cfg.addEventListener("change", async e => {
 });
 addEventListener("voz:dispositivos", () => { if (cfgAberto) renderConfigAudio().then(iniciarMedidor); });
 
+function abrirConfigSala(){
+  menu.innerHTML = `<h3>Configurar sala <button class="x" data-close aria-label="Fechar">×</button></h3>
+    <div class="cfg-sala">
+      <label>Nome<input id="cfgNome" maxlength="40" value="${esc(infoEspaco.nome)}"></label>
+      <div class="cfg-modos">${[["2d", "2D", "Visão de cima"], ["3d", "3D", "Primeira pessoa"], ["ambos", "2D e 3D", "Cada um escolhe"]].map(([v, t, d]) =>
+        `<label><input type="radio" name="cfgModo" value="${v}" ${modoSala === v ? "checked" : ""}><b>${t}</b><small>${d}</small></label>`).join("")}</div>
+      <p style="color:var(--mut);font-size:12.5px;margin:6px 0">ID da sala: <code>${esc(idPublico())}</code> (não muda)</p>
+      <button class="btn pri" data-salvarsala style="width:100%">Salvar</button>
+    </div>`;
+  menu.classList.remove("hidden");
+}
+async function salvarConfigSala(){
+  const nome = (document.getElementById("cfgNome").value || "").trim(), modo = (menu.querySelector("[name=cfgModo]:checked") || {}).value || modoSala;
+  if (!nome) return toast("Dê um nome para a sala");
+  try {
+    const m = await Dados.configurarSala(mapaId, { nome, modo });
+    S.espaco = m.espaco; S.name = m.name; lerEspaco(); Dados.lembrarSala(mapaId, nome); aplicarModo3d(); atualizarBotaoVista && atualizarBotaoVista();
+    menu.classList.add("hidden"); toast("⚙️ Sala atualizada");
+  } catch (e) { toast("Não consegui salvar: " + (e.message || "")); }
+}
 function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]); }
 let toastT = null;
 function toast(t){ const el = document.getElementById("toast"); el.textContent = t; el.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("show"), 1800); }

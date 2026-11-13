@@ -8,7 +8,7 @@ window.Sala = (function () {
 
   function entrar(opts) {
     meuId = opts.id; cb = opts;
-    canal = Dados.cliente.channel("escritorio-principal", { config: { presence: { key: meuId }, broadcast: { self: false } } });
+    canal = Dados.cliente.channel(opts.canal || "escritorio-principal", { config: { presence: { key: meuId }, broadcast: { self: false } } });
     canal.on("presence", { event: "sync" }, () => {
       const st = canal.presenceState(), agora = new Set();
       for (const [id, metas] of Object.entries(st)) {

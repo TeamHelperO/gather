@@ -47,7 +47,7 @@ const f = document.getElementById("f"), email = document.getElementById("email")
 (async () => {
   // voltou pelo link do e-mail (ou já tinha entrado)?
   const u = await Dados.pronto;
-  if (u) { try { const p = await Dados.garantirPerfil(); location.replace(p.avatar ? "escritorio.html" : "avatar.html"); return; } catch (e) { err.textContent = "Erro ao abrir seu perfil: " + e.message; } }
+  if (u) { try { const p = await Dados.garantirPerfil(); location.replace(p.avatar ? "salas.html" : "avatar.html"); return; } catch (e) { err.textContent = "Erro ao abrir seu perfil: " + e.message; } }
   const ult = localStorage.getItem("nextco_ultimo_email"); if (ult) email.value = ult;
   const hashErr = new URLSearchParams(location.hash.slice(1)).get("error_description"); if (hashErr) err.textContent = "O link expirou ou já foi usado. Peça outro.";
 })();

@@ -120,6 +120,53 @@
       return data || [];
     },
 
+    /* ---------- salas virtuais: cada uma é um mapa com um ID curto (o mapa "principal" é o escritório da Next Co.) ---------- */
+    normalizarSala(id) {
+      id = String(id || "").trim().toLowerCase().replace(/^.*[?&]sala=/, "").replace(/[^a-z0-9_-]/g, "");
+      return id === "nextco" || id === "next" ? "principal" : id;
+    },
+    salaDaUrl() { try { const q = new URLSearchParams(location.search).get("sala"); return q ? this.normalizarSala(q) : null; } catch (e) { return null; } },
+    ultimaSala() { try { return localStorage.getItem("nextco_sala") || null; } catch (e) { return null; } },
+    lembrarSala(id, nome) {
+      try {
+        localStorage.setItem("nextco_sala", id);
+        const l = this.salasRecentes().filter(x => x.id !== id); l.unshift({ id, nome: nome || id, em: Date.now() });
+        localStorage.setItem("nextco_salas_recentes", JSON.stringify(l.slice(0, 12)));
+      } catch (e) {}
+    },
+    esquecerSala(id) { try { localStorage.setItem("nextco_salas_recentes", JSON.stringify(this.salasRecentes().filter(x => x.id !== id))); if (this.ultimaSala() === id) localStorage.removeItem("nextco_sala"); } catch (e) {} },
+    salasRecentes() { try { return JSON.parse(localStorage.getItem("nextco_salas_recentes") || "[]"); } catch (e) { return []; } },
+    async minhasSalas() {
+      const eu = this.meuId(); if (!eu) return [];
+      const { data } = await sb.from("mapas").select("id,espaco:dados->espaco,atualizado_em").eq("dados->espaco->>dono", eu).order("atualizado_em", { ascending: false });
+      return (data || []).map(m => ({ id: m.id, ...(m.espaco || {}) }));
+    },
+    async infoSala(id) {
+      const { data } = await sb.from("mapas").select("id,espaco:dados->espaco,nome:dados->>name").eq("id", id).maybeSingle();
+      if (!data) return null;
+      const e = data.espaco || {};
+      return { ...e, id: data.id, nome: e.nome || data.nome || id, modo: e.modo || "ambos" };
+    },
+    async criarSala({ nome, modo, mapa }) {
+      const letras = "abcdefghjkmnpqrstuvwxyz23456789";
+      for (let t = 0; t < 6; t++) {
+        const id = Array.from(crypto.getRandomValues(new Uint8Array(6)), b => letras[b % letras.length]).join("");
+        const { data: ja } = await sb.from("mapas").select("id").eq("id", id).maybeSingle(); if (ja) continue;
+        const dados = { ...mapa, name: nome, espaco: { nome, modo, dono: this.meuId(), dono_nome: perfil ? perfil.nome : "", criado_em: agora() } };
+        const { error } = await sb.from("mapas").insert({ id, dados, atualizado_em: agora(), atualizado_por: this.meuId() });
+        if (error) throw error;
+        mapas[id] = dados; return id;
+      }
+      throw new Error("Não consegui gerar um ID livre, tente de novo");
+    },
+    async configurarSala(id, campos) {
+      const m = await this.carregarMapa(id); if (!m) throw new Error("Sala não encontrada");
+      m.espaco = { ...(m.espaco || {}), ...campos }; if (campos.nome) m.name = campos.nome;
+      const { error } = await sb.from("mapas").update({ dados: m, atualizado_em: agora(), atualizado_por: this.meuId() }).eq("id", id);
+      if (error) throw error;
+      mapas[id] = m; return m;
+    },
+
     /* ---------- mapas ---------- */
     mapaAtualId() { try { return localStorage.getItem("nextco_map_id") || "principal"; } catch (e) { return "principal"; } },
     async carregarMapa(id) {

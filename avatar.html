@@ -117,7 +117,7 @@ document.getElementById("rot").onclick = e => { const b = e.target.closest("[dat
 document.getElementById("rand").onclick = () => { av = Avatar.aleatorio(); painel(); refazer(); };
 document.getElementById("save").onclick = async () => {
   const b = document.getElementById("save"); b.disabled = true; b.textContent = "Salvando…";
-  try { await Dados.salvarAvatar(EMAIL, av); location.href = "escritorio.html"; }
+  try { await Dados.salvarAvatar(EMAIL, av); location.href = Dados.ultimaSala() ? "escritorio.html?sala=" + encodeURIComponent(Dados.ultimaSala()) : "salas.html"; }
   catch (e) { b.disabled = false; b.textContent = "Salvar e entrar"; document.getElementById("err").textContent = "Não foi possível salvar: " + e.message; }
 };
 const pv = document.getElementById("pv"), px = pv.getContext("2d");

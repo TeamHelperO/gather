@@ -9,7 +9,8 @@ import * as THREE from "./vendor/three/three.min.js";
 
 const cv = document.getElementById("cv3d");
 const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+const ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 1);
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -29,7 +30,7 @@ function texturaPiso(tipo) {
   if (tipo === "f_madeira" || tipo === "f_palco") { g.fillStyle = b; for (let i = 0; i < 4; i++) g.fillRect(0, i * 16, 64, 1); g.fillRect(((0) % 64), 0, 1, 16); g.fillRect(32, 16, 1, 16); g.fillRect(12, 32, 1, 16); g.fillRect(44, 48, 1, 16); }
   else if (tipo === "f_ceramica" || tipo === "f_ti") { g.fillStyle = b; g.fillRect(0, 0, 64, 2); g.fillRect(0, 0, 2, 64); g.fillRect(0, 32, 64, 2); g.fillRect(32, 0, 2, 64); if (tipo === "f_ti") { g.fillStyle = "#2fd4e8"; g.fillRect(6, 6, 3, 3); g.fillRect(40, 40, 3, 3); } }
   else { g.fillStyle = b; for (let i = 0; i < 90; i++) g.fillRect(Math.random() * 64, Math.random() * 64, 2, 2); }
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace; return t;
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.NearestFilter; t.anisotropy = ANISO; t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 function caixaM(w, h, d, m, x = 0, y = 0, z = 0, sombra = true) {
   const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof m === "string" ? mat(m) : m);
@@ -107,10 +108,11 @@ function movel(it, sala) {
 /* ---------- texturas vivas: o 2D desenha, o 3D mostra ---------- */
 const telas = []; // { it, c, g, tex }
 function materialTela(it, recorte) {
-  const a = ASSETS[it.k], c = document.createElement("canvas"); c.width = a.w; c.height = a.h;
-  const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.LinearFilter; tex.colorSpace = THREE.SRGBColorSpace;
+  // telas desenhadas em alta resolução (texto e vídeo nítidos de perto, na primeira pessoa)
+  const a = ASSETS[it.k], esc = /^(telao|telao_tend|telao_rot|projecao|tv)$/.test(it.k) ? 4 : 3, c = document.createElement("canvas"); c.width = a.w * esc; c.height = a.h * esc;
+  const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.generateMipmaps = true; tex.anisotropy = ANISO; tex.colorSpace = THREE.SRGBColorSpace;
   if (recorte) { const [x, y, w, h] = recorte; tex.offset.set(x / a.w, 1 - (y + h) / a.h); tex.repeat.set(w / a.w, h / a.h); }
-  telas.push({ it, c, g: c.getContext("2d"), tex });
+  telas.push({ it, c, g: c.getContext("2d"), tex, esc });
   return new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.75, roughness: 0.6 });
 }
 function spriteDe(img, w, h) {
@@ -123,9 +125,9 @@ function atualizarTelas(desenhaveis, agora, rapido) {
   const todas = agora - ultimaTela >= 500; if (todas) ultimaTela = agora;
   for (const s of telas) {
     if (!todas && !(rapido && s.it.k === "projecao")) continue;
-    const { it, c, g } = s, a = ASSETS[it.k];
+    const { it, c, g, esc } = s, a = ASSETS[it.k];
     g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height);
-    g.setTransform(1, 0, 0, 1, -it.x * T, -it.y * T); g.imageSmoothingEnabled = false;
+    g.setTransform(esc, 0, 0, esc, -it.x * T * esc, -it.y * T * esc); g.imageSmoothingEnabled = false;
     g.drawImage(IMG[it.k], it.x * T, it.y * T);
     for (const d of desenhaveis) { try { d.draw(g); } catch (e) {} }
     s.tex.needsUpdate = true; void a;
@@ -207,7 +209,7 @@ const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 400);
 /* primeira pessoa: câmera nos olhos do seu personagem (padrão do 3D); "iso" = visão de cima */
 const camFP = new THREE.PerspectiveCamera(70, 1, 0.05, 300);
 let vista = (() => { try { return localStorage.getItem("nextco_vista3d") || "1p"; } catch (e) { return "1p"; } })();
-let yaw = null, pitch = -0.04, eu = null;
+let yaw = null, pitch = -0.04, eu = null, yawAlvo = null, pitchAlvo = -0.04;
 const fp = () => vista === "1p";
 const camAtual = () => (fp() ? camFP : camera);
 const CEU = new THREE.Color("#a9cdf0"), FUNDO = new THREE.Color("#1b1828");
@@ -266,9 +268,9 @@ function medirDesempenho(dt) {
   if (!dt) return; somaDt += dt; nDt++;
   if (nDt < 90) return;
   const media = somaDt / nDt; somaDt = 0; nDt = 0;
-  if (media > 1 / 40 && nivel < 2) { // abaixo de ~40 qps
+  if (media > 1 / 32 && nivel < 2) { // abaixo de ~32 qps
     nivel++;
-    if (nivel === 1) { renderer.setPixelRatio(1); tamanho = ""; ajustar(); }
+    if (nivel === 1) { renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.25)); tamanho = ""; ajustar(); }
     if (nivel === 2) { renderer.shadowMap.enabled = false; cena.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }
     console.info("3D: qualidade reduzida para manter a fluidez (nível " + nivel + ")");
   }
@@ -286,7 +288,7 @@ const Iso3D = {
     apagadaFn = apagada;
     for (const [id, e] of escuros) { const off = apagada(id); if (e.sombra && e.sombra.visible !== off) e.sombra.visible = off; if (e.brilho && e.brilho.visible === off) e.brilho.visible = !off; }
   },
-  girar(d) { if (fp()) { if (yaw != null) yaw -= d * Math.PI / 4; return; } giroAlvo += d * Math.PI / 2; },
+  girar(d) { if (fp()) { if (yawAlvo != null) yawAlvo -= d * Math.PI / 4; return; } giroAlvo += d * Math.PI / 2; },
   // teclas/joystick: "cima" é para dentro da tela, conforme o giro da câmera
   direcaoTeclas(vx, vy) {
     if (!vx && !vy) return [0, 0];
@@ -306,7 +308,8 @@ const Iso3D = {
     const foco = new THREE.Vector3(P.px / T, 0.6, P.py / T);
     if (!alvoPronto) { alvo.copy(foco); alvoPronto = true; } else alvo.lerp(foco, Math.min(1, (dt || 0.016) * (fp() ? 30 : 6)));
     if (fp()) {
-      if (yaw == null) yaw = [Math.PI, Math.PI / 2, -Math.PI / 2, 0][P.dir || 0];
+      if (yaw == null) yaw = yawAlvo = [Math.PI, Math.PI / 2, -Math.PI / 2, 0][P.dir || 0];
+      const kOlhar = 1 - Math.exp(-(dt || 0.016) * 22); yaw += (yawAlvo - yaw) * kOlhar; pitch += (pitchAlvo - pitch) * kOlhar;
       const fov = Math.max(42, Math.min(88, 70 / Math.pow(Math.max(0.6, zoom) / 1.4, 0.35)));
       if (Math.abs(camFP.fov - fov) > 0.3) { camFP.fov = fov; camFP.updateProjectionMatrix(); }
       const olho = P.assento ? 1.18 : 1.55;
@@ -349,9 +352,9 @@ const Iso3D = {
   get primeiraPessoa() { return ativo && fp(); },
   get vista() { return vista; },
   trocarVista(v) { vista = v || (fp() ? "iso" : "1p"); if (fp() && eu) this.olharPara(eu.dir); try { localStorage.setItem("nextco_vista3d", vista); } catch (e) {} if (!fp()) for (const [, s] of pessoas) s.sp.visible = true; return vista; },
-  virar(rad) { if (yaw != null) yaw += rad; },
-  olharPara(dir) { yaw = [Math.PI, Math.PI / 2, -Math.PI / 2, 0][dir || 0]; pitch = -0.04; },
-  inclinar(rad) { pitch = Math.max(-0.75, Math.min(0.6, pitch + rad)); },
+  virar(rad) { if (yawAlvo != null) yawAlvo += rad; },
+  olharPara(dir) { yaw = yawAlvo = [Math.PI, Math.PI / 2, -Math.PI / 2, 0][dir || 0]; pitch = pitchAlvo = -0.04; },
+  inclinar(rad) { pitchAlvo = Math.max(-0.8, Math.min(0.7, pitchAlvo + rad)); },
   // para onde você está olhando, como direção do 2D (0 baixo, 1 esquerda, 2 direita, 3 cima)
   direcaoDoOlhar() { if (yaw == null) return 0; const fx = -Math.sin(yaw), fz = -Math.cos(yaw); return Math.abs(fx) > Math.abs(fz) ? (fx < 0 ? 1 : 2) : (fz < 0 ? 3 : 0); }, // px de tela por px do mundo (em objetos de frente para a câmera)
   // tela → mundo: o que está sob o dedo (telão, monitor, pessoa) ou o ponto do chão

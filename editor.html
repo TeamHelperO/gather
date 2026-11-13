@@ -250,6 +250,7 @@ async function save(){
   saving = true; dirty = false;
   S.rev = uid(); lastRev = S.rev; S.updatedAt = Date.now();
   const body = JSON.parse(JSON.stringify(S));
+  const antes = Dados.lerMapaLocal(mapId); if (antes && antes.espaco && !body.espaco) body.espaco = antes.espaco; // não perde dono/modo da sala ao importar
   const salvo = window.claude ? null : Dados.salvarMapaLocal(mapId, body, EMAIL);
   if (salvo){ setSaveState((await salvo) ? (mapId === "principal" ? "Salvo ✓ no escritório" : "Salvo ✓") : "Erro ao salvar – tente de novo"); }
   else if (db){
@@ -605,8 +606,8 @@ async function openMenu(){
     ${downloads?`<button class="mi" data-m="png">🖼️ Baixar imagem do mapa (PNG)</button><button class="mi" data-m="json">📄 Baixar arquivo do mapa (JSON)</button>`:""}
     <button class="mi" data-m="copy">📋 Copiar JSON do mapa</button>
     <label class="mi" style="cursor:pointer">📥 Importar JSON <input type="file" accept=".json,application/json" id="imp" hidden></label>
-    ${mapId !== "principal" ? `<button class="mi" data-m="pub">⭐ Usar este mapa no escritório</button>` : `<div class="note" style="margin:4px 10px">Este é o mapa que a equipe vê no escritório.</div>`}
-    <a class="mi" href="escritorio.html">🚶 Voltar ao escritório</a>
+    ${mapId !== "principal" && !(S && S.espaco) ? `<button class="mi" data-m="pub">⭐ Usar este mapa no escritório</button>` : `<div class="note" style="margin:4px 10px">Este é o mapa que a equipe vê no escritório.</div>`}
+    <a class="mi" href="escritorio.html?sala=${encodeURIComponent(mapId || "principal")}">🚶 Voltar para a sala</a>
     <button class="mi" data-m="help">❓ Como usar</button>
     <div class="sep"></div>
     <div style="font-weight:700;margin:6px 0">Mapas salvos</div><div class="maps" id="mapsList"><p class="note">Carregando…</p></div>`;
@@ -694,7 +695,7 @@ info("");
 /* ---------- boot ---------- */
 resize();
 if (imgsLeft === 0) { buildPatterns(ctx); }
-const startId = "principal";
+const startId = Dados.salaDaUrl() || "principal";
 S = templateNext(); afterLoad(true); setSaveState("Carregando…");
 if (!window.claude) (async () => {
   EMAIL = await Dados.exigirSessao("index.html"); if (!EMAIL) return;
