@@ -37,14 +37,20 @@ window.Sala = (function () {
       }
     });
   }
-  /* Envia a posição: no máximo 10x/s quando mudou, e de 2 em 2 s mesmo parado. */
+  /* Envia a posição. O Supabase (plano grátis) aguenta ~100 mensagens/s no projeto, e cada envio chega a todos
+     da sala, então a frequência cai conforme entra gente: até 3 pessoas 10x/s, 4 pessoas ~6x/s, 6 pessoas ~2,5x/s
+     (nunca menos de 2x/s). Mudança de estado (parou, sentou, emote, microfone) vai na hora; parado, reenvia a cada 2 s.
+     Quem recebe guarda as posições e anda suavemente entre elas (ver moverOutros). */
+  let ultimoSemPos = "";
+  function intervaloEnvio() { const n = presentes.size + 1; return Math.max(100, Math.min(500, Math.round(1000 * n * (n - 1) / 70))); }
   function enviarPosicao(estado, agora) {
     if (!pronto) return;
-    const chave = JSON.stringify(estado);
+    const chave = JSON.stringify(estado), { x, y, ...resto } = estado, semPos = JSON.stringify(resto);
     if (chave === ultimoEstado && agora - ultimoEnvio < 2000) return;
-    if (agora - ultimoEnvio < 100) return;
-    ultimoEstado = chave; ultimoEnvio = agora;
-    canal.send({ type: "broadcast", event: "pos", payload: { id: meuId, ...estado } });
+    const mudouEstado = semPos !== ultimoSemPos;
+    if (agora - ultimoEnvio < (mudouEstado ? 60 : intervaloEnvio())) return;
+    ultimoEstado = chave; ultimoSemPos = semPos; ultimoEnvio = agora;
+    canal.send({ type: "broadcast", event: "pos", payload: { id: meuId, iv: intervaloEnvio(), ...estado } });
   }
   function atualizarPresenca(obj) { if (pronto) canal.track(obj); }
   function sinal(para, dados) { if (pronto) canal.send({ type: "broadcast", event: "rtc", payload: { from: meuId, to: para, ...dados } }); }
