@@ -21,7 +21,8 @@ window.Sala = (function () {
       for (const id of [...presentes.keys()]) if (!agora.has(id)) { presentes.delete(id); cb.aoSair && cb.aoSair(id); }
     });
     canal.on("broadcast", { event: "pos" }, ({ payload }) => { if (payload && payload.id !== meuId) cb.aoMover && cb.aoMover(payload.id, payload); });
-    canal.on("broadcast", { event: "ola" }, ({ payload }) => { if (payload && payload.id !== meuId) { ultimoEstado = ""; cb.aoOla && cb.aoOla(payload.id); } }); // alguém chegou: reenvia minha posição (e o estado das luzes)
+    // alguém chegou: responde na hora com a minha última posição (não espera o laço do jogo, que para quando a aba está em segundo plano)
+    canal.on("broadcast", { event: "ola" }, ({ payload }) => { if (payload && payload.id !== meuId) { ultimoEstado = ""; responderOla(); cb.aoOla && cb.aoOla(payload.id); } });
     canal.on("broadcast", { event: "admin" }, ({ payload }) => { if (payload && (payload.to === meuId || payload.to === "*")) cb.aoAdmin && cb.aoAdmin(payload); });
     canal.on("broadcast", { event: "toque" }, ({ payload }) => { if (payload && payload.to === meuId) cb.aoToque && cb.aoToque(payload); });
     canal.on("broadcast", { event: "luz" }, ({ payload }) => { if (payload && payload.sala) cb.aoLuz && cb.aoLuz(payload.sala, payload); });
@@ -41,9 +42,15 @@ window.Sala = (function () {
      da sala, então a frequência cai conforme entra gente: até 3 pessoas 10x/s, 4 pessoas ~6x/s, 6 pessoas ~2,5x/s
      (nunca menos de 2x/s). Mudança de estado (parou, sentou, emote, microfone) vai na hora; parado, reenvia a cada 2 s.
      Quem recebe guarda as posições e anda suavemente entre elas (ver moverOutros). */
-  let ultimoSemPos = "";
+  let ultimoSemPos = "", ultimoObj = null;
+  function responderOla() {
+    if (!pronto || !ultimoObj) return;
+    const atraso = document.hidden ? 0 : Math.random() * 250; // espalha as respostas (em segundo plano manda já: o navegador atrasa timers)
+    setTimeout(() => { if (pronto && ultimoObj) { canal.send({ type: "broadcast", event: "pos", payload: { id: meuId, iv: intervaloEnvio(), ...ultimoObj } }); ultimoEnvio = performance.now(); } }, atraso);
+  }
   function intervaloEnvio() { const n = presentes.size + 1; return Math.max(100, Math.min(500, Math.round(1000 * n * (n - 1) / 70))); }
   function enviarPosicao(estado, agora) {
+    ultimoObj = estado;
     if (!pronto) return;
     const chave = JSON.stringify(estado), { x, y, ...resto } = estado, semPos = JSON.stringify(resto);
     if (chave === ultimoEstado && agora - ultimoEnvio < 2000) return;

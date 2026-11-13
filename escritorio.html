@@ -605,17 +605,20 @@ const idPublico = () => EH_NEXT ? "nextco" : mapaId;
 /* ---------- outras pessoas em tempo real ---------- */
 const sheets = {};
 function montarSheet(av){ const k = JSON.stringify(av || {}); return sheets[k] || (sheets[k] = Avatar.montar(av)); }
+const posPendente = new Map(); // posições recebidas antes de a pessoa aparecer na presença
 function conectarSala(){
   Sala.entrar({
     id: P.id, canal: EH_NEXT ? "escritorio-principal" : "escritorio-" + mapaId,
     presenca: () => ({ id: P.id, nome: user.nome, avatar: user.avatar, status: window.Social ? Social.status : "disponivel" }),
-    aoEntrar(id, m){ const a = new Ator({ id, nome: m.nome, sheet: null, x: 0, y: 0, visto: false }); a.status = m.status || "disponivel"; outros.push(a);
-      montarSheet(m.avatar).then(sh => a.sheet = sh); toast(`${m.nome} entrou no escritório`); },
+    aoEntrar(id, m){ if (outros.some(o => o.id === id)) return;
+      const a = new Ator({ id, nome: m.nome, sheet: null, x: 0, y: 0, visto: false }); a.status = m.status || "disponivel"; outros.push(a);
+      montarSheet(m.avatar).then(sh => a.sheet = sh); toast(`${m.nome} entrou no escritório`);
+      const pend = posPendente.get(id); if (pend){ posPendente.delete(id); this.aoMover(id, pend); } }, // a posição chegou antes da presença
     aoMudar(id, m){ const a = outros.find(o => o.id === id); if (!a) return; a.nome = m.nome; a.status = m.status || "disponivel"; montarSheet(m.avatar).then(sh => a.sheet = sh); },
     aoSair(id){ const i = outros.findIndex(o => o.id === id); if (i < 0) return; const a = outros[i];
       if (a.assento) { a.assento.ocupante = null; a.assento = null; } outros.splice(i, 1); toast(`${a.nome} saiu`); },
     aoMover(id, st){
-      const a = outros.find(o => o.id === id); if (!a) return;
+      const a = outros.find(o => o.id === id); if (!a){ posPendente.set(id, st); return; }
       const agoraR = performance.now();
       if (!a.visto){ a.x = st.x; a.y = st.y; a.visto = true; a.buf = []; }
       // fila de posições recebidas: o boneco anda entre elas com um pequeno atraso, sem trancos
