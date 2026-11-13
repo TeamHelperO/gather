@@ -332,7 +332,7 @@ const Iso3D = {
     for (const [a, s] of pessoas) if (!vivos.has(a)) { cena.remove(s.sp, s.sombra); s.tex.dispose(); pessoas.delete(a); }
     const perto = (x, z) => fp() && Math.hypot(x - alvo.x, z - alvo.z) < 1.4; // na 1ª pessoa, quem está colado na câmera some para não tapar a vista
     for (const a of atores) { desenharPessoa(a, t); const s = pessoas.get(a), some = fp() && (a === P || perto(a.px / T, a.py / T)); s.sp.visible = !some; if (some) s.sombra.visible = false; }
-    for (const g of cartazes) { const v = !perto(g.position.x, g.position.z); if (g.visible !== v) g.visible = v; }
+    for (const g of cartazes) { const ag = g.userData.item && g.userData.item.agente; const v = !perto(g.position.x, g.position.z) && !(ag && window.AGENTES_FORA && AGENTES_FORA.has(ag)); if (g.visible !== v) g.visible = v; }
     const temVideo = window.Projecao && (Projecao.apresentando || document.querySelector("video[autoplay]"));
     atualizarTelas(desenhaveis, performance.now(), !!temVideo);
     cortarParedes();

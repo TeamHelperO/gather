@@ -327,6 +327,7 @@ function drawWorld(c, extra){
   D.sort((a,b)=>sortKey(a)-sortKey(b));
   for (const it of D){
     if (it.draw){ it.draw(c); continue; }
+    if (it.agente && window.AGENTES_FORA && AGENTES_FORA.has(it.agente)) continue; // agente levantou da cadeira
     const im = IMG[it.k]; if (!im) continue;
     const px = Math.round(it.x*T), py = Math.round(it.y*T);
     desenharItem(c, it, im, px, py);

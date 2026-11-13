@@ -126,6 +126,7 @@ window.TI = (function () {
   function nomes(ctx, cam, zoom, t) {
     for (const it of allItems()) {
       if (!/^agente_\d$/.test(it.k) || !it.agente) continue;
+      if (window.AGENTES_FORA && AGENTES_FORA.has(it.agente)) continue; // está de pé andando: o nome vai com ele
       const a = agenteInfo(it.agente);
       const sx = (it.x * T + 16) * zoom + cam.ox, sy = (it.y * T + 56) * zoom + cam.oy;
       if (sx < -80 || sx > innerWidth + 80 || sy < -40 || sy > innerHeight + 40) continue;
@@ -446,5 +447,11 @@ window.TI = (function () {
   // fecha o painel se a pessoa sair da sala de TI
   function atualizar() { if (painel && opt && opt.eu && !dentroDaTI()) { fecharPainel(); opt.toast("Você saiu da TI: o painel de tendências foi fechado"); } }
   function abrirEm(m) { modo = m || "tend"; abrirPainel(); }
-  return { iniciar, desenhaveis, nomes, clicou, abrirPainel, abrirEm, fecharPainel, atualizar, get aberto() { return !!painel; } };
+  // para os agentes conversarem sobre o trabalho de verdade
+  function resumo() {
+    return { tend: tend.slice(0, 6).map(t => t.titulo), pega: tend.filter(t => t.decisao === "pega").slice(0, 4).map(t => t.titulo),
+      pendentes: tend.filter(t => t.decisao === "pendente").length, enviados: (prosp || []).filter(p => p.status === "enviado").length,
+      responderam: (prosp || []).filter(p => p.status === "respondeu").length };
+  }
+  return { iniciar, desenhaveis, nomes, clicou, abrirPainel, abrirEm, fecharPainel, atualizar, resumo, info: id => agenteInfo(id), get aberto() { return !!painel; } };
 })();

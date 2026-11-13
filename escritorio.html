@@ -423,6 +423,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 <script src="js/relatorio-core.js"></script>
 <script src="js/gestor.js"></script>
 <script src="js/configuracoes.js"></script>
+<script src="js/agentes-vivos.js"></script>
 <script src="js/voz.js"></script>
 <script>
 /* ícones da barra (Lucide) */
@@ -472,7 +473,7 @@ async function boot(){
   Dados.lembrarSala(mapaId, infoEspaco.nome);
   if (modoSala === "3d" && !window.Iso3D) { window.__quero3D = true; window.carregar3D && carregar3D(); }
   grid = buildBlocked();
-  assentos = construirAssentos();
+  assentos = construirAssentos(); AgentesVivos.montar();
   aplicarModo3d();
   teloes = allItems().filter(i => i.k === "telao");
   monitores = allItems().filter(i => EQUIP.test(i.k)); marcarMonitoresTI();
@@ -621,7 +622,7 @@ function recarregarMapa(novo){
   for (const a of [P, ...outros]) if (a.assento){ a.assento.ocupante = null; a.assento = null; }
   const modoAntes = modoSala;
   S = novo; lerEspaco(); if (modoSala !== modoAntes && modoSala !== "ambos") toast(`A sala agora é só ${modoSala.toUpperCase()}`);
-  grid = buildBlocked(); assentos = construirAssentos(); Projecao.recalcular();
+  grid = buildBlocked(); assentos = construirAssentos(); Projecao.recalcular(); AgentesVivos.montar();
   teloes = allItems().filter(i => i.k === "telao"); monitores = allItems().filter(i => EQUIP.test(i.k)); marcarMonitoresTI();
   if (!livre(P.x, P.y)) spawn();
   aplicarModo3d();
@@ -942,7 +943,7 @@ function loop(now){
   });
   telaoPerto = teloes.find(it => dentroDoTelao(it) && Math.hypot(it.x*T + 96 - P.px, it.y*T + 96 - P.py) < 120) || null;
   if (Telao.aberto && telaoSalaAberta && salaAtualId() !== telaoSalaAberta){ telaoSalaAberta = null; Telao.fechar(); toast("Você saiu da sala: o telão foi fechado"); }
-  TI.atualizar(); Edicao.atualizar(); atualizarBotaoLuz();
+  TI.atualizar(); Edicao.atualizar(); atualizarBotaoLuz(); AgentesVivos.atualizar(Date.now());
   const perto = !!telaoPerto;
   const bt = document.getElementById("btnTelao"); const mostra = perto && !Telao.aberto ? "flex" : "none"; if (bt.style.display !== mostra) bt.style.display = mostra;
   for (const a of [P, ...visiveis]){ a.vozReal = now - (a.vozAtiva || -1e9) < 350; if (Voz.ligado) a.falando = a.vozReal; else if (a.vozReal) a.falando = true; }
@@ -1035,7 +1036,7 @@ function draw(){
   const tres = em3d();
   ctx.setTransform(1,0,0,1,0,0);
   if (tres) ctx.clearRect(0, 0, cv.width, cv.height); else { ctx.fillStyle = "#16141f"; ctx.fillRect(0, 0, cv.width, cv.height); }
-  const c = cam(), atores = [P, ...outros.filter(o => o.visto && o.sheet)];
+  const c = cam(), atores = [P, ...outros.filter(o => o.visto && o.sheet), ...AgentesVivos.atores()];
   const ligados = new Set(monitoresTI); for (const a of atores) if (a.assento && a.assento.trabalho) for (const m of a.assento.monitores) ligados.add(m.x + "," + m.y);
   // telas vivas (telões, monitores, projeção, tendências, roteiros): as mesmas no 2D e no 3D
   const telasVivas = teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => { const r = salaDoTelao(it); if (!dentroDoTelao(it)){ telaoTrancado(g, it.x*T, it.y*T, r); return; } Telao.desenharTela(g, it.x*T, it.y*T, r ? Telao.filtrarSala(tarefas, r.id, salaPadrao()) : tarefas, r ? "TELÃO · " + r.name.toUpperCase() : "TELÃO DA EQUIPE"); } }))
