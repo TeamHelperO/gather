@@ -305,28 +305,39 @@ function sortKey(it){
 function buildPatterns(c){ for (const k of FLOORS) PAT[k] = c.createPattern(IMG[k], "repeat"); }
 
 /* Desenha piso, móveis e paredes. extra = [{sort, draw(c)}] entra na ordem de profundidade (ex.: avatares). */
+/* parte do mundo que aparece no canvas (px do mundo), com folga: o que está fora não é desenhado */
+function areaVisivel(c, folga = 64){
+  let m; try { m = c.getTransform().inverse(); } catch (e) { return null; }
+  const W = c.canvas.width, H = c.canvas.height, xs = [], ys = [];
+  for (const [sx, sy] of [[0,0],[W,0],[0,H],[W,H]]){ xs.push(m.a*sx + m.c*sy + m.e); ys.push(m.b*sx + m.d*sy + m.f); }
+  return { x0: Math.min(...xs) - folga, y0: Math.min(...ys) - folga, x1: Math.max(...xs) + folga, y1: Math.max(...ys) + folga };
+}
+const naArea = (v, x, y, w, h) => !v || (x + w >= v.x0 && x <= v.x1 && y + h >= v.y0 && y <= v.y1);
+function itemVisivel(v, it){ if (!v) return true; const a = ASSETS[it.k]; if (!a) return false; return naArea(v, it.x*T - 16, it.y*T - 16, Math.max(a.w, a.h) + 32, Math.max(a.w, a.h) + 32); }
 function drawWorld(c, extra){
+  const v = window.SEM_RECORTE ? null : areaVisivel(c);
   // ground
-  c.fillStyle = PAT.f_grama; c.fillRect(0,0,S.w*T,S.h*T);
+  c.fillStyle = PAT.f_grama; if (v) c.fillRect(Math.max(0, v.x0), Math.max(0, v.y0), Math.min(S.w*T, v.x1) - Math.max(0, v.x0), Math.min(S.h*T, v.y1) - Math.max(0, v.y0)); else c.fillRect(0,0,S.w*T,S.h*T);
   // floors
-  for (const r of S.rooms){ c.fillStyle = PAT[r.floor || TYPES[r.type].floor] || PAT.f_madeira; c.fillRect(r.x*T, r.y*T, r.w*T, r.h*T); }
+  for (const r of S.rooms){ if (!naArea(v, r.x*T, r.y*T, r.w*T, r.h*T)) continue; c.fillStyle = PAT[r.floor || TYPES[r.type].floor] || PAT.f_madeira; c.fillRect(r.x*T, r.y*T, r.w*T, r.h*T); }
   const items = allItems();
-  const floorItems = items.filter(i=>i.z==="floor");
+  const floorItems = items.filter(i=>i.z==="floor" && itemVisivel(v, i));
   for (const it of floorItems) desenharItem(c, it, IMG[it.k], Math.round(it.x*T), Math.round(it.y*T));
-  luzAmbiente(c, items);
+  luzAmbiente(c, items, v);
   // drawables
   const D = [];
   for (const r of S.rooms){
-    if (TYPES[r.type].noWalls) continue;
+    if (TYPES[r.type].noWalls || !naArea(v, r.x*T, (r.y-2)*T, r.w*T, 2*T)) continue;
     const dt = doorTile(r), glass = TYPES[r.type].glass;
     for (let tx=r.x; tx<r.x+r.w; tx++){
+      if (!naArea(v, tx*T, (r.y-2)*T, T, 2*T)) continue;
       let k = glass ? "parede_vidro" : "parede";
       if (temPorta(r, "cima", tx)) k = r.type==="reuniao" ? "porta_privada" : "porta";
       D.push({k, x:tx, y:r.y-2, sort:r.y*T-0.5, wallpiece:true});
     }
   }
-  for (const it of items) if (it.z!=="floor") D.push(it);
   apoiarNasMesas(items);
+  for (const it of items) if (it.z!=="floor" && itemVisivel(v, it)) D.push(it);
   if (extra) for (const e of extra) D.push(e);
   D.sort((a,b)=>sortKey(a)-sortKey(b));
   for (const it of D){
@@ -341,14 +352,14 @@ function drawWorld(c, extra){
     }
   }
   // side + bottom wall caps
-  for (const r of S.rooms){ if (!TYPES[r.type].noWalls) drawCaps(c, r); }
+  for (const r of S.rooms){ if (!TYPES[r.type].noWalls && naArea(v, r.x*T - 8, (r.y-2)*T, r.w*T + 16, (r.h+2)*T + 8)) drawCaps(c, r); }
 }
 /* Acabamento de luz: sombra de contato sob os móveis e sombra suave junto às paredes (desliga com window.SEM_SOMBRAS). */
-function luzAmbiente(c, items){
+function luzAmbiente(c, items, v){
   if (window.SEM_SOMBRAS) return;
   c.save();
   for (const r of S.rooms){
-    if (TYPES[r.type].noWalls) continue;
+    if (TYPES[r.type].noWalls || !naArea(v, r.x*T, r.y*T, r.w*T, r.h*T)) continue;
     const x0 = r.x*T, y0 = r.y*T, x1 = (r.x+r.w)*T, y1 = (r.y+r.h)*T;
     let gr = c.createLinearGradient(0, y0, 0, y0 + 34); gr.addColorStop(0, "rgba(20,14,30,.26)"); gr.addColorStop(1, "rgba(20,14,30,0)");
     c.fillStyle = gr; c.fillRect(x0, y0, x1 - x0, 34);
@@ -359,7 +370,7 @@ function luzAmbiente(c, items){
   }
   c.fillStyle = "rgba(20,14,30,.16)";
   for (const it of items){
-    if (it.z==="floor" || it.z==="wall" || SEM_COLISAO.test(it.k) || /^(rack_servidor|telao|tv|quadro|relogio|parede)/.test(it.k)) continue;
+    if (it.z==="floor" || it.z==="wall" || SEM_COLISAO.test(it.k) || /^(rack_servidor|telao|tv|quadro|relogio|parede)/.test(it.k) || !itemVisivel(v, it)) continue;
     const a = ASSETS[it.k]; if (!a) continue;
     const b = caixa(it), cx = b.x + b.w/2, by = b.y + b.h - 3, rx = Math.max(8, b.w*0.46);
     c.beginPath(); c.ellipse(cx, by, rx, Math.min(9, 4 + rx*0.12), 0, 0, Math.PI*2); c.fill();

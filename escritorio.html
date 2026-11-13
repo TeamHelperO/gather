@@ -40,6 +40,20 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
   .emotes.hud #btnAudio span{display:inline}
   #sala.hud small{display:none}
 }
+#miniMapa{position:fixed;left:8px;bottom:max(12px,env(safe-area-inset-bottom));z-index:9;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.35);cursor:crosshair;touch-action:none}
+@media (pointer:coarse){#miniMapa{top:104px;bottom:auto}}
+@media (max-width:900px) and (pointer:fine){#miniMapa{bottom:70px}}
+#bMapa.on{background:rgba(61,90,254,.85)}
+#tour{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(max(12px,env(safe-area-inset-bottom)) + 64px);z-index:30;width:min(380px,calc(100vw - 24px));background:#fff;color:#1d1d1f;border-radius:16px;padding:14px 16px 12px;box-shadow:0 14px 40px rgba(0,0,0,.35);display:none;transition:box-shadow .3s}
+@media (pointer:coarse){#tour{bottom:calc(max(12px,env(safe-area-inset-bottom)) + 214px)}}
+#tour.tour-ok{box-shadow:0 0 0 3px #3fbf5f,0 14px 40px rgba(0,0,0,.35)}
+#tour .tour-topo{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#6b6760;font-weight:650;margin-bottom:4px}
+#tour .tour-topo button{font-size:12px;color:#6b6760;padding:4px 6px;border-radius:7px}#tour .tour-topo button:hover{background:#f0eee9}
+#tour b{font-size:16px;display:block;margin-bottom:4px}#tour p{margin:0 0 10px;font-size:14px;line-height:1.4;color:#3a3a3c}
+#tour .tour-pts{display:flex;gap:5px;margin-bottom:10px}#tour .tour-pts i{width:22px;height:5px;border-radius:3px;background:#e4dfd5}#tour .tour-pts i.ok{background:#3fbf5f}#tour .tour-pts i.ag{background:#3d5afe}
+#tour .tour-bts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}#tour .tour-bts button{padding:9px 14px;border-radius:10px;font-weight:700;font-size:14px;background:#f0eee9}#tour .tour-bts button.pri{background:#3d5afe;color:#fff}
+.tour-foco{box-shadow:0 0 0 3px #ffd166,0 0 18px 4px rgba(255,209,102,.7)!important;animation:tourPulso 1.2s ease-in-out infinite}
+@keyframes tourPulso{50%{box-shadow:0 0 0 5px #ffd166,0 0 26px 8px rgba(255,209,102,.5)}}
 #cv{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block}
 .top{position:fixed;top:8px;left:8px;right:8px;display:flex;gap:6px;align-items:center;z-index:10;pointer-events:none}
 .top>*{pointer-events:auto}
@@ -391,7 +405,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
   <div class="pill hud" id="sala">Carregando…</div>
   <button class="pill hud" id="eu" aria-label="Menu"><canvas id="mini" class="px" width="32" height="32"></canvas><span id="nome"></span></button>
 </div>
-<div class="zoom pill hud"><button id="zin" aria-label="Aproximar"></button><button id="zout" aria-label="Afastar"></button><button id="b3d" title="Alternar 2D / 3D isométrico" aria-label="Alternar 2D e 3D"></button><button id="bVista" title="Primeira pessoa ou visão de cima (V)" style="display:none"></button><button id="gEsq" title="Girar câmera (Q)" style="display:none"></button><button id="gDir" title="Girar câmera (E)" style="display:none"></button></div>
+<div class="zoom pill hud"><button id="zin" aria-label="Aproximar"></button><button id="zout" aria-label="Afastar"></button><button id="b3d" title="Alternar 2D / 3D isométrico" aria-label="Alternar 2D e 3D"></button><button id="bVista" title="Primeira pessoa ou visão de cima (V)" style="display:none"></button><button id="gEsq" title="Girar câmera (Q)" style="display:none"></button><button id="gDir" title="Girar câmera (E)" style="display:none"></button><button id="bMapa" title="Minimapa (M)" aria-label="Mostrar ou esconder o minimapa"></button></div>
 <div class="emotes pill hud">
   <button id="btnAudio">Ligar áudio</button><button id="btnCfgAudio" title="Microfone, saída de áudio e volume de cada pessoa" aria-label="Configurar áudio"></button><i class="div"></i><button id="btnMont">Patinete</button><button id="btnMao" style="display:none">Levantar a mão</button><button data-emote="5" title="Acenar"></button><button data-emote="6" title="Dançar"></button><button data-emote="4" title="Sentar ou levantar"></button><button id="btnLuz" style="display:none" title="Acender ou apagar a luz desta sala (L)"></button>
 </div>
@@ -429,10 +443,13 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 <script src="js/configuracoes.js"></script>
 <script src="js/ia-config.js"></script>
 <script src="js/agentes-vivos.js"></script>
+<script src="js/minimapa.js"></script>
+<script src="js/tour.js"></script>
 <script src="js/voz.js"></script>
 <script>
 /* ícones da barra (Lucide) */
 ROTULO(document.getElementById("btnAudio"), "headphones", "Ligar áudio");
+ROTULO(document.getElementById("bMapa"), "map", "");
 ROTULO(document.getElementById("btnCfgAudio"), "settings", "");
 ROTULO(document.querySelector('[data-emote="5"]'), "hand", "Acenar");
 ROTULO(document.querySelector('[data-emote="6"]'), "music", "Dançar");
@@ -504,6 +521,9 @@ async function boot(){
   Gestor.iniciar({ mapaId, toast, outros: () => outros.filter(o => o.visto), salaAtual: () => { const id = salaAtualId(); return id ? roomById(id) : null; },
     tarefas: () => tarefas, abrirTarefa: abrirTarefaPorId, ehNext: EH_NEXT, ehAdmin: () => Dados.ehAdmin(), podeVerEquipe: () => souDonoDaSala(), nomeSala: () => infoEspaco.nome,
     aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
+  Minimapa.iniciar({ irPara: (x, y) => andarAte(x, y, 48), bloqueado: () => Telao.aberto || TI.aberto || Edicao.aberto || Acesso.aberto });
+  document.getElementById("bMapa").onclick = () => Minimapa.alternar();
+  setTimeout(() => Tour.iniciar({ eu: () => P, modoSala: () => modoSala, vista: v => { if ((v === "3d") !== !!quer3d) document.getElementById("b3d").click(); } }), 1800);
   Configuracoes.iniciar({ mapaId, ehNext: EH_NEXT, toast, user: () => user, info: () => infoEspaco, modoSala: () => modoSala, idPublico,
     souDono: () => souDonoDaSala(), ehAdminGeral: () => Dados.ehAdmin(), outros: () => outros.filter(o => o.visto),
     em3d: () => em3d(), alternar3d: () => document.getElementById("b3d").click(), trocarVista: () => trocarVista(),
@@ -766,6 +786,7 @@ function marcarMonitoresTI(){ monitoresTI = new Set(monitores.filter(m => { cons
 const salaLivreEm = (x, y) => { const r = roomAt(x, y - 4); return !r || Acesso.podeEntrar(r); };
 function livreP(x, y){
   if (!livre(x, y)) return false;
+  if (em3d() && Iso3D.livre && !Iso3D.livre(x, y) && Iso3D.livre(P.x, P.y)) return false; // 3D: não atravessa o móvel (só deixa sair se já estiver dentro)
   const r = roomAt(x, y - 4);
   if (r && !Acesso.podeEntrar(r)){ const atual = roomAt(P.px, P.py - 4); if (!atual || atual.id !== r.id){ P.path = null; Acesso.tentou(r); return false; } }
   return true;
@@ -790,6 +811,7 @@ document.getElementById("btnLuz").addEventListener("click", alternarLuz);
 addEventListener("keyup", e => keys.delete(e.key));
 addEventListener("blur", () => keys.clear());
 const em3d = () => !!(window.Iso3D && Iso3D.ativo);
+const TOQUE = matchMedia("(pointer:coarse)").matches;
 const toWorld = (sx, sy) => { if (em3d()) return Iso3D.mundo(sx, sy); const c = cam(); return [(sx - c.ox)/zoom, (sy - c.oy)/zoom]; };
 const ptrs = new Map(); let pinch = null, pularUp = 0;
 cv.addEventListener("pointerdown", e => {
@@ -856,7 +878,7 @@ function atualizarBotaoVista(){
   ROTULO(b, um ? "box" : "eye", ""); b.title = um ? "Ver de cima (V)" : "Primeira pessoa (V)";
   document.getElementById("gEsq").title = um ? "Virar para a esquerda (Q ou ←)" : "Girar câmera (Q)";
   document.getElementById("gDir").title = um ? "Virar para a direita (E ou →)" : "Girar câmera (E)";
-  const h = document.getElementById("hint"); if (h) h.textContent = em3d() && um ? "W/S andam · A/D andam de lado · Q/E ou ←/→ viram · arraste a tela para olhar · V troca a vista" : "Setas/WASD ou clique para andar · pare perto de uma cadeira para sentar";
+  const h = document.getElementById("hint"); if (h) h.textContent = em3d() && um ? (TOQUE ? "Toque no chão para ir até lá · controle: frente anda, lados viram · arraste para olhar" : "W/S andam · A/D andam de lado · Q/E ou ←/→ viram · arraste a tela para olhar · V troca a vista") : (TOQUE ? "Use o controle ou toque no chão para andar" : "Setas/WASD ou clique para andar · pare perto de uma cadeira para sentar");
 }
 function trocarVista(){ if (!window.Iso3D) return; const v = Iso3D.trocarVista(); atualizarBotaoVista(); toast(v === "1p" ? "👁 Primeira pessoa · arraste a tela para olhar em volta" : "🧊 Visão de cima"); }
 document.getElementById("bVista").onclick = trocarVista;
@@ -917,10 +939,14 @@ function loop(now){
   const umaP = em3d() && Iso3D.primeiraPessoa;
   for (const k of keys){ if (umaP && (k === "ArrowLeft" || k === "ArrowRight")) continue; const d = DIRKEYS[k]; if (d){ vx += d[0]; vy += d[1]; } }
   if (umaP && virando.size){ let g = 0; for (const k of virando) g += (k === "q" || k === "arrowleft") ? 1 : -1; Iso3D.virar(g*dt*2.4); }
-  if (joyV){ vx = joyV[0]; vy = joyV[1]; }
+  if (joyV){ vx = joyV[0]; vy = joyV[1];
+    // celular na 1ª pessoa: o controle é como um carrinho (para frente/trás anda, para os lados vira)
+    if (umaP && TOQUE){ Iso3D.virar(-vx*dt*2.6); vx = 0; if (Math.abs(vy) < 0.25) vy = 0; } }
   if ((vx || vy) && em3d()) [vx, vy] = Iso3D.direcaoTeclas(vx, vy); // no 3D, "cima" é para dentro da tela
   if ((vx || vy) && P.assento) P.levantar();
-  if (!vx && !vy && !P.assento && P.path) [vx, vy] = seguirCaminho(P);
+  if (!vx && !vy && !P.assento && P.path){ [vx, vy] = seguirCaminho(P); if (umaP && Iso3D.seguirOlhar) Iso3D.seguirOlhar(vx, vy, dt); }
+  // caminho travado (um móvel no meio no 3D): desiste em vez de ficar empurrando
+  if (P.path && !P.assento){ const d = Math.hypot(P.x - (P.travaX ?? P.x), P.y - (P.travaY ?? P.y)); if (d > 6 || P.travaX == null){ P.travaX = P.x; P.travaY = P.y; P.travaT = 0; } else if ((P.travaT += dt) > 1.2){ P.path = null; P.travaX = null; } }
   Montaria.atualizar(P);
   if (!P.assento) moverAtor(P, dt, vx, vy, livreP, Montaria.velocidade()); else { P.moving = false; P.parado += dt; }
   if (umaP && !P.assento && !P.moving) P.dir = Iso3D.direcaoDoOlhar(); // os outros veem para onde você olha
@@ -956,6 +982,8 @@ function loop(now){
   if (sujo && now - ultimoSave > 4000){ salvarPos(); ultimoSave = now; }
   if (marca){ marca.t -= dt*1.5; if (marca.t <= 0) marca = null; }
   draw();
+  if (Minimapa.ligado) Minimapa.desenhar(S, [{ x: P.x, y: P.y, eu: true }, ...outros.filter(o => o.visto).map(o => ({ x: o.px, y: o.py, cor: (Social.STATUS[o.status] || {}).cor || "#7ee787" }))],
+    roomAt(P.x, P.y - 4), em3d() && Iso3D.olhar != null ? Iso3D.olhar : [Math.PI/2, Math.PI, 0, -Math.PI/2][P.dir || 0]);
   requestAnimationFrame(loop);
 }
 function salvarPos(){ if (!P) return; sujo = false; const v = P.assento && P.volta ? P.volta : P;
@@ -1053,6 +1081,10 @@ function draw(){
     Iso3D.render(atores, telasVivas, t, zoom, P, dtQuadro);
     const umaP = Iso3D.primeiraPessoa;
     for (const a of atores){ if (umaP && a === P) continue; const k = Math.min(2.4, Iso3D.escalaEm ? Iso3D.escalaEm(a.px, a.py) : Iso3D.escala()); if (!k) continue; const [fx, fy] = Iso3D.tela(a.px, a.py, 0); ctx.setTransform(DPR*k, 0, 0, DPR*k, DPR*(fx - a.px*k), DPR*(fy - a.py*k)); a.balao(ctx, t); }
+    if (marca){ // destino do toque, também no 3D
+      const [mx, my] = Iso3D.tela(marca.x, marca.y, 0), k = Math.min(3, Iso3D.escalaEm ? Iso3D.escalaEm(marca.x, marca.y) : 1) || 1;
+      if (mx > -9e3){ ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.strokeStyle = `rgba(61,90,254,${marca.t})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(mx, my, 12*k*(1.6-marca.t*.6), 5*k*(1.6-marca.t*.6), 0, 0, Math.PI*2); ctx.stroke(); }
+    }
   } else {
     ctx.setTransform(zoom*DPR, 0, 0, zoom*DPR, c.ox*DPR, c.oy*DPR);
     drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(telasVivas));

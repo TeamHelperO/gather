@@ -1,6 +1,7 @@
 /* Ícones Lucide (https://lucide.dev, licença ISC – assets/icones/LICENSE-lucide-ISC.txt), convertidos para caminhos SVG 24×24 (traço).
    Gerado a partir de lucide-static. ICONE(nome, tamanho) devolve o <svg> para usar em botões. */
 window.ICONES_LUCIDE = {
+"map": "M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z M15 5.764v15 M9 3.236v15",
 "message-circle": "M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719",
 "check-check": "M18 6 7 17l-5-5 m22 10-7.5 7.5L13 16",
 "zap": "M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z",

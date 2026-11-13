@@ -46,7 +46,7 @@ window.Configuracoes = (function () {
       + bloco("Visual",
         (opt.modoSala() === "ambos" ? linha("Modo", `<div class="cfg-seg">${[["2d", "2D"], ["3d", "3D"]].map(([k, l]) => `<button data-cmodo="${k}" class="${(opt.em3d() ? "3d" : "2d") === k ? "on" : ""}">${l}</button>`).join("")}</div>`) : linha("Modo", MODOS[opt.modoSala()] + " (definido pela sala)"))
         + (opt.modoSala() !== "2d" ? linha("Câmera no 3D", `<div class="cfg-seg">${[["1p", "Primeira pessoa"], ["iso", "Visão de cima"]].map(([k, l]) => `<button data-cvista="${k}" class="${(window.Iso3D ? Iso3D.vista : "1p") === k ? "on" : ""}">${l}</button>`).join("")}</div>`) : ""))
-      + bloco("Seus dados", linha("Tempo nesta sala", `<button class="btn" data-ctempo>📊 Meu tempo</button>`) + linha("Exportar", `<button class="btn" data-cexp>💾 Baixar meus dados (JSON)</button>`) + linha("Conta", `<button class="btn dan" data-csair>🚪 Sair da conta</button>`));
+      + bloco("Seus dados", linha("Tempo nesta sala", `<button class="btn" data-ctempo>📊 Meu tempo</button>`) + linha("Tutorial", `<button class="btn" data-ctour>🧭 Ver o tutorial de novo</button>`) + linha("Minimapa", `<button class="btn" data-cmapa>🗺️ ${window.Minimapa && Minimapa.ligado ? "Esconder" : "Mostrar"} (tecla M)</button>`) + linha("Exportar", `<button class="btn" data-cexp>💾 Baixar meus dados (JSON)</button>`) + linha("Conta", `<button class="btn dan" data-csair>🚪 Sair da conta</button>`));
   }
 
   /* ---------- Sala ---------- */
@@ -92,6 +92,8 @@ window.Configuracoes = (function () {
     if (d.cmodo) { if ((opt.em3d() ? "3d" : "2d") !== d.cmodo) opt.alternar3d(); setTimeout(desenhar, 300); return; }
     if (d.cvista) { if (window.Iso3D && Iso3D.vista !== d.cvista) opt.trocarVista(); if (!opt.em3d() && opt.modoSala() !== "2d") opt.alternar3d(); setTimeout(desenhar, 300); return; }
     if ("ctempo" in d) { fechar(); return Gestor.abrirMeuTempo(); }
+    if ("ctour" in d) { fechar(); return window.Tour && Tour.iniciar(null, true); }
+    if ("cmapa" in d) { const on = window.Minimapa && Minimapa.alternar(); t.textContent = `🗺️ ${on ? "Esconder" : "Mostrar"} (tecla M)`; return; }
     if ("cexp" in d) return opt.exportar();
     if ("csair" in d) return opt.sair();
     if ("cconvite" in d) { const link = location.origin + location.pathname + "?sala=" + opt.idPublico();
