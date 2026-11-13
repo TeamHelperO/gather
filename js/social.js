@@ -127,7 +127,10 @@ window.Social = (function () {
         <button data-a="ir">🚶 Ir até</button><button data-a="chamar">🔔 Chamar</button>
         <button data-a="msg">💬 Mensagem</button><button data-a="vol">🎚️ Volume</button>
         ${a.tela ? `<button data-a="tela" class="full">🖥️ Ver a tela compartilhada</button>` : ""}
-      </div></div>`);
+      </div>
+      ${opt.souAdmin && opt.souAdmin() ? `<div class="sc-adm"><small>Administrador da sala</small>
+        ${a.proj || a.tela ? `<button data-a="parar_proj">⛔ Encerrar a projeção</button>` : ""}
+        <button data-a="expulsar" class="dan">🚪 Remover da sala</button></div>` : ""}</div>`);
     p.onclick = e => {
       const b = e.target.closest("[data-a]"); if (!b) return; fecharPop();
       const ac = b.dataset.a;
@@ -136,6 +139,12 @@ window.Social = (function () {
       if (ac === "msg") abrirChat(Dados.canalDM(a.id));
       if (ac === "vol") opt.abrirVolume(a.id);
       if (ac === "tela") opt.verTela(a);
+      if (ac === "parar_proj") opt.acaoAdmin(a, "parar_proj");
+      if (ac === "expulsar") {
+        const p2 = abrirPop(x + 10, y - 20, `<div class="soc-card"><b>Remover ${esc(a.nome)} da sala?</b><p style="color:var(--mut);font-size:13px;margin:6px 0 10px">A pessoa sai na hora e não consegue entrar de novo até você readmitir em Configurações → Administração.</p>
+          <div class="sc-acoes"><button data-c="sim" class="dan">Remover</button><button data-c="nao">Cancelar</button></div></div>`);
+        p2.onclick = ev => { const c = ev.target.closest("[data-c]"); if (!c) return; fecharPop(); if (c.dataset.c === "sim") opt.acaoAdmin(a, "expulsar"); };
+      }
     };
   }
 

@@ -122,6 +122,8 @@ async function entrar(id, errEl) {
   $("eu").textContent = eu.nome || "";
   SessaoUnica.iniciar({ soOutrosAparelhos: true }); // entrar aqui derruba a conta aberta em outro aparelho
   // veio por um convite (?sala=…)?
+  const qs = new URLSearchParams(location.search);
+  if (qs.get("removido")) $("errEntrar").textContent = `Você foi removido da sala "${qs.get("removido")}"${qs.get("por") ? " por " + qs.get("por") : ""}. Fale com o administrador dela para voltar.`;
   let convite = Dados.salaDaUrl(); try { convite = convite || localStorage.getItem("nextco_sala_convite"); localStorage.removeItem("nextco_sala_convite"); } catch (e) {}
   if (convite) { $("idSala").value = convite; return entrar(convite, $("errEntrar")); }
 

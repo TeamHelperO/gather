@@ -1,6 +1,8 @@
 /* Telão de projeção do auditório.
    – Item "projecao" (categoria Auditório no editor). Já vem montado na parede do palco de todo auditório.
-   – Só quem está EM CIMA DO PALCO (piso de palco) de uma sala com telão de projeção pode compartilhar a tela.
+   – Sala com palco (auditório): só quem está EM CIMA DO PALCO pode compartilhar a tela.
+   – Sala sem palco (ex.: reunião com telão de projeção): quem estiver dentro e compartilhar primeiro.
+   – Administrador ou dono da sala virtual pode encerrar a projeção de qualquer pessoa (Projecao.pararPorAdmin).
    – A tela compartilhada aparece no próprio item, no mapa, para quem está na sala.
    – Clicar no telão abre uma janela maior, com tela cheia. Dá para assistir de qualquer lugar pela janela.
    Transmissão por WebRTC (quem apresenta envia para cada pessoa que está assistindo); sinais pela Sala
@@ -44,6 +46,14 @@ window.Projecao = (function () {
   }
   const salaDoItem = it => (it.room && roomById(it.room)) || roomAt(it.x * T + 96, it.y * T + 110) || roomAt(it.x * T + 96, it.y * T + 140);
   const salasComTelao = () => new Set(itens.map(salaDoItem).filter(Boolean).map(r => r.id));
+  // salas que têm piso de palco: nelas só quem está no palco apresenta
+  const salasComPalco = () => { const s = new Set(); for (const k of palco) { const [x, y] = k.split(",").map(Number); const r = roomAt(x * T + 16, y * T + 16); if (r) s.add(r.id); } return s; };
+  // sala com telão de projeção e sem palco onde a pessoa está: livre para quem compartilhar primeiro
+  function salaLivre(a) {
+    if (!a) return null;
+    const r = roomAt(a.px, a.py - 4);
+    return r && salasComTelao().has(r.id) && !salasComPalco().has(r.id) ? r : null;
+  }
   function salaNoPalco(a) {
     if (!a) return null;
     const tx = Math.floor(a.px / T), ty = Math.floor((a.py - 2) / T);
@@ -72,8 +82,8 @@ window.Projecao = (function () {
 
   /* ---------------- quem apresenta ---------------- */
   async function compartilhar() {
-    const eu = opt.eu(), r = salaNoPalco(eu), mesa = !r && naMesa(eu);
-    if (!r && !mesa) { opt.toast("Suba no palco do auditório, ou sente numa mesa de trabalho, para compartilhar a tela"); return; }
+    const eu = opt.eu(), r = salaNoPalco(eu) || salaLivre(eu), mesa = !r && naMesa(eu);
+    if (!r && !mesa) { opt.toast("Suba no palco do auditório, entre numa sala com telão de projeção, ou sente numa mesa de trabalho, para compartilhar a tela"); return; }
     if (r && !podePalestrar(eu, r.id)) { opt.toast(`🎤 Só ${Acesso.nomeDe(Acesso.palestranteDe(r.id))} pode apresentar neste auditório`); return; }
     const outro = r && apresentador(r.id);
     if (outro) { opt.toast(`${outro.nome} já está apresentando`); return; }
@@ -94,7 +104,7 @@ window.Projecao = (function () {
     if (v && "contentHint" in v) v.contentHint = "detail";
     v.addEventListener("ended", () => parar(true));
     const chave = r ? r.id : "mesa:" + eu.id;
-    share = { stream, sala: chave, tipo: r ? "palco" : "mesa", nomeSala: r ? r.name : "mesa", video: videoOculto(stream, true), viewers: new Map() };
+    share = { stream, sala: chave, tipo: r ? (salasComPalco().has(r.id) ? "palco" : "livre") : "mesa", nomeSala: r ? r.name : "mesa", video: videoOculto(stream, true), viewers: new Map() };
     foraDoPalcoDesde = 0;
     if (r) { opt.toast("Você está apresentando no telão 🎬"); opt.registrar && opt.registrar(`Começou a apresentar no telão de ${r.name}`, r.name); }
     else { opt.toast("Sua tela está aberta: quem chegar perto e clicar no seu computador consegue ver 🖥️"); opt.registrar && opt.registrar("Abriu a tela do computador para os colegas", eu.sala); }
@@ -189,11 +199,11 @@ window.Projecao = (function () {
     const eu = opt.eu();
     // quem apresenta precisa continuar no palco (2 s de tolerância)
     if (share) {
-      const r = salaNoPalco(eu);
+      const r = share.tipo === "livre" ? salaLivre(eu) : salaNoPalco(eu);
       const ok = share.tipo === "mesa" ? naMesa(eu) : (r && r.id === share.sala);
       if (ok) foraDoPalcoDesde = 0;
       else if (!foraDoPalcoDesde) foraDoPalcoDesde = agora;
-      else if (agora - foraDoPalcoDesde > 2000) { const m = share.tipo === "mesa"; parar(false); opt.toast(m ? "Você levantou da mesa: sua tela foi fechada" : "Você saiu do palco: a apresentação foi encerrada"); }
+      else if (agora - foraDoPalcoDesde > 2000) { const m = share.tipo; parar(false); opt.toast(m === "mesa" ? "Você levantou da mesa: sua tela foi fechada" : m === "livre" ? "Você saiu da sala: a projeção foi encerrada" : "Você saiu do palco: a apresentação foi encerrada"); }
     }
     // quem saiu da sala deixa de receber a transmissão
     if (share) for (const [id, pc] of [...share.viewers]) {
@@ -229,7 +239,7 @@ window.Projecao = (function () {
   /* ---------------- botão de apresentar ---------------- */
   function atualizarBotao(eu) {
     const b = document.getElementById("btnProj"); if (!b) return;
-    const r = salaNoPalco(eu);
+    const r = salaNoPalco(eu) || salaLivre(eu);
     let mostra = false, txt = "", ativo = true;
     if (share) { mostra = true; txt = share.tipo === "mesa" ? `⏹ Fechar minha tela${share.viewers.size ? ` (${share.viewers.size} vendo)` : ""}` : `⏹ Parar de compartilhar${share.viewers.size ? ` (${share.viewers.size} vendo)` : ""}`; }
     else if (!r && naMesa(eu)) { mostra = true; txt = podeCompartilhar() ? "🖥️ Deixar colegas verem minha tela" : "🖥️ Mostrar tela (só no computador)"; }
@@ -240,7 +250,7 @@ window.Projecao = (function () {
       if (ap) { txt = `🎬 ${ap.nome} está apresentando`; ativo = false; }
       else txt = podeCompartilhar() ? "🖥️ Compartilhar minha tela no telão" : "🖥️ Compartilhar tela (só no computador)";
     }
-    const d = mostra ? "block" : "none"; if (b.style.display !== d) b.style.display = d;
+    const d = mostra ? "flex" : "none"; if (b.style.display !== d) b.style.display = d;
     // ícone Lucide no lugar do emoji do começo do texto
     const ic = /^⏹/.test(txt) ? "x" : /^🎤/.test(txt) ? "mic" : /^🎬/.test(txt) ? "presentation" : "monitor";
     const limpo = txt.replace(/^(⏹|🖥️|🎤|🎬)\s*/u, "");
@@ -281,7 +291,7 @@ window.Projecao = (function () {
     } else {
       g.fillStyle = "rgba(61,90,254,.08)"; g.fillRect(x, y, w, h);
       g.fillStyle = "#8a8578"; g.font = "bold 8px system-ui,sans-serif"; g.fillText("TELÃO DE PROJEÇÃO", x + w / 2, y + h / 2 - 6);
-      g.font = "7px system-ui,sans-serif"; g.fillText("Suba no palco para compartilhar sua tela", x + w / 2, y + h / 2 + 7);
+      g.font = "7px system-ui,sans-serif"; g.fillText(r && !salasComPalco().has(r.id) ? "Livre: quem entrar pode compartilhar a tela" : "Suba no palco para compartilhar sua tela", x + w / 2, y + h / 2 + 7);
     }
     g.restore();
   }
@@ -369,7 +379,7 @@ window.Projecao = (function () {
     const s = popup.el.querySelector(".proj-status"); if (s.textContent !== st) s.textContent = st;
     const vazio = popup.el.querySelector(".proj-vazio");
     const mesa = String(popup.sala).startsWith("mesa:");
-    const msg = tem ? "" : ap ? "Conectando…" : mesa ? "Essa pessoa fechou a tela." : "Ninguém está apresentando agora.<br><small>Quem subir no palco pode compartilhar a tela.</small>";
+    const msg = tem ? "" : ap ? "Conectando…" : mesa ? "Essa pessoa fechou a tela." : "Ninguém está apresentando agora.<br><small>" + (popup.sala && !salasComPalco().has(popup.sala) ? "Quem estiver na sala pode compartilhar a tela." : "Quem subir no palco pode compartilhar a tela.") + "</small>";
     if (vazio.innerHTML !== msg) vazio.innerHTML = msg;
     vazio.style.display = tem ? "none" : "grid";
     if (tem && popup.video.srcObject !== (meu ? share.stream : v.stream)) atualizarPopup();
@@ -390,7 +400,9 @@ window.Projecao = (function () {
   function diagnostico() { return [...vendo.entries()].map(([sala, v]) => ({ sala, de: v.de, conectado: v.conectado, tentativas: v.tentativas, estado: v.pc && v.pc.connectionState, ice: v.pc && v.pc.iceConnectionState, temStream: !!v.stream, videoPronto: v.video && v.video.readyState, pausado: v.video && v.video.paused })); }
   return { diagnostico,
     iniciar, recalcular, aoSinal, atualizar, desenhaveis, clicou, clicarBotao, abrirPopup, fecharPopup, parar,
-    get minhaSala() { return share && share.tipo === "palco" ? share.sala : null; },
+    get minhaSala() { return share && (share.tipo === "palco" || share.tipo === "livre") ? share.sala : null; },
+    // um administrador mandou encerrar minha projeção (telão ou tela da mesa)
+    pararPorAdmin(quem) { if (!share) return false; parar(false); opt.toast(`⛔ ${quem || "O administrador"} encerrou sua projeção`); return true; },
     get minhaTela() { return !!(share && share.tipo === "mesa"); },
     abrirTelaDe, salaNoPalco,
     get apresentando() { return !!share; },

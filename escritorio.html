@@ -126,6 +126,10 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 .sc-acoes{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .sc-acoes button{padding:9px 6px;border-radius:10px;background:var(--chip);border:1px solid var(--line);font-weight:700;font-size:13px}
 .sc-acoes button:hover{border-color:var(--brand)}.sc-acoes .full{grid-column:1/-1}
+.sc-adm{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:6px}
+.sc-adm small{color:var(--mut);font-size:11px;font-weight:800;text-transform:uppercase}
+.sc-adm button{padding:8px;border-radius:10px;background:var(--chip);border:1px solid var(--line);font-weight:700;font-size:13px;text-align:left}
+.soc-card .dan,.sc-adm .dan{color:#e5484d}
 .soc-toque{position:fixed;z-index:70;left:50%;top:76px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:min(560px,94vw);
   background:var(--panel);color:var(--ink);border:2px solid var(--brand);border-radius:16px;padding:12px 14px;box-shadow:0 18px 50px rgba(0,0,0,.45);animation:tqIn .35s cubic-bezier(.2,1.4,.4,1)}
 @keyframes tqIn{from{transform:translate(-50%,-14px) scale(.95);opacity:0}}
@@ -314,7 +318,9 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 .pp-det{margin-top:8px}.pp-det summary{cursor:pointer;font-weight:700;color:var(--mut);margin-bottom:4px}
 @media (max-width:760px){#palcoPainel{left:8px;right:8px;width:auto;bottom:118px;max-height:40vh}}
 /* ---- telão de projeção ---- */
-#btnProj{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:70px;z-index:12;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe;white-space:nowrap}
+#acoesCentro{position:fixed;left:50%;transform:translateX(-50%);bottom:74px;z-index:12;display:flex;gap:8px;pointer-events:none}
+#acoesCentro>*{pointer-events:auto}
+#btnProj{display:none;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe;white-space:nowrap}
 #btnProj.parar{background:#e5484d;border-color:#e5484d}
 #btnProj:disabled{background:var(--panel);color:var(--ink);border-color:var(--line);opacity:1;cursor:default}
 .proj-bg{position:fixed;inset:0;z-index:60;background:rgba(8,6,14,.82);display:grid;place-items:center;padding:16px}
@@ -364,8 +370,8 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 <div class="emotes pill hud">
   <button id="btnAudio">Ligar áudio</button><button id="btnCfgAudio" title="Microfone, saída de áudio e volume de cada pessoa" aria-label="Configurar áudio"></button><i class="div"></i><button id="btnMont">Patinete</button><button id="btnMao" style="display:none">Levantar a mão</button><button data-emote="5" title="Acenar"></button><button data-emote="6" title="Dançar"></button><button data-emote="4" title="Sentar ou levantar"></button><button id="btnLuz" style="display:none" title="Acender ou apagar a luz desta sala (L)"></button>
 </div>
-<button class="pill hud" id="btnProj"></button>
-<button class="pill hud" id="btnTelao" style="display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:78px;z-index:12;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe">Abrir telão</button>
+<div id="acoesCentro"><button class="pill hud" id="btnProj"></button>
+<button class="pill hud" id="btnTelao" style="display:none;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe">Abrir telão</button></div>
 <div id="hint" class="hud">Setas/WASD ou clique para andar · pare perto de uma cadeira para sentar</div>
 <div id="joy"><div id="knob"></div></div>
 <aside id="menu" class="sheet hidden"></aside>
@@ -440,6 +446,7 @@ async function boot(){
   if (!S) { Dados.esquecerSala(mapaId); location.replace("salas.html"); return; }
   lerEspaco();
   if (EH_NEXT) abrirPortaPesquisaEdicao();
+  if ((infoEspaco.banidos || []).includes(Dados.meuId())) { Dados.esquecerSala(mapaId); location.replace("salas.html?removido=" + encodeURIComponent(infoEspaco.nome)); return; }
   Dados.lembrarSala(mapaId, infoEspaco.nome);
   if (modoSala === "3d" && !window.Iso3D) { window.__quero3D = true; window.carregar3D && carregar3D(); }
   grid = buildBlocked();
@@ -462,7 +469,7 @@ async function boot(){
   Social.iniciar({ mapaId, eu: () => P, outros: () => outros.filter(o => o.visto), toast,
     salaAtual: () => { const id = salaAtualId(); return id ? roomById(id) : null; }, salas: () => S.rooms, nomeSalaAtual: () => { const id = salaAtualId(); const r = id && roomById(id); return r ? r.name : ""; },
     irAte: a => andarAte(a.px, a.py + 18, 26), irParaSala: id => { const r = roomById(id); if (r) andarAte((r.x + r.w/2)*T, (r.y + r.h/2)*T, 80); },
-    abrirVolume: id => abrirConfigAudio(id), verTela: a => verTelaDe(a), abrirTarefa: abrirTarefaPorId, idPublico,
+    abrirVolume: id => abrirConfigAudio(id), verTela: a => verTelaDe(a), souAdmin: () => souDonoDaSala(), acaoAdmin, abrirTarefa: abrirTarefaPorId, idPublico,
     presencaMudou: () => Sala.atualizarPresenca({ id: P.id, nome: user.nome, avatar: user.avatar, status: Social.status }),
     mutar: () => { if (Voz.ligado && Voz.micAberto) { Voz.alternarMic(); atualizarBotaoAudio(); } }, micMudo: () => Voz.ligado && !Voz.micAberto,
     aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; }, bloqueado: () => Telao.aberto || TI.aberto || Edicao.aberto || Acesso.aberto });
@@ -481,6 +488,38 @@ async function atualizarTarefas(){
   const l = await Dados.listarTarefas();
   // fora do escritório da Next, o telão só mostra tarefas criadas nas salas deste mapa
   tarefas = EH_NEXT ? l : l.filter(t => t.sala && S && S.rooms.some(r => r.id === t.sala));
+}
+/* ---------- poderes do administrador da sala (dono da sala virtual ou admin) ---------- */
+const ehAdminDe = id => { const u = (Social.usuarios || []).find(u => u.id === id); return (u && u.papel === "admin") || (!!infoEspaco.dono && infoEspaco.dono === id); };
+async function acaoAdmin(a, acao){
+  if (!souDonoDaSala()) return toast("Só o administrador da sala pode fazer isso");
+  if (acao === "parar_proj"){ Sala.admin(a.id, { acao, por: user.nome }); toast(`⛔ Projeção de ${a.nome} encerrada`); Dados.registrarAtividade(EMAIL, "acao", `Encerrou a projeção de ${a.nome}`, {}); return; }
+  if (acao === "expulsar"){
+    if (ehAdminDe(a.id) && !Dados.ehAdmin()) return toast("Não dá para expulsar outro administrador");
+    try {
+      const banidos = [...new Set([...(infoEspaco.banidos || []), a.id])];
+      const m = await Dados.configurarSala(mapaId, { banidos }); S.espaco = m.espaco; lerEspaco();
+      Sala.admin(a.id, { acao, por: user.nome, sala: infoEspaco.nome });
+      toast(`🚪 ${a.nome} foi removido da sala`); Dados.registrarAtividade(EMAIL, "acao", `Removeu ${a.nome} da sala`, {});
+    } catch (e) { toast("Não consegui remover: " + (e.message || "")); }
+  }
+}
+async function readmitir(id){
+  const banidos = (infoEspaco.banidos || []).filter(x => x !== id);
+  const m = await Dados.configurarSala(mapaId, { banidos }); S.espaco = m.espaco; lerEspaco();
+}
+// pedido vindo de um administrador (confere quem mandou)
+async function recebeuAdmin(msg){
+  if (!ehAdminDe(msg.from)) return;
+  if (msg.acao === "parar_proj") Projecao.pararPorAdmin(msg.por);
+  if (msg.acao === "expulsar"){
+    // confere no mapa salvo que eu fui mesmo removido
+    const m = await Dados.carregarMapa(mapaId).catch(() => null), ban = m && m.espaco && m.espaco.banidos || [];
+    if (!ban.includes(Dados.meuId())) return;
+    try { Projecao.pararPorAdmin(); Sala.sair(); Voz.desligar(); } catch (e) {}
+    Dados.esquecerSala(mapaId);
+    location.replace("salas.html?removido=" + encodeURIComponent(msg.sala || infoEspaco.nome) + "&por=" + encodeURIComponent(msg.por || ""));
+  }
 }
 // uma vez só: porta na parede entre a sala de Pesquisa e a de Edição (salas vizinhas)
 function abrirPortaPesquisaEdicao(){
@@ -529,6 +568,7 @@ function conectarSala(){
     aoSinal: msg => msg.canal === "proj" ? Projecao.aoSinal(msg) : Voz.aoSinal(msg),
     aoLuz: (id, est) => aplicarLuz(id, est, true),
     aoToque: msg => Social.recebeuToque(msg),
+    aoAdmin: msg => recebeuAdmin(msg),
     aoOla: () => { for (const [id, est] of Object.entries(luzes)) Sala.luz(id, est); },
     aoConectar(){ for (const [id, est] of Object.entries(luzes)) Sala.luz(id, est); },
     aoDesconectar(){ toast("Conexão instável… tentando de novo"); },
@@ -873,7 +913,7 @@ function loop(now){
   if (Telao.aberto && telaoSalaAberta && salaAtualId() !== telaoSalaAberta){ telaoSalaAberta = null; Telao.fechar(); toast("Você saiu da sala: o telão foi fechado"); }
   TI.atualizar(); Edicao.atualizar(); atualizarBotaoLuz();
   const perto = !!telaoPerto;
-  const bt = document.getElementById("btnTelao"); const mostra = perto && !Telao.aberto ? "block" : "none"; if (bt.style.display !== mostra) bt.style.display = mostra;
+  const bt = document.getElementById("btnTelao"); const mostra = perto && !Telao.aberto ? "flex" : "none"; if (bt.style.display !== mostra) bt.style.display = mostra;
   for (const a of [P, ...visiveis]){ a.vozReal = now - (a.vozAtiva || -1e9) < 350; if (Voz.ligado) a.falando = a.vozReal; else if (a.vozReal) a.falando = true; }
   checarSala(false); moverCamera(dt);
   if (sujo && now - ultimoSave > 4000){ salvarPos(); ultimoSave = now; }
