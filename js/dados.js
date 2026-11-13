@@ -37,7 +37,7 @@
   }
   const paraUsuario = (p) => p && ({ id: p.id, email: p.email, nome: p.nome, papel: p.papel || "usuario", avatar: p.avatar, posicao: p.posicao, prefs: p.prefs || {}, criadoEm: p.criado_em, ultimoAcesso: p.ultimo_acesso });
   const paraTarefa = (r) => ({ id: r.id, titulo: r.titulo, descricao: r.descricao || "", responsavel: r.responsavel || "", prazo: r.prazo || "", status: r.status,
-    etapas: r.etapas || [], progressoManual: r.progresso_manual ?? 0, ordem: r.ordem, sala: r.sala ?? null, historico: r.historico || [], criadoPor: r.criado_por, criadoEm: r.criado_em, atualizadoEm: r.atualizado_em });
+    etapas: r.etapas || [], progressoManual: r.progresso_manual ?? 0, ordem: r.ordem, sala: r.sala ?? null, historico: r.historico || [], comentarios: r.comentarios || [], criadoPor: r.criado_por, criadoEm: r.criado_em, atualizadoEm: r.atualizado_em });
   const daTarefa = (t) => ({ id: t.id, titulo: t.titulo, descricao: t.descricao || null, responsavel: t.responsavel || null, prazo: t.prazo || null, status: t.status || "a_fazer",
     etapas: t.etapas || [], progresso_manual: t.etapas && t.etapas.length ? null : (+t.progressoManual || 0), ordem: t.ordem ?? 0, historico: t.historico || [], atualizado_em: agora() });
 
@@ -119,6 +119,43 @@
       const { data } = await sb.from("atividades").select("tipo,detalhe,sala,extra,quando").eq("user_id", usuarioAuth.id).order("quando", { ascending: false }).limit(limite);
       return data || [];
     },
+
+    /* ---------- chat ---------- */
+    canalDM(outro) { const eu = this.meuId(); return "dm:" + [eu, outro].sort().join(":"); },
+    async listarMensagens(mapa, canal, n = 60) {
+      const { data, error } = await sb.from("mensagens").select("*").eq("mapa_id", mapa).eq("canal", canal).order("criado_em", { ascending: false }).limit(n);
+      if (error) return null; return (data || []).reverse();
+    },
+    // últimas mensagens diretas (para a lista de conversas e contagem de não lidas)
+    async listarDMs(mapa, n = 200) {
+      const { data, error } = await sb.from("mensagens").select("*").eq("mapa_id", mapa).like("canal", "dm:%").order("criado_em", { ascending: false }).limit(n);
+      if (error) return null; return data || [];
+    },
+    async enviarMensagem(mapa, canal, texto) {
+      const { data, error } = await sb.from("mensagens").insert({ mapa_id: mapa, canal, texto }).select().single();
+      if (error) throw error; return data;
+    },
+    async apagarMensagem(id) { const { error } = await sb.from("mensagens").delete().eq("id", id); if (error) throw error; },
+    ouvirMensagens(mapa, cb) { return sb.channel("msg-" + mapa + "-" + Math.random().toString(36).slice(2, 6)).on("postgres_changes", { event: "*", schema: "public", table: "mensagens", filter: `mapa_id=eq.${mapa}` }, p => cb(p)).subscribe(); },
+
+    /* ---------- agenda ---------- */
+    async listarReunioes(mapa, desde) {
+      const { data, error } = await sb.from("reunioes").select("*").eq("mapa_id", mapa).gte("fim", desde || new Date(Date.now() - 6 * 3600e3).toISOString()).order("inicio").limit(200);
+      if (error) return null; return data || [];
+    },
+    async salvarReuniao(r) {
+      const q = r.id ? sb.from("reunioes").update(r).eq("id", r.id) : sb.from("reunioes").insert(r);
+      const { data, error } = await q.select().single(); if (error) throw error; return data;
+    },
+    async excluirReuniao(id) { const { error } = await sb.from("reunioes").delete().eq("id", id); if (error) throw error; },
+    ouvirReunioes(mapa, cb) { return sb.channel("reun-" + mapa + "-" + Math.random().toString(36).slice(2, 6)).on("postgres_changes", { event: "*", schema: "public", table: "reunioes", filter: `mapa_id=eq.${mapa}` }, () => cb()).subscribe(); },
+
+    /* ---------- avisos (menções, convites, tarefas) ---------- */
+    async listarAvisos(n = 40) { const { data, error } = await sb.from("avisos").select("*").eq("para", this.meuId()).order("criado_em", { ascending: false }).limit(n); if (error) return null; return data || []; },
+    async criarAvisos(lista) { const l = lista.filter(a => a.para && a.para !== this.meuId()); if (!l.length) return; const { error } = await sb.from("avisos").insert(l); if (error) console.warn("avisos:", error.message); },
+    async marcarAvisosLidos(ids) { if (!ids.length) return; await sb.from("avisos").update({ lido: true }).in("id", ids); },
+    ouvirAvisos(cb) { const eu = this.meuId(); return sb.channel("avisos-" + eu).on("postgres_changes", { event: "INSERT", schema: "public", table: "avisos", filter: `para=eq.${eu}` }, p => cb(p.new)).subscribe(); },
+    async comentarTarefa(id, texto) { const { data, error } = await sb.rpc("comentar_tarefa", { p_tarefa: id, p_texto: texto }); if (error) throw error; return data; },
 
     /* ---------- salas virtuais: cada uma é um mapa com um ID curto (o mapa "principal" é o escritório da Next Co.) ---------- */
     normalizarSala(id) {

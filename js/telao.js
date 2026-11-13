@@ -89,6 +89,10 @@ window.Telao = (function () {
 .tl-f input,.tl-f select,.tl-f textarea{border:1px solid var(--line,#e4dfd5);background:var(--chip,#f3f1ec);color:inherit;border-radius:10px;padding:9px 11px;font:inherit}
 .tl-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 .tl-f input,.tl-f select{min-width:0;width:100%}
+.tl-com{display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--line,#e4dfd5)}.tl-com p{margin:2px 0 0;white-space:pre-wrap;word-break:break-word;font-size:13.5px}
+.tl-com small{color:var(--mut,#6b6760);font-size:11px}.tl-com .av{width:26px;height:26px;border-radius:50%;color:#fff;display:grid;place-items:center;font-size:10px;font-weight:800;flex:none}
+.tl-coms textarea{flex:1;border:1px solid var(--line,#e4dfd5);border-radius:10px;background:var(--chip,#f3f1ec);padding:8px 10px;font:inherit;resize:vertical}
+.tl-coms .men{color:#3d5afe}
 .tl-resps{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:46px;padding:6px 8px;border:1px solid var(--line,#e4dfd5);border-radius:11px;background:var(--chip,#f3f1ec)}
 .tl-resps input{flex:1;min-width:120px;border:0!important;background:transparent!important;padding:4px!important;height:auto!important;outline:none}
 .tl-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 4px 3px 3px;border-radius:999px;background:var(--panel,#fff);border:1px solid var(--line,#e4dfd5);font-size:13px;font-weight:650}
@@ -117,7 +121,7 @@ window.Telao = (function () {
     injetarCSS();
     // cada sala tem o seu telão: só as tarefas daquela sala (sem sala = sala padrão, a Área de trabalho)
     estado = { email: opts.email, cheia: !!opts.telaCheia, aoFechar: opts.aoFechar, filtro: "todas", tarefas: [], usuarios: [], nome: opts.nome || "",
-      sala: opts.sala || null, nomeSala: opts.nomeSala || "", salaPadrao: opts.salaPadrao || null };
+      sala: opts.sala || null, nomeSala: opts.nomeSala || "", salaPadrao: opts.salaPadrao || null, focar: opts.focar || null };
     const tvURL = "telao.html" + (estado.sala ? `?sala=${encodeURIComponent(estado.sala)}&nome=${encodeURIComponent(estado.nomeSala)}&padrao=${encodeURIComponent(estado.salaPadrao || "")}` : "");
     const raiz = document.createElement("div"); raiz.className = "tl" + (estado.cheia ? " cheia" : "");
     raiz.innerHTML = `<div class="tl-box">
@@ -151,6 +155,7 @@ window.Telao = (function () {
     if (!estado) return;
     estado.usuarios = await Dados.listarUsuarios();
     desenhar();
+    if (estado.focar) { const t = estado.tarefas.find(x => x.id === estado.focar); estado.focar = null; if (t) editar(t); }
   }
   function nomeResp(r) { if (!r) return ""; const u = estado.usuarios.find(u => u.email === r); return u ? u.nome : r; }
   // vários responsáveis por tarefa: guardados no mesmo campo, separados por ";" (e-mail de usuário ou nome livre)
@@ -159,9 +164,10 @@ window.Telao = (function () {
   function desenhar() {
     const r = estado.raiz, ts = estado.tarefas, sm = resumo(ts);
     r.querySelector("#tlSum").innerHTML = `<b>${sm.media}%</b> concluído · ${sm.ativas} abertas · ${sm.escalonadas ? `<b>⚠ ${sm.escalonadas} escalonada${sm.escalonadas > 1 ? "s" : ""}</b>` : "nada escalonado"}`;
-    const fil = [["todas", "Todas"], ["minhas", "Minhas"], ["escalonadas", "⚠ Escalonadas"], ["semdono", "Sem responsável"]];
+    const fil = [["todas", "Todas"], ["minhas", "Minhas"], ["semana", "📅 Minha semana"], ["escalonadas", "⚠ Escalonadas"], ["semdono", "Sem responsável"]];
     r.querySelector("#tlFil").innerHTML = fil.map(([k, l]) => `<button data-fil="${k}" class="${estado.filtro === k ? "on" : ""}">${l}</button>`).join("");
     const passa = t => estado.filtro === "todas" || (estado.filtro === "minhas" && minha(t)) || (estado.filtro === "escalonadas" && nivel(t) > 0) || (estado.filtro === "semdono" && !respsDe(t).length);
+    if (estado.filtro === "semana") { r.querySelector("#tlBoard").innerHTML = minhaSemana(ts); return; }
     r.querySelector("#tlBoard").innerHTML = STATUS.map(st => {
       const lista = ts.filter(t => (t.status || "a_fazer") === st.id && passa(t));
       return `<section class="tl-col" data-st="${st.id}"><h4><i style="background:${st.cor}"></i>${st.nome}<span>${lista.length}</span></h4>
@@ -169,8 +175,30 @@ window.Telao = (function () {
         <button class="tl-add" data-nova="${st.id}">+ Adicionar</button></section>`;
     }).join("");
   }
+  // minhas tarefas abertas por dia: atrasadas, hoje, próximos 7 dias e sem prazo
+  function minhaSemana(ts) {
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    const grupos = new Map([["atr", { nome: "⚠ Atrasadas", l: [] }]]);
+    for (let i = 0; i < 7; i++) { const d = new Date(hoje); d.setDate(hoje.getDate() + i);
+      grupos.set("d" + i, { nome: i === 0 ? "Hoje" : i === 1 ? "Amanhã" : d.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" }), l: [] }); }
+    grupos.set("depois", { nome: "Mais pra frente", l: [] }); grupos.set("sem", { nome: "Sem prazo", l: [] });
+    for (const t of ts.filter(t => minha(t) && t.status !== "feito")) {
+      if (!t.prazo) { grupos.get("sem").l.push(t); continue; }
+      const dd = Math.round((new Date(t.prazo + "T00:00:00") - hoje) / 864e5);
+      grupos.get(dd < 0 ? "atr" : dd < 7 ? "d" + dd : "depois").l.push(t);
+    }
+    const cols = [...grupos.values()].filter(g => g.l.length);
+    if (!cols.length) return `<div class="tl-vazio" style="grid-column:1/-1;padding:40px">Nenhuma tarefa aberta com você neste telão. 🎉</div>`;
+    return cols.map(g => `<section class="tl-col"><h4 style="text-transform:capitalize">${esc(g.nome)}<span>${g.l.length}</span></h4><div class="tl-list">${g.l.map(cartao).join("")}</div></section>`).join("");
+  }
+  // @menções: usuários cujo nome (ou primeiro nome) aparece depois de um @
+  function mencoes(texto) {
+    const t = " " + String(texto || "").toLowerCase();
+    return estado.usuarios.filter(u => { const n = String(u.nome || "").toLowerCase().trim(); return n && (t.includes("@" + n) || t.includes("@" + n.split(/\s+/)[0])); });
+  }
   function cartao(t) {
     const p = progresso(t), n = nivel(t), atr = diasAtraso(t), resps = respsDe(t).map(nomeResp);
+    const nCom = (t.comentarios || []).length;
     const textoResp = resps.length <= 2 ? resps.join(" e ") : `${resps.slice(0, 2).join(", ")} +${resps.length - 2}`;
     const cor = p >= 100 ? "#3fbf5f" : n >= 2 ? "#e5484d" : n === 1 ? "#f2a33a" : "#3d5afe";
     const et = t.etapas && t.etapas.length ? `☑ ${t.etapas.filter(e => e.feito).length}/${t.etapas.length}` : "";
@@ -178,7 +206,7 @@ window.Telao = (function () {
       <div class="alca" title="Arrastar" aria-label="Arrastar">⠿</div>
       <div class="t">${esc(t.titulo)}</div>
       <div class="meta">${resps.length ? `<span class="avs" title="${esc(resps.join(", "))}">${resps.slice(0, 3).map(n => `<span class="av" style="background:${corNome(n)}">${esc(iniciais(n))}</span>`).join("")}</span><span>${esc(textoResp)}</span>` : `<span>Sem responsável</span>`}
-        ${t.prazo ? `<span class="${atr > 0 ? "atr" : ""}">· ${atr > 0 ? `atrasada ${atr}d` : "até " + fmtData(t.prazo)}</span>` : ""}${et ? `<span>· ${et}</span>` : ""}</div>
+        ${t.prazo ? `<span class="${atr > 0 ? "atr" : ""}">· ${atr > 0 ? `atrasada ${atr}d` : "até " + fmtData(t.prazo)}</span>` : ""}${et ? `<span>· ${et}</span>` : ""}${nCom ? `<span>· 💬 ${nCom}</span>` : ""}</div>
       <div class="meta" style="margin-top:6px"><div class="bar" style="flex:1;margin:0"><i style="width:${p}%;background:${cor}"></i></div><span class="pc">${p}%</span></div>
       ${n ? `<div class="esc">⚠ ${NIVEL[n]}</div>` : ""}
     </div>`;
@@ -229,6 +257,9 @@ window.Telao = (function () {
         <div class="tl-f"><label>Observações</label><textarea name="descricao" rows="3" maxlength="1000">${esc(d.descricao || "")}</textarea></div>
         ${nivel(d) ? `<div class="tl-card n${nivel(d)}" style="cursor:default;padding:8px"><div class="esc" style="margin:0">⚠ ${NIVEL[nivel(d)]}${d.status === "bloqueado" ? " — tarefa bloqueada" : ""}${diasAtraso(d) > 0 ? ` — ${diasAtraso(d)} dia(s) de atraso` : ""}</div></div>` : ""}
         <div class="tl-acts"><button class="tl-btn pri" type="submit">Salvar</button><button class="tl-btn" type="button" data-x>Cancelar</button>${novo ? "" : `<button class="tl-btn dan" type="button" data-del>Excluir</button>`}</div>
+        ${t ? `<div class="tl-f tl-coms"><label>Comentários</label>
+          ${(d.comentarios || []).map(c => `<div class="tl-com"><span class="av" style="background:${corNome(c.nome || "")}">${esc(iniciais(c.nome || "?"))}</span><div><b>${esc(c.nome || "—")}</b> <small>${new Date(c.quando).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small><p>${esc(c.texto).replace(/@([\wÀ-ÿ]+)/g, '<b class="men">@$1</b>')}</p></div></div>`).join("") || `<div style="color:var(--mut,#6b6760);font-size:13px">Nenhum comentário ainda.</div>`}
+          <div class="tl-novaet"><textarea id="tlCom" rows="2" maxlength="1500" placeholder="Comentar… use @nome para avisar alguém"></textarea><button type="button" class="tl-btn pri" data-comentar style="background:#3d5afe;color:#fff">Enviar</button></div></div>` : ""}
         ${t && t.historico ? `<div class="tl-hist"><b>Histórico</b>${t.historico.slice(-6).reverse().map(h => `<div>${new Date(h.quando).toLocaleString("pt-BR")} · ${esc(nomeResp(h.email) || "—")} · ${esc(h.acao)}</div>`).join("")}</div>` : ""}
       </form>`;
       const f = m.querySelector("form");
@@ -248,6 +279,21 @@ window.Telao = (function () {
       m.querySelectorAll("[data-et]").forEach(c => c.onchange = () => { ler(); d.etapas[+c.dataset.et].feito = c.checked; if (d.etapas.every(e => e.feito) && d.status !== "feito") d.status = "feito"; else if (!d.etapas.every(e => e.feito) && d.status === "feito") d.status = "andamento"; else if (d.status === "a_fazer" && c.checked) d.status = "andamento"; render(); });
       m.querySelectorAll("[data-rmet]").forEach(b => b.onclick = () => { ler(); d.etapas.splice(+b.dataset.rmet, 1); render(); });
       m.querySelectorAll("[data-x]").forEach(b => b.onclick = () => m.classList.add("hidden"));
+      const bc = m.querySelector("[data-comentar]");
+      if (bc) bc.onclick = async () => {
+        const ta = m.querySelector("#tlCom"), texto = ta.value.trim(); if (!texto) return;
+        bc.disabled = true;
+        try {
+          const c = await Dados.comentarTarefa(t.id, texto); ler();
+          d.comentarios = (d.comentarios || []).concat(c); t.comentarios = d.comentarios;
+          const meuId = Dados.meuId && Dados.meuId();
+          const alvos = new Map(mencoes(texto).map(u => [u.id, "mencionou você"]));
+          for (const r of respsDe(d)) { const u = estado.usuarios.find(u => u.email === r); if (u && !alvos.has(u.id)) alvos.set(u.id, "comentou"); }
+          if (Dados.criarAvisos) Dados.criarAvisos([...alvos].filter(([id]) => id !== meuId).map(([id, acao]) => ({ para: id, tipo: acao === "comentou" ? "tarefa" : "mencao",
+            texto: `${estado.nome || "Alguém"} ${acao} em “${d.titulo}”: ${texto.slice(0, 120)}`, dados: { tarefa: t.id, mapa: window.mapaIdAtual || null } })));
+          render();
+        } catch (err) { bc.disabled = false; alert(/comentar_tarefa|function/i.test(err.message || "") ? "Para comentar, rode o arquivo rodar_no_supabase_6.sql no Supabase." : "Não consegui comentar: " + (err.message || "")); }
+      };
       const del = m.querySelector("[data-del]");
       if (del) del.onclick = async () => { if (del.dataset.ok) { await Dados.excluirTarefa(t.id, estado.email); m.classList.add("hidden"); recarregar(); } else { del.dataset.ok = 1; del.textContent = "Confirmar exclusão"; } };
       f.onsubmit = async e => {
@@ -256,7 +302,11 @@ window.Telao = (function () {
         if (!novo && t.status !== d.status) acao = `Moveu para "${STATUS.find(s => s.id === d.status).nome}"`;
         if (!novo && d.status === "feito" && t.status !== "feito") acao = "Concluiu a tarefa";
         if (novo) d.ordem = Math.max(0, ...estado.tarefas.filter(x => x.status === d.status).map(x => (x.ordem ?? 0) + 1));
-        await Dados.salvarTarefa(d, estado.email, acao);
+        const salva = await Dados.salvarTarefa(d, estado.email, acao); if (salva && salva.id) d.id = salva.id;
+        // avisa quem acabou de virar responsável
+        const antes = new Set(novo ? [] : respsDe(t)), meuId = Dados.meuId && Dados.meuId();
+        const novos = respsDe(d).filter(r => !antes.has(r)).map(r => estado.usuarios.find(u => u.email === r)).filter(u => u && u.id !== meuId);
+        if (novos.length && Dados.criarAvisos && d.id) Dados.criarAvisos(novos.map(u => ({ para: u.id, tipo: "tarefa", texto: `${estado.nome || "Alguém"} colocou você como responsável em “${d.titulo}”${d.prazo ? " (prazo " + fmtData(d.prazo) + ")" : ""}`, dados: { tarefa: d.id, mapa: window.mapaIdAtual || null } })));
         m.classList.add("hidden"); recarregar();
       };
     };

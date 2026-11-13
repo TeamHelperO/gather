@@ -16,12 +16,13 @@ window.Sala = (function () {
         agora.add(id);
         const m = metas[metas.length - 1];
         if (!presentes.has(id)) { presentes.set(id, m); cb.aoEntrar && cb.aoEntrar(id, m); }
-        else if (JSON.stringify(presentes.get(id).avatar) !== JSON.stringify(m.avatar) || presentes.get(id).nome !== m.nome) { presentes.set(id, m); cb.aoMudar && cb.aoMudar(id, m); }
+        else if (JSON.stringify(presentes.get(id).avatar) !== JSON.stringify(m.avatar) || presentes.get(id).nome !== m.nome || presentes.get(id).status !== m.status) { presentes.set(id, m); cb.aoMudar && cb.aoMudar(id, m); }
       }
       for (const id of [...presentes.keys()]) if (!agora.has(id)) { presentes.delete(id); cb.aoSair && cb.aoSair(id); }
     });
     canal.on("broadcast", { event: "pos" }, ({ payload }) => { if (payload && payload.id !== meuId) cb.aoMover && cb.aoMover(payload.id, payload); });
     canal.on("broadcast", { event: "ola" }, ({ payload }) => { if (payload && payload.id !== meuId) { ultimoEstado = ""; cb.aoOla && cb.aoOla(payload.id); } }); // alguém chegou: reenvia minha posição (e o estado das luzes)
+    canal.on("broadcast", { event: "toque" }, ({ payload }) => { if (payload && payload.to === meuId) cb.aoToque && cb.aoToque(payload); });
     canal.on("broadcast", { event: "luz" }, ({ payload }) => { if (payload && payload.sala) cb.aoLuz && cb.aoLuz(payload.sala, payload); });
     canal.on("broadcast", { event: "rtc" }, ({ payload }) => { if (payload && payload.to === meuId) cb.aoSinal && cb.aoSinal(payload); });
     canal.subscribe(async (status) => {
@@ -46,7 +47,8 @@ window.Sala = (function () {
   }
   function atualizarPresenca(obj) { if (pronto) canal.track(obj); }
   function sinal(para, dados) { if (pronto) canal.send({ type: "broadcast", event: "rtc", payload: { from: meuId, to: para, ...dados } }); }
+  function toque(para, dados) { if (pronto) canal.send({ type: "broadcast", event: "toque", payload: { from: meuId, to: para, ...dados } }); }
   function luz(sala, est) { if (pronto) canal.send({ type: "broadcast", event: "luz", payload: { sala, acesa: !!est.acesa, ts: est.ts, por: est.por || "" } }); }
   function sair() { if (canal) { canal.untrack(); Dados.cliente.removeChannel(canal); canal = null; pronto = false; } }
-  return { entrar, enviarPosicao, atualizarPresenca, sinal, luz, sair, get conectado() { return pronto; }, get online() { return presentes.size + 1; } };
+  return { entrar, enviarPosicao, atualizarPresenca, sinal, luz, toque, sair, get conectado() { return pronto; }, get online() { return presentes.size + 1; } };
 })();

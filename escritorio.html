@@ -107,6 +107,83 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 .ed-win .tend-barra .tab.on{background:#e04fa0;border-color:#e04fa0}
 .ed-win .tend-barra select{margin-left:auto;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--chip);padding:0 8px;max-width:260px}
 .ed-win .tend-lista{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+/* ---------- social: topo, chat, cartão, toque, agenda ---------- */
+.soc-topo{display:flex;gap:6px;margin-left:auto;pointer-events:auto}
+.soc-topo+#eu{margin-left:0}
+.soc-st,.soc-ic{display:flex;align-items:center;gap:7px;padding:8px 11px;font-weight:750;font-size:13px;position:relative}
+.soc-ic .soc-ico{display:grid;place-items:center}
+.soc-ic .bdg{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;border-radius:9px;background:#e5484d;color:#fff;font:800 10.5px/18px Inter,system-ui;font-style:normal;text-align:center;padding:0 5px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex:none}
+.soc-pop{position:fixed;z-index:60;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,.4)}
+.soc-menu{display:flex;flex-direction:column;padding:6px;min-width:210px}
+.soc-menu button{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;font-weight:650;text-align:left}
+.soc-menu button:hover,.soc-menu button.on{background:var(--chip)}
+.soc-menu p{margin:6px 8px 4px;font-size:11.5px;color:var(--mut);max-width:220px}
+.soc-card{padding:12px;width:270px}
+.sc-top{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.sc-top small{display:flex;align-items:center;gap:5px;color:var(--mut);font-size:12px}
+.av{width:30px;height:30px;border-radius:50%;color:#fff;display:inline-grid;place-items:center;font:800 11px Inter,system-ui;flex:none}
+.sc-acoes{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.sc-acoes button{padding:9px 6px;border-radius:10px;background:var(--chip);border:1px solid var(--line);font-weight:700;font-size:13px}
+.sc-acoes button:hover{border-color:var(--brand)}.sc-acoes .full{grid-column:1/-1}
+.soc-toque{position:fixed;z-index:70;left:50%;top:76px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:min(560px,94vw);
+  background:var(--panel);color:var(--ink);border:2px solid var(--brand);border-radius:16px;padding:12px 14px;box-shadow:0 18px 50px rgba(0,0,0,.45);animation:tqIn .35s cubic-bezier(.2,1.4,.4,1)}
+@keyframes tqIn{from{transform:translate(-50%,-14px) scale(.95);opacity:0}}
+.tq-ic{font-size:26px;animation:tqSino 1s ease-in-out 3}
+@keyframes tqSino{25%{transform:rotate(-14deg)}75%{transform:rotate(14deg)}}
+.tq-tx{flex:1;min-width:180px}.tq-ac{display:flex;gap:6px}.tq-ac .btn{padding:8px 12px;font-size:13px}
+.soc-chat{position:fixed;z-index:40;top:64px;right:10px;bottom:84px;width:min(380px,calc(100vw - 20px));display:none;flex-direction:column;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.4);overflow:hidden}
+.soc-chat.on{display:flex}
+.sc-h{display:flex;align-items:center;gap:8px;padding:12px 12px 8px 14px}.sc-h b{flex:1;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-x{width:30px;height:30px;border-radius:9px;font-size:20px;line-height:1}.sc-x:hover{background:var(--chip)}
+.sc-v{font-weight:700;color:var(--brand);font-size:13px}
+.sc-abas{display:flex;gap:4px;padding:0 10px 8px;border-bottom:1px solid var(--line)}
+.sc-abas button{padding:6px 11px;border-radius:999px;font-weight:700;font-size:12.5px;background:var(--chip);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.sc-abas button.on{background:var(--brand);color:#fff}
+.sc-abas i,.soc-dms i{font-style:normal;background:#e5484d;color:#fff;border-radius:999px;padding:0 6px;font-size:11px;margin-left:3px}
+.soc-msgs{flex:1;overflow:auto;padding:8px 12px}
+.msg{display:flex;gap:9px;margin-top:10px;position:relative}.msg.junto{margin-top:2px;padding-left:39px}
+.msg-c{flex:1;min-width:0}.msg-h{display:flex;gap:8px;align-items:baseline}.msg-h small{color:var(--mut);font-size:11px}
+.msg-t{white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.4}
+.msg-t a{color:var(--brand)}.msg-t .men{color:var(--brand);background:#3d5afe18;border-radius:5px;padding:0 3px}
+.msg-x{position:absolute;right:0;top:0;opacity:0;color:var(--mut);width:22px;height:22px;border-radius:6px}.msg:hover .msg-x{opacity:1}
+.msg-dia{text-align:center;color:var(--mut);font-size:11.5px;font-weight:700;margin:14px 0 4px;text-transform:capitalize}
+.soc-env{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.soc-env textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:12px;background:var(--chip);color:var(--ink);padding:10px 12px;font:inherit;font-size:14px;max-height:120px}
+.soc-env .btn{padding:0 14px}
+.soc-vazio{color:var(--mut);text-align:center;padding:30px 18px;margin:0;font-size:13.5px}
+.soc-dms{flex:1;overflow:auto;padding:6px}
+.soc-dms button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 8px;border-radius:11px;text-align:left}
+.soc-dms button:hover{background:var(--chip)}.dm-tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.dm-tx small{color:var(--mut);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dm-sep{font-size:11.5px;font-weight:800;color:var(--mut);text-transform:uppercase;margin:12px 8px 4px}
+.soc-modal{position:fixed;inset:0;z-index:55;display:none;place-items:center;background:rgba(10,8,18,.55);padding:16px}
+.soc-modal.on{display:grid}
+.sm-win{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:18px;width:min(620px,100%);max-height:86vh;overflow:auto;box-shadow:0 24px 70px rgba(0,0,0,.5)}
+.sm-h{display:flex;align-items:center;gap:8px;padding:14px 14px 10px 18px;position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line)}.sm-h b{flex:1;font-size:16px}
+.sm-h .btn{padding:8px 12px;font-size:13px}
+.ag-lista{padding:4px 16px 16px}
+.ag-r{display:flex;gap:12px;padding:10px;border:1px solid var(--line);border-radius:12px;margin-top:8px;opacity:.75}
+.ag-r.eu{opacity:1;border-left:4px solid var(--brand)}.ag-r.agora{border-color:#3fbf5f;background:#3fbf5f12}
+.ag-h{font-weight:900;font-size:16px;display:flex;flex-direction:column;min-width:52px}.ag-h small{font-weight:600;color:var(--mut);font-size:12px}
+.ag-c{flex:1;min-width:0}.ag-c small{display:block;color:var(--mut);font-size:12.5px;margin-top:2px}.ag-c p{margin:6px 0 0;font-size:13px}
+.ag-tag{font-size:11px;font-weight:800;color:#fff;background:#3fbf5f;border-radius:999px;padding:1px 7px}
+.ag-ac{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.ag-ac .btn{padding:7px 11px;font-size:12.5px;text-decoration:none;color:inherit}
+.btn.dan{color:#e5484d}
+.ag-form{padding:12px 18px 18px;display:flex;flex-direction:column;gap:10px}
+.ag-form label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:700;color:var(--mut)}
+.ag-form input,.ag-form select,.ag-form textarea{height:40px;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:0 10px;font:inherit;font-size:14px;font-weight:400}
+.ag-form textarea{height:auto;padding:8px 10px;resize:vertical}
+.ag-form .row3{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:8px}
+.ag-conv{display:flex;flex-wrap:wrap;gap:6px}
+.ag-conv .chip{flex-direction:row;align-items:center;gap:6px;padding:4px 10px 4px 4px;border:1px solid var(--line);border-radius:999px;color:var(--ink);cursor:pointer;font-weight:650}
+.ag-conv .chip .av{width:22px;height:22px;font-size:9.5px}
+.ag-conv input{display:none}.ag-conv .chip:has(input:checked){border-color:var(--brand);background:#3d5afe1c}
+.av-lista{padding:8px}
+.av-i{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;padding:10px;border-radius:11px}
+.av-i:hover{background:var(--chip)}.av-i b{font-weight:600;font-size:13.5px;display:block}.av-i small{color:var(--mut);font-size:11.5px;text-transform:capitalize}
+.av-i.novo{background:#3d5afe12}.av-i.novo b{font-weight:800}
+@media (max-width:760px){.soc-st span{display:none}.soc-st,.soc-ic{padding:8px 9px}.soc-chat{top:58px;bottom:76px}.ag-form .row3{grid-template-columns:1fr 1fr}}
 .sala-info{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--chip);margin:0 0 8px}
 .sala-info>div{flex:1;min-width:0}.sala-info small{display:block;color:var(--mut);font-size:12px}
 .sala-info code,.cfg-sala code{font:700 12.5px ui-monospace,Menlo,monospace;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
@@ -284,6 +361,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 <script src="js/telao.js"></script>
 <script src="js/sala.js"></script>
 <script src="js/sessao-unica.js"></script>
+<script src="js/social.js"></script>
 <script src="js/voz.js"></script>
 <script>
 /* ícones da barra (Lucide) */
@@ -302,6 +380,7 @@ let S = null, grid = null, user = null, assentos = [];
 const mapaId = Dados.salaDaUrl() || Dados.ultimaSala() || "";
 if (!mapaId) location.replace("salas.html");
 const EH_NEXT = mapaId === "principal";
+window.mapaIdAtual = mapaId;
 let modoSala = "ambos", infoEspaco = {};
 const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
 let DPR = 1, VW = 0, VH = 0, zoom = innerWidth <= 760 ? 1.6 : Math.max(1.2, Math.min(2.2, (innerHeight - 150) / 450)); // no PC, a sala inteira cabe na tela
@@ -334,7 +413,7 @@ async function boot(){
   aplicarModo3d();
   teloes = allItems().filter(i => i.k === "telao");
   monitores = allItems().filter(i => EQUIP.test(i.k)); marcarMonitoresTI();
-  await atualizarTarefas(); setInterval(atualizarTarefas, 30000); Dados.ouvirTarefas(atualizarTarefas);
+  await atualizarTarefas(); setInterval(atualizarTarefas, 30000); setTimeout(() => window.Social && Social.avisarPrazos(tarefas, user), 3000); Dados.ouvirTarefas(atualizarTarefas);
   Dados.ouvirMapa(mapaId, novoMapa => recarregarMapa(novoMapa));
   const sheet = await Avatar.montar(user.avatar);
   P = new Ator({ id: Dados.meuId(), nome: user.nome, sheet, x: 0, y: 0 });
@@ -346,6 +425,13 @@ async function boot(){
   Edicao.iniciar({ eu: () => P, toast, aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
   conectarSala();
   // a mesma conta só fica aberta em um lugar: entrar em outro aparelho/aba derruba este
+  Social.iniciar({ mapaId, eu: () => P, outros: () => outros.filter(o => o.visto), toast,
+    salaAtual: () => { const id = salaAtualId(); return id ? roomById(id) : null; }, salas: () => S.rooms, nomeSalaAtual: () => { const id = salaAtualId(); const r = id && roomById(id); return r ? r.name : ""; },
+    irAte: a => andarAte(a.px, a.py + 18, 26), irParaSala: id => { const r = roomById(id); if (r) andarAte((r.x + r.w/2)*T, (r.y + r.h/2)*T, 80); },
+    abrirVolume: id => abrirConfigAudio(id), verTela: a => verTelaDe(a), abrirTarefa: abrirTarefaPorId, idPublico,
+    presencaMudou: () => Sala.atualizarPresenca({ id: P.id, nome: user.nome, avatar: user.avatar, status: Social.status }),
+    mutar: () => { if (Voz.ligado && Voz.micAberto) { Voz.alternarMic(); atualizarBotaoAudio(); } }, micMudo: () => Voz.ligado && !Voz.micAberto,
+    aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; }, bloqueado: () => Telao.aberto || TI.aberto || Edicao.aberto || Acesso.aberto });
   SessaoUnica.iniciar({ aoCair(){ try { Sala.sair(); } catch (e) {} try { Voz.desligar(); } catch (e) {} try { Projecao.parar && Projecao.parar(false); } catch (e) {} keys.clear(); joyV = null; } });
   document.getElementById("load").remove();
   ligarAudioAuto();
@@ -372,10 +458,10 @@ function montarSheet(av){ const k = JSON.stringify(av || {}); return sheets[k] |
 function conectarSala(){
   Sala.entrar({
     id: P.id, canal: EH_NEXT ? "escritorio-principal" : "escritorio-" + mapaId,
-    presenca: () => ({ id: P.id, nome: user.nome, avatar: user.avatar }),
-    aoEntrar(id, m){ const a = new Ator({ id, nome: m.nome, sheet: null, x: 0, y: 0, visto: false }); outros.push(a);
+    presenca: () => ({ id: P.id, nome: user.nome, avatar: user.avatar, status: window.Social ? Social.status : "disponivel" }),
+    aoEntrar(id, m){ const a = new Ator({ id, nome: m.nome, sheet: null, x: 0, y: 0, visto: false }); a.status = m.status || "disponivel"; outros.push(a);
       montarSheet(m.avatar).then(sh => a.sheet = sh); toast(`${m.nome} entrou no escritório`); },
-    aoMudar(id, m){ const a = outros.find(o => o.id === id); if (!a) return; a.nome = m.nome; montarSheet(m.avatar).then(sh => a.sheet = sh); },
+    aoMudar(id, m){ const a = outros.find(o => o.id === id); if (!a) return; a.nome = m.nome; a.status = m.status || "disponivel"; montarSheet(m.avatar).then(sh => a.sheet = sh); },
     aoSair(id){ const i = outros.findIndex(o => o.id === id); if (i < 0) return; const a = outros[i];
       if (a.assento) { a.assento.ocupante = null; a.assento = null; } outros.splice(i, 1); toast(`${a.nome} saiu`); },
     aoMover(id, st){
@@ -392,6 +478,7 @@ function conectarSala(){
     },
     aoSinal: msg => msg.canal === "proj" ? Projecao.aoSinal(msg) : Voz.aoSinal(msg),
     aoLuz: (id, est) => aplicarLuz(id, est, true),
+    aoToque: msg => Social.recebeuToque(msg),
     aoOla: () => { for (const [id, est] of Object.entries(luzes)) Sala.luz(id, est); },
     aoConectar(){ for (const [id, est] of Object.entries(luzes)) Sala.luz(id, est); },
     aoDesconectar(){ toast("Conexão instável… tentando de novo"); },
@@ -506,6 +593,28 @@ function atualizarBotaoLuz(){
   b.classList.toggle("luz-off", chave === "off");
 }
 const dentroDoTelao = it => { const r = salaDoTelao(it); return !r || r.id === salaAtualId(); };
+// anda até perto de um ponto (procura um lugar livre em volta)
+function andarAte(wx, wy, raio){
+  if (!P || !grid) return;
+  if (P.assento) P.levantar();
+  for (let rr = 0; rr <= (raio || 40); rr += 8) for (let k = 0; k < 12; k++){
+    const x = wx + Math.cos(k/12*Math.PI*2)*rr, y = wy + Math.sin(k/12*Math.PI*2)*rr;
+    if (!livre(x, y)) continue;
+    const path = findPath(grid, Math.floor(P.x/C16), Math.floor(P.y/C16), Math.floor(x/C16), Math.floor(y/C16));
+    if (path && path.length){ P.path = path; P.emote = null; P.saiuDe = null; marca = {x: path[path.length-1][0], y: path[path.length-1][1], t: 1}; return true; }
+  }
+  toast("Não achei um caminho até lá"); return false;
+}
+// abre o telão onde a tarefa está e já abre a tarefa
+function abrirTarefaPorId(id){
+  const tf = tarefas.find(t => t.id === id); const salaId = tf && tf.sala || salaPadrao();
+  const it = teloes.find(t => { const r = salaDoTelao(t); return r && r.id === salaId; });
+  if (it && !dentroDoTelao(it)){ const r = salaDoTelao(it); toast(`A tarefa está no telão de ${r.name} — indo até lá`); andarAte(it.x*T + 96, it.y*T + 150, 60); return; }
+  if (Telao.aberto) return;
+  keys.clear(); joyV = null; if (P) P.path = null;
+  const r = it ? salaDoTelao(it) : null; telaoSalaAberta = r ? r.id : null;
+  Telao.abrir({ email: EMAIL, nome: user.nome, aoFechar: atualizarTarefas, sala: r ? r.id : null, nomeSala: r ? r.name : "", salaPadrao: salaPadrao(), focar: id });
+}
 function abrirTelao(it){
   if (Telao.aberto) return;
   if (!it || !it.k) it = telaoPerto || teloes.find(t => { const r = salaDoTelao(t); return r && r.id === salaAtualId(); });
@@ -582,7 +691,7 @@ const up = e => {
   if (!had || !grid || !P) return;
   const [wx, wy] = toWorld(e.clientX, e.clientY);
   const pessoa = outros.find(o => o.visto && o.sheet && Math.abs(o.px - wx) < 12 && wy > o.py - 34 && wy < o.py + 4);
-  if (pessoa){ if (pessoa.tela) verTelaDe(pessoa); else abrirConfigAudio(pessoa.id); return; }
+  if (pessoa){ const r = roomAt(pessoa.px, pessoa.py - 4); pessoa.sala = r && !TYPES[r.type].noWalls ? r.name : ""; Social.cartao(pessoa, e.clientX, e.clientY); return; }
   // clicou no computador de alguém que abriu a tela?
   const mon = monitores.find(m => /^(monitor|notebook)$/.test(m.k) && wx >= m.x*T && wx <= m.x*T + 32 && wy >= m.y*T && wy <= m.y*T + 32);
   if (mon){ const s = assentos.find(s => s.monitores && s.monitores.some(m2 => m2.x === mon.x && m2.y === mon.y)); const dono = s && s.ocupante;
@@ -858,6 +967,15 @@ function draw(){
     ctx.save(); ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
     ctx.fillStyle = a === P ? "rgba(61,90,254,.95)" : "rgba(22,20,31,.82)"; ctx.beginPath(); ctx.roundRect(sx - w/2, sy - 20, w, 19, 9); ctx.fill(); ctx.restore();
     ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(txt, sx - w/2 + 8, sy - 10);
+    const stA = a === P ? Social.status : a.status; // bolinha de status
+    if (stA && stA !== "disponivel"){ ctx.fillStyle = (Social.STATUS[stA] || {}).cor || "#9aa0ad"; ctx.strokeStyle = "#16141f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx - w/2 + 2, sy - 18, 4.5, 0, Math.PI*2); ctx.fill(); ctx.stroke(); }
+    if (a.falaChat && performance.now() < a.falaChatAte){ // balão com a última mensagem do chat
+      const msg = a.falaChat.length > 46 ? a.falaChat.slice(0, 44) + "…" : a.falaChat;
+      ctx.font = "600 12px Inter,system-ui,sans-serif"; const bw = Math.min(260, ctx.measureText(msg).width + 18), by = sy - 50 - (mao ? 34 : 0);
+      ctx.save(); ctx.globalAlpha = Math.min(1, (a.falaChatAte - performance.now())/600);
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.roundRect(sx - bw/2, by, bw, 24, 10); ctx.fill(); ctx.beginPath(); ctx.moveTo(sx - 5, by + 24); ctx.lineTo(sx, by + 30); ctx.lineTo(sx + 5, by + 24); ctx.fill();
+      ctx.fillStyle = "#1d1d1f"; ctx.textAlign = "center"; ctx.fillText(msg, sx, by + 12.5, bw - 12); ctx.restore(); ctx.textAlign = "left";
+    }
     icones.forEach(([nm, cor], i) => iconeCanvas(ctx, nm, sx - w/2 + 8 + wt + 9 + i*15, sy - 10.5, 12, cor));
   }
   if (!tres) TI.nomes(ctx, c, zoom, t);
