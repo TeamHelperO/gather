@@ -220,6 +220,8 @@ function montar(S) {
     }
     for (const p of portasDe(r)) portas3d.push({ r, p, vidro, privada: r.type === "reuniao" }); // montadas depois (sem repetir a porta de uma parede dividida)
   }
+  palcos.length = 0;
+  for (const it of allItems()) if (it.k === "f_palco" || it.k === "palco_frente") { const a = ASSETS[it.k]; if (a) palcos.push({ x0: it.x, x1: it.x + a.w / T, z0: it.y, z1: it.y + a.h / T, y: 0.34 }); }
   for (const it of allItems()) {
     const a = ASSETS[it.k]; if (!a || it.k === "parede") continue;
     const sala = it.room && roomById(it.room);
@@ -229,14 +231,18 @@ function montar(S) {
     else if (g.userData.chao) g.position.set(cx, 0.04, it.y + a.h / T / 2);
     else if (g.userData.billboard) {
       let z = it.y + a.h / T - 0.1;
+      if (!g.userData.vistas) { // mascote/NPC atrás de um balcão ou mesa no 2D: fica atrás dela no 3D, não dentro
+        const m = allItems().find(o => MESAS3D.test(o.k) && ASSETS[o.k] && cx > o.x && cx < o.x + ASSETS[o.k].w / T && z > o.y + ASSETS[o.k].h / T - 1.25 && z < o.y + ASSETS[o.k].h / T + 0.3);
+        if (m) z = m.y + ASSETS[m.k].h / T - 0.05 - profMesa(m) - 0.3;
+      }
       if (g.userData.vistas) { // senta encostado na mesa que está logo acima no 2D
         const m = allItems().find(o => MESAS3D.test(o.k) && ASSETS[o.k] && cx > o.x && cx < o.x + ASSETS[o.k].w / T && o.y + ASSETS[o.k].h / T > it.y - 0.6 && o.y + ASSETS[o.k].h / T < it.y + a.h / T + 0.2);
         if (m) z = m.y + ASSETS[m.k].h / T - 0.05 + 0.4;
       }
-      g.position.set(cx, 0.06, z); cartazes.push(g);
+      g.position.set(cx, 0.06 + alturaChao(cx, z), z); cartazes.push(g);
     }
     else if (g.userData.sobreMesa && mesaSob(it)) { const [x, z] = naMesa(it, mesaSob(it)); g.position.set(x, 0, z); }
-    else { const base = it.y + a.h / T; g.position.set(cx, g.userData.sobreMesa ? 0 : 0.08, base - g.userData.prof / 2 - 0.05); }
+    else { const base = it.y + a.h / T, z = base - g.userData.prof / 2 - 0.05; g.position.set(cx, (g.userData.sobreMesa ? 0 : 0.08) + alturaChao(cx, z), z); }
     girarComoNoEditor(g, it);
     if (it.rot) g.rotation.y += -it.rot * Math.PI / 180; if (it.flip) g.scale.x *= -1;
     g.traverse(o => { o.userData.item = it; });
@@ -258,6 +264,9 @@ function montar(S) {
   montarPortas();
 }
 /* mesa embaixo de um item (monitor, gabinete, teclado…) e onde ele fica em cima dela no 3D */
+/* chão elevado (palco do auditório): quem está em cima sobe junto */
+const palcos = [];
+function alturaChao(x, z) { for (const b of palcos) if (x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1) return b.y; return 0; }
 const MESAS3D = /^(mesa|mesa_pc|mesa_reuniao\d*|balcao)$/;
 const profMesa = m => /^mesa_reuniao/.test(m.k) ? Math.max(1, ASSETS[m.k].h / T * 0.75) : 1.1;
 function mesaSob(it) {
@@ -368,8 +377,9 @@ function desenharPessoa(a, t) {
   else a.vistaSentado = direcaoVistaEm(a.assento.dir ?? (a.assento.face === "costas" ? 3 : 0), a.px / T, a.py / T); // sentado: de frente, de costas ou de lado conforme você gira em volta
   try { a.draw(g, t); } finally { a.dir = d; a.vistaSentado = undefined; }
   s.tex.needsUpdate = true;
-  s.sp.position.set(a.px / T, a.assento ? 0.12 : 0.08, a.py / T);
-  s.sombra.position.set(a.px / T, 0.1, a.py / T); s.sombra.visible = !a.assento;
+  const ch = alturaChao(a.px / T, a.py / T - 0.05);
+  s.sp.position.set(a.px / T, (a.assento ? 0.12 : 0.08) + ch, a.py / T);
+  s.sombra.position.set(a.px / T, 0.1 + ch, a.py / T); s.sombra.visible = !a.assento;
 }
 
 /* ---------- paredes da frente ficam baixas (corte isométrico) ---------- */
@@ -430,7 +440,7 @@ const Iso3D = {
       const kOlhar = 1 - Math.exp(-(dt || 0.016) * 22); yaw += (yawAlvo - yaw) * kOlhar; pitch += (pitchAlvo - pitch) * kOlhar;
       const fov = Math.max(38, Math.min(72, 58 / Math.pow(Math.max(0.6, zoom) / 1.4, 0.35)));
       if (Math.abs(camFP.fov - fov) > 0.3) { camFP.fov = fov; camFP.updateProjectionMatrix(); }
-      const olho = P.assento ? 1.2 : 1.6;
+      const olho = (P.assento ? 1.2 : 1.6) + alturaChao(P.px / T, P.py / T - 0.05);
       camFP.position.set(alvo.x, olho, alvo.z);
       camFP.lookAt(alvo.x - Math.sin(yaw) * Math.cos(pitch), olho + Math.sin(pitch), alvo.z - Math.cos(yaw) * Math.cos(pitch)); camFP.updateMatrixWorld();
       // luz apagada na sala em que você está: o ambiente escurece, só as telas brilham
