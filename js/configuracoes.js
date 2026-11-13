@@ -62,6 +62,10 @@ window.Configuracoes = (function () {
             <div class="cfg-modos">${[["2d", "2D", "Visão de cima"], ["3d", "3D", "Primeira pessoa"], ["ambos", "2D e 3D", "Cada um escolhe"]].map(([v, t, d]) =>
               `<label><input type="radio" name="modo" value="${v}" ${opt.modoSala() === v ? "checked" : ""}><b>${t}</b><small>${d}</small></label>`).join("")}</div>
             <button class="btn pri">Salvar</button></form>`, "O modo vale para todo mundo que entrar nesta sala.") : "")
+      + (opt.souDono() ? bloco("Logo da sala", `<div class="cfg-logo"><div class="cfg-logo-prev">${opt.logo && opt.logo() ? `<img src="${opt.logo()}" alt="Logo atual">` : "<small>Logo padrão</small>"}</div>
+            <div class="cfg-acoes"><label class="btn pri">🖼️ Enviar imagem<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" data-clogo hidden></label>
+            ${opt.logo && opt.logo() ? `<button type="button" class="btn dan" data-clogotira>Voltar ao padrão</button>` : ""}</div></div>`,
+          "A imagem aparece em todos os itens “Logo” das salas, no 2D e no 3D. Use PNG com fundo transparente para ficar melhor.") : "")
       + bloco("Mapa e telões",
         (opt.ehNext || opt.souDono() ? linha("Salas, móveis e portas", `<a class="btn" href="editor.html?sala=${encodeURIComponent(opt.mapaId)}">🛠️ Abrir o editor do mapa</a>`) : "")
         + linha("Tarefas da equipe", `<button class="btn" data-ctelao>📋 Telão da equipe</button>`)
@@ -99,6 +103,7 @@ window.Configuracoes = (function () {
     if ("cmapa" in d) { const on = window.Minimapa && Minimapa.alternar(); t.textContent = `🗺️ ${on ? "Esconder" : "Mostrar"} (tecla M)`; return; }
     if ("cexp" in d) return opt.exportar();
     if ("csair" in d) return opt.sair();
+    if ("clogotira" in d) { if (!d.ok) { d.ok = 1; t.textContent = "Confirmar"; return; } try { await opt.salvarLogo(null); opt.toast("Logo padrão de volta"); desenhar(); } catch (er) { opt.toast("Não consegui: " + (er.message || "")); } return; }
     if ("cconvite" in d) { const link = location.origin + location.pathname + "?sala=" + opt.idPublico();
       await navigator.clipboard.writeText(`Entre na sala "${opt.info().nome}": ${link}  (ID: ${opt.idPublico()})`); t.textContent = "Copiado ✓"; setTimeout(() => t.textContent = "Copiar convite", 1500); return; }
     if ("ctelao" in d) { fechar(); return opt.abrirTelao(); }
@@ -130,6 +135,13 @@ window.Configuracoes = (function () {
     }
     if (window.IAConfig && IAConfig.enviar) { const r = await IAConfig.enviar(f, opt); if (r) desenhar(); }
   }
+  // Logo da sala: arquivo escolhido
+  document.addEventListener("change", async e => {
+    if (!e.target.matches("[data-clogo]")) return;
+    const arq = e.target.files && e.target.files[0]; if (!arq) return;
+    try { const url = await Decoracao.prepararLogo(arq); await opt.salvarLogo(url); opt.toast("🖼️ Logo atualizado em todas as salas"); desenhar(); }
+    catch (er) { opt.toast(er.message || "Não consegui enviar a imagem"); }
+  });
   // Mudou de status por aqui
   document.addEventListener("change", e => { if (e.target.matches("[data-cstatus]") && window.Social) { Social.mudarStatus(e.target.value); opt.toast("Status: " + Social.STATUS[e.target.value].nome); } });
 

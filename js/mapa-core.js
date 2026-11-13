@@ -279,6 +279,7 @@ function allItems(){
   const out=[];
   for (const r of S.rooms) if (r.auto) for (const it of layout(r)){ const aj = r.ajustes && r.ajustes[chaveAuto(it, r)]; if (aj){ if (aj.rot) it.rot = aj.rot; if (aj.flip) it.flip = true; } out.push(it); }
   for (const it of S.items) if (!(window.OCULTAR_PESSOAS && /^pessoa/.test(it.k))) out.push(it);
+  if (window.DECORACAO) for (const it of window.DECORACAO) if (ASSETS[it.k]) out.push(it); // decoração temática dos eventos (não fica salva no mapa)
   if (window.CACHE_ITENS){ _itensCache = out; _itensDe = S; }
   return out;
 }
@@ -426,7 +427,7 @@ function buildBlocked(){
     for (let cx=x0-1; cx<=x1; cx++){ if (!(cx>=x0 && cx<x1 && temPorta(r, "baixo", Math.floor(cx/2)))) set(cx, y1); }
   }
   for (const it of allItems()){
-    if (it.z==="floor" || it.z==="wall" || SEM_COLISAO.test(it.k)) continue;
+    if (it.z==="floor" || it.z==="wall" || it.deco || SEM_COLISAO.test(it.k)) continue;
     const a = ASSETS[it.k]; if (!a) continue;
     const b = caixa(it), px0 = b.x + 4, px1 = b.x + b.w - 4, pb = b.y + b.h - 2, pt = pb - Math.min(b.h*0.45, 26);
     for (let cy=Math.floor(pt/C16); cy<=Math.floor(pb/C16); cy++) for (let cx=Math.floor(px0/C16); cx<=Math.floor(px1/C16); cx++) set(cx, cy);

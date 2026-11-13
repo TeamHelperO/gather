@@ -112,6 +112,24 @@ function movel(it, sala) {
   else if (/^agente_\d$/.test(k) || /^npc_/.test(k) || k === "pet") { // pixel art em pé, sempre de frente para a câmera
     const sp = spriteDe(IMG[k], a.w, a.h); sp.scale.multiplyScalar(GENTE); add(sp); g.userData.billboard = true; prof = 0.4;
   }
+  else if (/^deco_/.test(k) && it.z === "floor") { // confete no chão
+    const pl = new THREE.Mesh(new THREE.PlaneGeometry(a.w / T, a.h / T), new THREE.MeshStandardMaterial({ map: texDe(IMG[k]), transparent: true, alphaTest: 0.3, roughness: 0.9 }));
+    pl.rotation.x = -Math.PI / 2; pl.position.set(0, 0.095, 0); add(pl); g.userData.chao = true; prof = 0.01;
+  }
+  else if (/^deco_/.test(k) && it.z === "wall") { // faixa, bandeirinhas, luzinhas, teia: desenho na parede
+    const pl = new THREE.Mesh(new THREE.PlaneGeometry(a.w / T, a.h / T), new THREE.MeshStandardMaterial({ map: texDe(IMG[k]), transparent: true, alphaTest: 0.2, roughness: 0.8, side: THREE.DoubleSide,
+      emissive: k === "deco_luzes" ? new THREE.Color("#ffffff") : new THREE.Color("#000000"), emissiveMap: k === "deco_luzes" ? texDe(IMG[k]) : null, emissiveIntensity: k === "deco_luzes" ? 0.8 : 0 }));
+    pl.position.set(0, a.h / T / 2, 0.06); add(pl);
+    g.userData.parede = true; g.userData.alturaParede = /^deco_faixa/.test(k) ? 2.55 : k === "deco_teia" ? 2.5 : 2.3; prof = 0.1;
+  }
+  else if (/^deco_/.test(k)) { // balões, bolo, árvore, abóbora…: em pé, sempre de frente
+    const sp = spriteDe(IMG[k], a.w, a.h); sp.scale.multiplyScalar(k === "deco_arvore" ? 1.5 : 1.15); add(sp); g.userData.billboard = true; prof = 0.3;
+  }
+  else if ((k === "logo" || k === "quadro_avisos" || k === "placa") && IMG[k] && IMG[k].width) { // logo (o PNG enviado pelo dono) e quadros: a imagem de verdade na parede
+    const f = Math.min(1, 2.6 / (a.w / T)), pl = new THREE.Mesh(new THREE.PlaneGeometry(a.w / T * f, a.h / T * f), new THREE.MeshStandardMaterial({ map: texDe(IMG[k]), transparent: true, alphaTest: 0.05, roughness: 0.7 }));
+    pl.position.set(0, a.h / T * f / 2, 0.06); add(pl);
+    g.userData.parede = true; g.userData.alturaParede = k === "logo" ? 1.3 : 1.25; prof = 0.1;
+  }
   else if (NA_PAREDE.test(k)) {
     const tela = /^(telao|telao_tend|telao_rot|tv|projecao)/.test(k);
     if (tela) {
@@ -132,6 +150,12 @@ function movel(it, sala) {
 
 /* ---------- texturas vivas: o 2D desenha, o 3D mostra ---------- */
 const telas = []; // { it, c, g, tex }
+function texDe(img) {
+  if (!img) return null; if (img._tex3d) return img._tex3d;
+  const hd = img._hd, fonte = hd || img; // logo enviado: versão nítida, suavizada
+  const t = fonte instanceof HTMLCanvasElement ? new THREE.CanvasTexture(fonte) : new THREE.Texture(fonte);
+  t.magFilter = hd ? THREE.LinearFilter : THREE.NearestFilter; t.minFilter = hd ? THREE.LinearMipmapLinearFilter : THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; img._tex3d = t; return t;
+}
 function materialTela(it, recorte) {
   // telas desenhadas em alta resolução (texto e vídeo nítidos de perto, na primeira pessoa)
   const a = ASSETS[it.k], esc = /^(telao|telao_tend|telao_rot|projecao|tv)$/.test(it.k) ? 4 : 3, c = document.createElement("canvas"); c.width = a.w * esc; c.height = a.h * esc;
@@ -164,7 +188,7 @@ const paredes = [], cartazes = []; // cartazes: agentes, NPCs e pets em pixel ar
 const solidos = [], tetos = [], portas3d = []; // caixas no chão (colisão no 3D), tetos (só na 1ª pessoa) e portas que abrem
 const PE_DIREITO = 3.6; // mesma altura de parede e teto em todas as salas; telões grandes diminuem para caber
 const GENTE = 1.27; // o desenho da pessoa tem ~1,35 tile; ×1,27 ≈ 1,72 m, na escala dos móveis (1 tile = 1 m)
-const SEM_BATER = /^(cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$|teclado|mouse$|notebook$|gabinete$|projecao$|sino$)/;
+const SEM_BATER = /^(deco_|cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$|teclado|mouse$|notebook$|gabinete$|projecao$|sino$)/;
 let objetos = null;
 function montar(S) {
   if (objetos) { cena.remove(objetos); objetos.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
@@ -227,7 +251,8 @@ function montar(S) {
     const sala = it.room && roomById(it.room);
     const g = movel(it, sala); if (!g) continue;
     const cx = it.x + a.w / T / 2;
-    if (g.userData.parede) { const r = sala || roomAt(it.x * T + 16, it.y * T + a.h + 40); g.position.set(cx, g.userData.alturaParede, (r ? r.y : it.y + 2) + 0.09); }
+    if (g.userData.parede && it.pendurada) { const r = sala || roomAt(it.x * T + 16, it.y * T + a.h + 40); g.position.set(cx, 2.62, r ? r.y + Math.min(2.2, r.h * 0.35) : it.y + 2); }
+    else if (g.userData.parede) { const r = sala || roomAt(it.x * T + 16, it.y * T + a.h + 40); g.position.set(cx, g.userData.alturaParede, (r ? r.y : it.y + 2) + 0.09); }
     else if (g.userData.chao) g.position.set(cx, 0.04, it.y + a.h / T / 2);
     else if (g.userData.billboard) {
       let z = it.y + a.h / T - 0.1;

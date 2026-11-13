@@ -41,6 +41,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
   #sala.hud small{display:none}
 }
 .sala-espaco{background:#3d5afe;color:#fff;border-radius:999px;padding:2px 9px;font-size:12px;margin-right:8px;white-space:nowrap;max-width:46vw;overflow:hidden;text-overflow:ellipsis}
+.cfg-logo{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.cfg-logo-prev{width:120px;height:80px;border-radius:10px;display:grid;place-items:center;background:repeating-conic-gradient(#0001 0 25%,#0000 0 50%) 0 0/16px 16px;border:1px solid rgba(127,127,127,.3)}.cfg-logo-prev img{max-width:110px;max-height:72px}
 #miniMapa{position:fixed;left:8px;bottom:max(12px,env(safe-area-inset-bottom));z-index:9;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.35);cursor:crosshair;touch-action:none}
 @media (pointer:coarse){#miniMapa{top:104px;bottom:auto}}
 @media (max-width:900px) and (pointer:fine){#miniMapa{bottom:70px}}
@@ -187,6 +188,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 .ag-h{font-weight:900;font-size:16px;display:flex;flex-direction:column;min-width:52px}.ag-h small{font-weight:600;color:var(--mut);font-size:12px}
 .ag-c{flex:1;min-width:0}.ag-c small{display:block;color:var(--mut);font-size:12.5px;margin-top:2px}.ag-c p{margin:6px 0 0;font-size:13px}
 .ag-tag{font-size:11px;font-weight:800;color:#fff;background:#3fbf5f;border-radius:999px;padding:1px 7px}
+.ag-tag.tema{background:#3d5afe}
 .ag-ac{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.ag-ac .btn{padding:7px 11px;font-size:12.5px;text-decoration:none;color:inherit}
 .btn.dan{color:#e5484d}
 .ag-form{padding:12px 18px 18px;display:flex;flex-direction:column;gap:10px}
@@ -425,6 +427,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 <script src="js/avatar-pixel.js"></script>
 <script src="js/projecao.js"></script>
 <script src="js/ti.js"></script>
+<script src="js/decoracao.js"></script>
 <script src="js/edicao.js"></script>
 <script src="js/video.js"></script>
 <script src="js/palco.js"></script>
@@ -522,6 +525,9 @@ async function boot(){
   Gestor.iniciar({ mapaId, toast, outros: () => outros.filter(o => o.visto), salaAtual: () => { const id = salaAtualId(); return id ? roomById(id) : null; },
     tarefas: () => tarefas, abrirTarefa: abrirTarefaPorId, ehNext: EH_NEXT, ehAdmin: () => Dados.ehAdmin(), podeVerEquipe: () => souDonoDaSala(), nomeSala: () => infoEspaco.nome,
     aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
+  Decoracao.iniciar({ reunioes: () => Social.reunioes, aoLogo: () => { if (em3d()) Iso3D.montar(S); },
+    aoMudar: ativos => { grid = buildBlocked(); if (em3d()) Iso3D.montar(S); for (const r of ativos) { const sala = roomById(r.sala_id); if (sala) toast(`🎉 ${sala.name} decorada: ${Decoracao.TEMAS[Decoracao.temaDe(r)].nome.replace(/^\S+\s/, "")} (${r.titulo})`); } } });
+  Decoracao.aplicarLogo(infoEspaco.logo);
   Minimapa.iniciar({ irPara: (x, y) => andarAte(x, y, 48), bloqueado: () => Telao.aberto || TI.aberto || Edicao.aberto || Acesso.aberto });
   document.getElementById("bMapa").onclick = () => Minimapa.alternar();
   setTimeout(() => Tour.iniciar({ eu: () => P, modoSala: () => modoSala, vista: v => { if ((v === "3d") !== !!quer3d) document.getElementById("b3d").click(); } }), 1800);
@@ -529,6 +535,8 @@ async function boot(){
   try { const u = new URL(location.href); if (u.searchParams.get("sala") !== idPublico()) { u.searchParams.set("sala", idPublico()); history.replaceState(null, "", u.pathname + u.search + u.hash); } } catch (e) {}
   if (!EH_NEXT) toast(`Você está no espaço "${infoEspaco.nome}" (ID ${idPublico()}). O escritório da Next é o ID nextco.`);
   Configuracoes.iniciar({ mapaId, ehNext: EH_NEXT, toast, user: () => user, info: () => infoEspaco, modoSala: () => modoSala, idPublico,
+    logo: () => infoEspaco.logo || null,
+    salvarLogo: async url => { const m = await Dados.configurarSala(mapaId, { logo: url || null }); S.espaco = m.espaco; lerEspaco(); Decoracao.aplicarLogo(url); },
     souDono: () => souDonoDaSala(), ehAdminGeral: () => Dados.ehAdmin(), outros: () => outros.filter(o => o.visto),
     em3d: () => em3d(), alternar3d: () => document.getElementById("b3d").click(), trocarVista: () => trocarVista(),
     abrirAudio: () => abrirConfigAudio(), abrirTelao: () => abrirTelao(), acaoAdmin, readmitir,
@@ -675,7 +683,7 @@ function moverOutros(dt){
 function recarregarMapa(novo){
   for (const a of [P, ...outros]) if (a.assento){ a.assento.ocupante = null; a.assento = null; }
   const modoAntes = modoSala;
-  S = novo; lerEspaco(); if (modoSala !== modoAntes && modoSala !== "ambos") toast(`A sala agora é só ${modoSala.toUpperCase()}`);
+  S = novo; lerEspaco(); Decoracao.aplicarLogo(infoEspaco.logo); Decoracao.atualizar(); if (modoSala !== modoAntes && modoSala !== "ambos") toast(`A sala agora é só ${modoSala.toUpperCase()}`);
   grid = buildBlocked(); assentos = construirAssentos(); Projecao.recalcular(); AgentesVivos.montar();
   teloes = allItems().filter(i => i.k === "telao"); monitores = allItems().filter(i => EQUIP.test(i.k)); marcarMonitoresTI();
   if (!livre(P.x, P.y)) spawn();

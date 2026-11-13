@@ -299,7 +299,8 @@ window.Social = (function () {
   let reunioes = [];
   const envolvido = r => !r.convidados || !r.convidados.length || r.convidados.includes(Dados.meuId()) || r.criado_por === Dados.meuId();
   const proximasMinhas = () => reunioes.filter(r => envolvido(r) && new Date(r.fim) > Date.now());
-  async function carregarReunioes() { const l = await Dados.listarReunioes(opt.mapaId); if (l) reunioes = l; desenharTopo(); if (agendaAberta) desenharAgenda(); }
+  async function carregarReunioes() { const l = await Dados.listarReunioes(opt.mapaId); if (l) reunioes = l; desenharTopo(); if (agendaAberta) desenharAgenda(); if (window.Decoracao) Decoracao.atualizar(); }
+  const D = window.Decoracao || { temaDe: () => null, pautaSemTema: p => p, comTema: p => p, TEMAS: {} };
   const lembrados = ls.get("nextco_lembretes", {});
   function checarLembretes() {
     const agora = Date.now();
@@ -324,7 +325,7 @@ window.Social = (function () {
     const f = d => new Date(d).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
     const link = location.origin + location.pathname + "?sala=" + encodeURIComponent(opt.idPublico());
     return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(r.titulo) + "&dates=" + f(r.inicio) + "/" + f(r.fim) +
-      "&details=" + encodeURIComponent((r.pauta ? r.pauta + "\n\n" : "") + "Entrar no escritório virtual: " + link + (r.sala_nome ? "\nSala: " + r.sala_nome : "")) +
+      "&details=" + encodeURIComponent((D.pautaSemTema(r.pauta) ? D.pautaSemTema(r.pauta) + "\n\n" : "") + "Entrar no escritório virtual: " + link + (r.sala_nome ? "\nSala: " + r.sala_nome : "")) +
       "&location=" + encodeURIComponent((r.sala_nome ? r.sala_nome + " · " : "") + "Escritório virtual");
   }
   let agendaAberta = false, modal = null;
@@ -345,9 +346,9 @@ window.Social = (function () {
       const agora = new Date(r.inicio) <= Date.now(), meu = r.criado_por === Dados.meuId(), conv = (r.convidados || []).map(nomeDe);
       return sep + `<div class="ag-r ${envolvido(r) ? "eu" : ""} ${agora ? "agora" : ""}">
         <div class="ag-h">${hora(r.inicio)}<small>${hora(r.fim)}</small></div>
-        <div class="ag-c"><b>${esc(r.titulo)}</b>${agora ? ` <span class="ag-tag">acontecendo</span>` : ""}
+        <div class="ag-c"><b>${esc(r.titulo)}</b>${agora ? ` <span class="ag-tag">acontecendo</span>` : ""}${D.temaDe(r) ? ` <span class="ag-tag tema">${esc(D.TEMAS[D.temaDe(r)].nome)}</span>` : ""}
           <small>${r.sala_nome ? "📍 " + esc(r.sala_nome) + " · " : ""}${conv.length ? "👥 " + esc(conv.join(", ")) : "👥 todos"} · por ${esc(nomeDe(r.criado_por))}</small>
-          ${r.pauta ? `<p>${esc(r.pauta)}</p>` : ""}
+          ${D.pautaSemTema(r.pauta) ? `<p>${esc(D.pautaSemTema(r.pauta))}</p>` : ""}
           <div class="ag-ac">${r.sala_id ? `<button class="btn" data-ir="${esc(r.sala_id)}">🚶 Ir para a sala</button>` : ""}<a class="btn" href="${linkGoogle(r)}" target="_blank" rel="noopener">Google Agenda</a>
             ${meu ? `<button class="btn" data-editar="${r.id}">Editar</button><button class="btn dan" data-cancelar="${r.id}">Cancelar</button>` : ""}</div></div></div>`;
     }).join("");
@@ -381,7 +382,8 @@ window.Social = (function () {
         <label>Sala<select name="sala"><option value="">Sem sala</option>${salas.map(s => `<option value="${esc(s.id)}" ${s.id === padrao ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>
         <label>Convidados <small>(sem ninguém marcado = todos)</small></label>
         <div class="ag-conv">${usuarios.filter(u => u.id !== Dados.meuId()).map(u => `<label class="chip"><input type="checkbox" name="conv" value="${u.id}" ${conv.has(u.id) ? "checked" : ""}><span class="av" style="background:${corNome(u.nome)}">${esc(iniciais(u.nome))}</span>${esc(u.nome)}</label>`).join("")}</div>
-        <label>Pauta<textarea name="pauta" rows="3" maxlength="1000" placeholder="Opcional">${esc(r ? r.pauta || "" : "")}</textarea></label>
+        <label>Pauta<textarea name="pauta" rows="3" maxlength="1000" placeholder="Opcional">${esc(r ? D.pautaSemTema(r.pauta) || "" : "")}</textarea></label>
+        ${opt.souAdmin && opt.souAdmin() ? `<label>Decoração temática <small>(a sala do evento se enfeita sozinha de 30 min antes até 15 min depois)</small><select name="tema"><option value="">Nenhuma</option>${Object.entries(D.TEMAS).map(([k, t]) => `<option value="${k}" ${r && D.temaDe(r) === k ? "selected" : ""}>${esc(t.nome)}</option>`).join("")}</select></label>` : ""}
         <div class="ag-ac"><button class="btn pri">${r ? "Salvar" : "Marcar e avisar"}</button><button type="button" class="btn" data-voltar>Voltar</button></div>
       </form>`);
     const f = modal.querySelector("form");
@@ -390,7 +392,8 @@ window.Social = (function () {
       e.preventDefault();
       const fd = new FormData(f), inicio = new Date(fd.get("data") + "T" + fd.get("hora")), fim = new Date(inicio.getTime() + (+fd.get("dur")) * 60e3);
       const sala = salas.find(s => s.id === fd.get("sala"));
-      const dados = { mapa_id: opt.mapaId, titulo: String(fd.get("titulo")).trim(), pauta: String(fd.get("pauta") || "").trim() || null, inicio: inicio.toISOString(), fim: fim.toISOString(),
+      const temaEsc = fd.has("tema") ? String(fd.get("tema") || "") : (r ? D.temaDe(r) : ""); // quem não é admin não vê a opção e mantém o tema que já existia
+      const dados = { mapa_id: opt.mapaId, titulo: String(fd.get("titulo")).trim(), pauta: D.comTema(String(fd.get("pauta") || "").trim(), temaEsc) || null, inicio: inicio.toISOString(), fim: fim.toISOString(),
         sala_id: sala ? sala.id : null, sala_nome: sala ? sala.name : null, convidados: fd.getAll("conv") };
       if (r) dados.id = r.id;
       try {
@@ -467,6 +470,6 @@ window.Social = (function () {
   let ultimaSalaChat = null;
   return {
     iniciar, cartao, recebeuToque, abrirChat, fecharChat, abrirAgenda, avisarPrazos, acharMencoes, notificar, mudarStatus,
-    STATUS, get status() { return status; }, get chatAberto() { return chat.aberto; }, get usuarios() { return usuarios; },
+    STATUS, get status() { return status; }, get reunioes() { return reunioes; }, get chatAberto() { return chat.aberto; }, get usuarios() { return usuarios; },
   };
 })();
