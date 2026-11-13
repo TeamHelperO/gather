@@ -253,6 +253,18 @@ function caixa(it){ // retângulo desenhado (px), já considerando o giro em vol
   const w = de ? a.h : a.w, h = de ? a.w : a.h, cx = it.x*T + a.w/2, cy = it.y*T + a.h/2;
   return { x: cx - w/2, y: cy - h/2, w, h, cx, cy, rot };
 }
+/* Para onde um sofá/poltrona olha (0 baixo, 1 esquerda, 2 direita, 3 cima). Sem giro do editor, encostado numa parede
+   ele fica de costas para ela (sofá na parede de baixo olha para cima, para dentro da sala). */
+function frenteDoEstofado(it){
+  if (it.rot || it.flip) return null; // girado à mão: vale o giro
+  const a = ASSETS[it.k], r = it.room ? S.rooms.find(q => q.id === it.room) : roomAt(it.x*T + a.w/2, it.y*T + a.h - 4);
+  if (!a || !r) return 0;
+  const x0 = it.x, x1 = it.x + a.w/T, y0 = it.y, y1 = it.y + a.h/T, perto = 1.3;
+  const dBaixo = r.y + r.h - y1, dCima = y0 - r.y, dEsq = x0 - r.x, dDir = r.x + r.w - x1;
+  const largo = a.w / T > 1.4;
+  const op = [[dBaixo, 3], [dCima, 0], ...(largo ? [] : [[dEsq, 2], [dDir, 1]])].filter(([d]) => d < perto).sort((p, q) => p[0] - q[0]);
+  return op.length ? op[0][1] : 0;
+}
 function desenharItem(c, it, im, px, py){
   if (!it.rot && !it.flip){ c.drawImage(im, px, py); return; }
   const a = ASSETS[it.k], b = caixa(it);

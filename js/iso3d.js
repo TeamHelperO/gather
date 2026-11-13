@@ -75,7 +75,9 @@ function movel(it, sala) {
     add(caixaM(0.48, 0.08, 0.46, cor, 0, 0.42, 0)); add(cilindro(0.04, 0.42, "#2b2f39", 0, 0, 0)); const enc = add(caixaM(0.48, 0.5, 0.07, cor, 0, 0.5, -0.2));
     const rot = { cadeira_baixo: 0, cadeira_cima: Math.PI, cadeira_esq: -Math.PI / 2, cadeira_dir: Math.PI / 2, cadeira_plateia: Math.PI }[k] ?? 0; g.rotation.y = rot; void enc;
   }
-  else if (k === "sofa" || k === "poltrona") { prof = 0.9; const cor = k === "sofa" ? "#3f5fd6" : "#e08a3a"; add(caixaM(w - 0.1, 0.36, prof, cor, 0, 0.05, 0)); add(caixaM(w - 0.1, 0.45, 0.2, cor, 0, 0.35, -prof / 2 + 0.1)); add(caixaM(0.18, 0.5, prof, cor, -w / 2 + 0.14, 0.05, 0)); add(caixaM(0.18, 0.5, prof, cor, w / 2 - 0.14, 0.05, 0)); }
+  else if (k === "sofa" || k === "poltrona") { prof = 0.9; const cor = k === "sofa" ? "#3f5fd6" : "#e08a3a"; add(caixaM(w - 0.1, 0.36, prof, cor, 0, 0.05, 0)); add(caixaM(w - 0.1, 0.45, 0.2, cor, 0, 0.35, -prof / 2 + 0.1)); add(caixaM(0.18, 0.5, prof, cor, -w / 2 + 0.14, 0.05, 0)); add(caixaM(0.18, 0.5, prof, cor, w / 2 - 0.14, 0.05, 0));
+    const f = typeof frenteDoEstofado === "function" ? frenteDoEstofado(it) : null; // encostado na parede: de costas para ela
+    if (f != null) g.rotation.y = { 0: 0, 3: Math.PI, 2: Math.PI / 2, 1: -Math.PI / 2 }[f]; }
   else if (/^planta/.test(k)) { prof = 0.5; const gr = k === "planta_grande"; add(cilindro(0.2, 0.32, "#c96a3a", 0, 0, 0)); add(bola(gr ? 0.42 : 0.3, "#3f9a4a", 0, gr ? 0.85 : 0.6, 0)); add(bola(gr ? 0.3 : 0.2, "#56b85c", 0.12, gr ? 1.15 : 0.82, 0.05)); }
   else if (k === "estante") { prof = 0.45; add(caixaM(w, 1.9, prof, "#8a5a32", 0, 0, 0)); const cores = ["#d0463c", "#3d6fd6", "#e8b83a", "#4e9a5a", "#7d5bc4"]; for (let r = 0; r < 4; r++) for (let i = 0; i < 6; i++) add(caixaM(w / 7.5, 0.3, 0.05, cores[(r * 3 + i) % 5], -w / 2 + 0.15 + i * w / 6.5, 0.12 + r * 0.45, prof / 2 + 0.01, false)); }
   else if (k === "geladeira") { prof = 0.7; add(caixaM(0.8, 1.8, prof, "#e9ecf2", 0, 0, 0)); add(caixaM(0.04, 0.5, 0.04, "#9aa0ad", 0.3, 1.1, prof / 2 + 0.02)); }
@@ -94,7 +96,7 @@ function movel(it, sala) {
   else if (k === "cafeteira") { prof = 0.3; add(caixaM(0.25, 0.35, 0.25, "#2c313c", 0, 0.74, 0)); add(cilindro(0.05, 0.08, "#f2efe8", 0, 0.76, 0.06)); g.userData.sobreMesa = true; }
   else if (k === "caixa_som") { prof = 0.45; add(caixaM(0.5, 1.1, 0.42, "#1d2028", 0, 0, 0)); add(cilindro(0.15, 0.02, "#3b414e", 0, 0.35, 0.215)); add(cilindro(0.08, 0.02, "#3b414e", 0, 0.8, 0.215)); }
   else if (k === "megafone") { prof = 0.3; add(cilindro(0.03, 1.0, "#2b2f39", 0, 0, 0)); add(caixaM(0.2, 0.18, 0.3, "#e5484d", 0, 1.0, 0)); }
-  else if (k === "pufe") { prof = 0.5; add(cilindro(0.24, 0.4, "#d0463c", 0, 0, 0, 16)); }
+  else if (k === "pufe") { prof = 0.5; add(cilindro(0.26, 0.4, "#e2b23a", 0, 0, 0, 20)); add(cilindro(0.27, 0.04, "#c9962a", 0, 0.38, 0, 20)); }
   else if (k === "pulpito") { prof = 0.6; add(caixaM(0.7, 1.1, 0.5, "#8a5a32", 0, 0, 0)); add(caixaM(0.3, 0.3, 0.01, "#1d1d1f", 0, 0.55, 0.26, false)); }
   else if (k === "f_palco" || k === "palco_frente") { g.add(caixaM(1, 0.3, 1, "#7f3636", 0, 0, 0)); g.userData.chao = true; prof = 1; }
   else if (/^agente_\d$/.test(k) && window.AvatarPixel && AvatarPixel.agenteFolha) { // agente sentado: cadeira de verdade e pose de frente, de lado ou de costas conforme a câmera
@@ -314,7 +316,7 @@ const sol = new THREE.DirectionalLight(0xfff1dc, 1.9); sol.castShadow = true; so
 cena.add(sol, sol.target);
 const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 400);
 /* primeira pessoa: câmera nos olhos do seu personagem (padrão do 3D); "iso" = visão de cima */
-const camFP = new THREE.PerspectiveCamera(70, 1, 0.05, 300);
+const camFP = new THREE.PerspectiveCamera(58, 1, 0.05, 300); // campo de visão menor: menos distorção nas bordas
 let vista = (() => { try { return localStorage.getItem("nextco_vista3d") || "1p"; } catch (e) { return "1p"; } })();
 let yaw = null, pitch = -0.04, eu = null, yawAlvo = null, pitchAlvo = -0.04;
 const fp = () => vista === "1p";
@@ -426,7 +428,7 @@ const Iso3D = {
     if (fp()) {
       if (yaw == null) yaw = yawAlvo = [Math.PI, Math.PI / 2, -Math.PI / 2, 0][P.dir || 0];
       const kOlhar = 1 - Math.exp(-(dt || 0.016) * 22); yaw += (yawAlvo - yaw) * kOlhar; pitch += (pitchAlvo - pitch) * kOlhar;
-      const fov = Math.max(42, Math.min(88, 70 / Math.pow(Math.max(0.6, zoom) / 1.4, 0.35)));
+      const fov = Math.max(38, Math.min(72, 58 / Math.pow(Math.max(0.6, zoom) / 1.4, 0.35)));
       if (Math.abs(camFP.fov - fov) > 0.3) { camFP.fov = fov; camFP.updateProjectionMatrix(); }
       const olho = P.assento ? 1.2 : 1.6;
       camFP.position.set(alvo.x, olho, alvo.z);

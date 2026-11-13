@@ -16,6 +16,7 @@ const ASSENTOS_DEF = {
 const DIR_ASSENTO = { cadeira_cima: 3, cadeira_baixo: 0, cadeira_esq: 1, cadeira_dir: 2, cadeira_plateia: 3, sofa: 0, poltrona: 0, pufe: 0 };
 function direcaoDoAssento(it){
   const giro = [3, 2, 0, 1]; let d = DIR_ASSENTO[it.k] ?? 0;
+  if ((it.k === "sofa" || it.k === "poltrona") && typeof frenteDoEstofado === "function"){ const f = frenteDoEstofado(it); if (f != null) return f; }
   const passos = Math.round((((it.rot || 0) % 360) + 360) % 360 / 90);
   d = giro[(giro.indexOf(d) + passos) % 4];
   if (it.flip && (d === 1 || d === 2)) d = 3 - d;
