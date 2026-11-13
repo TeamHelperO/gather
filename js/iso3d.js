@@ -169,7 +169,9 @@ function montar(S) {
       [r.x, r.y, r.x, r.y + r.h, [-1, 0], "esquerda"], [r.x + r.w, r.y, r.x + r.w, r.y + r.h, [1, 0], "direita"]];
     for (const [x0, z0, x1, z1, n, sd] of lados) {
       const horiz = z0 === z1, comp = horiz ? x1 - x0 : z1 - z0, trechos = [];
-      if (lado === sd && dt != null) { const p = horiz ? dt - x0 : dt - z0; if (p > 0) trechos.push([0, p]); if (p + 1 < comp) trechos.push([p + 1, comp]); } else trechos.push([0, comp]);
+      // um vão em cada porta deste lado (a principal e as extras)
+      const vaos = portasDe(r).filter(p => p.side === sd).map(p => horiz ? p.tile - x0 : p.tile - z0).sort((a, b) => a - b);
+      let ini = 0; for (const p of vaos) { if (p > ini) trechos.push([ini, p]); ini = p + 1; } if (ini < comp) trechos.push([ini, comp]);
       for (const [a, b] of trechos) {
         const len = b - a, m = new THREE.Mesh(new THREE.BoxGeometry(horiz ? len : ESP, ALT, horiz ? ESP : len), vidro && sd !== "cima" ? matVidro : mat("#efe9dc"));
         m.geometry.translate(0, ALT / 2, 0);

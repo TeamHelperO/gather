@@ -439,6 +439,7 @@ async function boot(){
   if (!S && EH_NEXT) { S = templateNext(); Dados.salvarMapaLocal(mapaId, S); }
   if (!S) { Dados.esquecerSala(mapaId); location.replace("salas.html"); return; }
   lerEspaco();
+  if (EH_NEXT) abrirPortaPesquisaEdicao();
   Dados.lembrarSala(mapaId, infoEspaco.nome);
   if (modoSala === "3d" && !window.Iso3D) { window.__quero3D = true; window.carregar3D && carregar3D(); }
   grid = buildBlocked();
@@ -480,6 +481,19 @@ async function atualizarTarefas(){
   const l = await Dados.listarTarefas();
   // fora do escritório da Next, o telão só mostra tarefas criadas nas salas deste mapa
   tarefas = EH_NEXT ? l : l.filter(t => t.sala && S && S.rooms.some(r => r.id === t.sala));
+}
+// uma vez só: porta na parede entre a sala de Pesquisa e a de Edição (salas vizinhas)
+function abrirPortaPesquisaEdicao(){
+  if (S.portaPesquisaEdicao) return;
+  const pq = S.rooms.find(r => r.type === "ti"), ed = S.rooms.find(r => r.type === "edicao"); if (!pq || !ed) return;
+  const [esq, dir] = pq.x < ed.x ? [pq, ed] : [ed, pq];
+  if (esq.x + esq.w !== dir.x) return; // não estão encostadas
+  const y0 = Math.max(esq.y, dir.y), y1 = Math.min(esq.y + esq.h, dir.y + dir.h) - 1; if (y1 < y0) return;
+  const ty = Math.round((y0 + y1) / 2), pos = r => r.h > 1 ? (ty - r.y) / (r.h - 1) : 0.5;
+  esq.portas = (esq.portas || []).concat({ side: "direita", pos: pos(esq) });
+  dir.portas = (dir.portas || []).concat({ side: "esquerda", pos: pos(dir) });
+  S.portaPesquisaEdicao = true;
+  Dados.salvarMapaLocal(mapaId, S);
 }
 function lerEspaco(){
   infoEspaco = { ...(S.espaco || {}) }; infoEspaco.nome = infoEspaco.nome || (EH_NEXT ? "Escritório Next Co." : S.name || mapaId);

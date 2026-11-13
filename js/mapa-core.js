@@ -201,9 +201,9 @@ function layoutBase(r){
 /* Tira da frente da porta os móveis que bloqueiam a passagem (desliza para o lado ou remove). */
 function layout(r){
   const its = layoutBase(r);
-  const side = r.door ? r.door.side : "nenhuma"; if (side === "nenhuma") return its;
-  const dt = doorTile(r), {x, y, w, h} = r;
-  const livres = side==="baixo" ? [[dt,y+h-1],[dt,y+h-2]] : side==="cima" ? [[dt,y],[dt,y+1]] : side==="esquerda" ? [[x,dt],[x+1,dt]] : [[x+w-1,dt],[x+w-2,dt]];
+  const portas = portasDe(r); if (!portas.length) return its;
+  const {x, y, w, h} = r;
+  const livres = portas.flatMap(({ side, tile: dt }) => side==="baixo" ? [[dt,y+h-1],[dt,y+h-2]] : side==="cima" ? [[dt,y],[dt,y+1]] : side==="esquerda" ? [[x,dt],[x+1,dt]] : [[x+w-1,dt],[x+w-2,dt]]);
   const SOLTO = /^(cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$|teclado|mouse$|notebook$|gabinete$|projecao$)/;
   const pe = (it, dx) => { const a = ASSETS[it.k]; const bx0 = (it.x+dx)*T+4, bx1 = (it.x+dx)*T+a.w-4, bb = it.y*T+a.h-2, bt = bb-Math.min(a.h*0.45,26); return [bx0,bt,bx1,bb]; };
   const bate = (it, dx) => { const [a0,b0,a1,b1] = pe(it, dx); return livres.some(([tx,ty]) => a1 > tx*T-6 && a0 < (tx+1)*T+6 && b1 > ty*T && b0 < (ty+1)*T); };
@@ -227,6 +227,14 @@ function roomAt(wx, wy){ // world px → topmost room
   return null;
 }
 function roomAtTile(tx,ty){ for (let i=S.rooms.length-1;i>=0;i--){ const r=S.rooms[i]; if (tx>=r.x && tx<r.x+r.w && ty>=r.y && ty<r.y+r.h) return r; } return null; }
+/* portas: a principal (r.door) e as extras (r.portas = [{side, pos}]), ex.: uma porta na parede entre duas salas vizinhas */
+function portasDe(r){
+  const l = [];
+  if (r.door && r.door.side && r.door.side !== "nenhuma") l.push({ side: r.door.side, tile: doorTile(r) });
+  for (const p of r.portas || []) if (p && p.side && p.side !== "nenhuma") l.push({ side: p.side, tile: doorTile({ x: r.x, y: r.y, w: r.w, h: r.h, door: p }) });
+  return l;
+}
+const temPorta = (r, side, tile) => portasDe(r).some(p => p.side === side && p.tile === tile);
 function doorTile(r){
   const d=r.door||{side:"baixo",pos:.5};
   if (d.side==="baixo"||d.side==="cima") return r.x + Math.max(0,Math.min(r.w-1, Math.round(d.pos*(r.w-1))));
@@ -309,7 +317,7 @@ function drawWorld(c, extra){
     const dt = doorTile(r), glass = TYPES[r.type].glass;
     for (let tx=r.x; tx<r.x+r.w; tx++){
       let k = glass ? "parede_vidro" : "parede";
-      if (r.door && r.door.side==="cima" && tx===dt) k = r.type==="reuniao" ? "porta_privada" : "porta";
+      if (temPorta(r, "cima", tx)) k = r.type==="reuniao" ? "porta_privada" : "porta";
       D.push({k, x:tx, y:r.y-2, sort:r.y*T-0.5, wallpiece:true});
     }
   }
@@ -354,16 +362,19 @@ function luzAmbiente(c, items){
   c.restore();
 }
 function drawCaps(c, r){
-  const dt = doorTile(r), side = r.door ? r.door.side : "nenhuma";
-  const band = (x,y,w,h) => { c.fillStyle="#2a2333"; c.fillRect(x,y,w,h); c.fillStyle="#efe9dc"; c.fillRect(x+1,y+1,w-2,h-2); };
-  const x0=r.x*T, y0=r.y*T, x1=(r.x+r.w)*T, y1=(r.y+r.h)*T;
-  // left & right
+  const band = (x,y,w,h) => { if (w <= 0 || h <= 0) return; c.fillStyle="#2a2333"; c.fillRect(x,y,w,h); c.fillStyle="#efe9dc"; c.fillRect(x+1,y+1,w-2,h-2); };
+  const x0=r.x*T, y0=r.y*T, x1=(r.x+r.w)*T, y1=(r.y+r.h)*T, portas = portasDe(r);
+  // esquerda e direita: faixa com um vão em cada porta
   for (const [sd, X] of [["esquerda", x0-4], ["direita", x1-4]]){
-    if (side===sd){ const gy=dt*T; band(X, y0-T*2+9, 8, gy-(y0-T*2+9)); band(X, gy+T, 8, y1+4-(gy+T)); c.fillStyle="rgba(120,90,60,.55)"; c.fillRect(X-6, gy+4, 20, T-8); }
-    else band(X, y0-T*2+9, 8, y1-(y0-T*2+9)+4);
+    const vaos = portas.filter(p => p.side === sd).map(p => p.tile*T).sort((a,b) => a-b);
+    let ini = y0-T*2+9;
+    for (const gy of vaos){ band(X, ini, 8, gy-ini); c.fillStyle="rgba(120,90,60,.55)"; c.fillRect(X-6, gy+4, 20, T-8); ini = gy+T; }
+    band(X, ini, 8, y1+4-ini);
   }
-  if (side==="baixo"){ const gx=dt*T; band(x0-4, y1-4, gx-x0+4, 8); band(gx+T, y1-4, x1+4-(gx+T), 8); c.fillStyle="rgba(120,90,60,.55)"; c.fillRect(gx+4, y1-6, T-8, 12); }
-  else band(x0-4, y1-4, x1-x0+8, 8);
+  const vaos = portas.filter(p => p.side === "baixo").map(p => p.tile*T).sort((a,b) => a-b);
+  let ini = x0-4;
+  for (const gx of vaos){ band(ini, y1-4, gx-ini, 8); c.fillStyle="rgba(120,90,60,.55)"; c.fillRect(gx+4, y1-6, T-8, 12); ini = gx+T; }
+  band(ini, y1-4, x1+4-ini, 8);
 }
 
 /* ---------- colisão (grade de 16 px) ---------- */
@@ -374,18 +385,17 @@ function buildBlocked(){
   const set = (cx, cy) => { if (cx>=0 && cy>=0 && cx<cols && cy<rows) g[cy*cols+cx] = 1; };
   for (const r of S.rooms){
     if (TYPES[r.type].noWalls) continue;
-    const side = r.door ? r.door.side : "nenhuma", dt = doorTile(r);
     const x0 = r.x*2, x1 = (r.x+r.w)*2, y0 = r.y*2, y1 = (r.y+r.h)*2;
     for (let cx=x0; cx<x1; cx++){ // parede de cima (2 tiles de altura)
-      const porta = side==="cima" && Math.floor(cx/2)===dt;
+      const porta = temPorta(r, "cima", Math.floor(cx/2));
       for (let cy=y0-4; cy<y0; cy++) if (!porta) set(cx, cy);
     }
     for (let cy=y0-4; cy<=y1; cy++){
-      const porta = (t) => Math.floor(cy/2)===dt && side===t && cy<y1;
+      const porta = (t) => cy<y1 && cy>=y0 && temPorta(r, t, Math.floor(cy/2));
       if (!porta("esquerda")) set(x0-1, cy);
       if (!porta("direita")) set(x1, cy);
     }
-    for (let cx=x0-1; cx<=x1; cx++){ if (!(side==="baixo" && Math.floor(cx/2)===dt && cx>=x0 && cx<x1)) set(cx, y1); }
+    for (let cx=x0-1; cx<=x1; cx++){ if (!(cx>=x0 && cx<x1 && temPorta(r, "baixo", Math.floor(cx/2)))) set(cx, y1); }
   }
   for (const it of allItems()){
     if (it.z==="floor" || it.z==="wall" || SEM_COLISAO.test(it.k)) continue;

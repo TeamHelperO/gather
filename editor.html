@@ -473,6 +473,8 @@ function refreshPanel(){
       <div class="row"><label>Piso</label><select id="rFloor"><option value="">Padrão do tipo</option>${FLOORS.map(f=>`<option value="${f}" ${f===r.floor?"selected":""}>${ASSETS[f].label}</option>`).join("")}</select></div>
       <div class="row"><label>Porta</label><select id="rDoor">${Object.entries(SIDES).map(([k,l])=>`<option value="${k}" ${k===d.side?"selected":""}>${l}</option>`).join("")}</select></div>
       ${d.side!=="nenhuma"?`<div class="row"><label>Lugar</label><input type="range" id="rDoorPos" min="0" max="1" step="0.01" value="${d.pos}" style="flex:1"></div>`:""}
+      ${(r.portas||[]).map((p,i)=>`<div class="row"><label>Porta ${i+2}</label><select data-pside="${i}">${Object.entries(SIDES).filter(([k])=>k!=="nenhuma").map(([k,l])=>`<option value="${k}" ${k===p.side?"selected":""}>${l}</option>`).join("")}</select><input type="range" data-ppos="${i}" min="0" max="1" step="0.01" value="${p.pos}" style="flex:1"><button class="btn" data-prm="${i}" title="Tirar esta porta">×</button></div>`).join("")}
+      <div class="row"><label></label><button class="btn" id="rAddPorta" title="Útil para ligar duas salas vizinhas">＋ Outra porta</button></div>
       <label class="toggle"><input type="checkbox" id="rAuto" ${r.auto?"checked":""}> Móveis automáticos</label>
       <p class="note">${r.auto ? "Os móveis se reorganizam sozinhos quando você muda o tamanho. Arraste um móvel para passar a editar à mão." : "Móveis manuais: arraste, adicione em 🪑 Itens ou remova cada um. Ligue a opção acima para voltar ao arranjo automático."}</p>
       <div class="btns"><button class="btn" data-act="zoomroom">🔍 Zoom na sala</button><button class="btn" data-act="dup">Duplicar</button><button class="btn dan" data-act="del">Excluir sala</button></div>`;
@@ -480,6 +482,10 @@ function refreshPanel(){
     panel.querySelector("#rType").onchange = e => { const b=snapshot(); r.type = e.target.value; if (!r.auto && !confirmInline()) {} commit(b); };
     panel.querySelector("#rFloor").onchange = e => { const b=snapshot(); r.floor = e.target.value || null; commit(b); };
     panel.querySelector("#rDoor").onchange = e => { const b=snapshot(); r.door = {side:e.target.value, pos:(r.door&&r.door.pos)||.5}; commit(b); };
+    panel.querySelector("#rAddPorta").onclick = () => { const b=snapshot(); r.portas = (r.portas||[]).concat({ side: "direita", pos: .5 }); commit(b); };
+    panel.querySelectorAll("[data-pside]").forEach(el => el.onchange = e => { const b=snapshot(); r.portas[+el.dataset.pside].side = e.target.value; commit(b); });
+    panel.querySelectorAll("[data-ppos]").forEach(el => { let b0=null; el.onpointerdown=()=>{b0=snapshot();}; el.oninput = e => { r.portas[+el.dataset.ppos].pos = +e.target.value; draw(); }; el.onchange = () => commit(b0||snapshot()); });
+    panel.querySelectorAll("[data-prm]").forEach(el => el.onclick = () => { const b=snapshot(); r.portas.splice(+el.dataset.prm, 1); if (!r.portas.length) delete r.portas; commit(b); });
     const dp = panel.querySelector("#rDoorPos"); if (dp){ let b0=null; dp.onpointerdown=()=>{b0=snapshot();}; dp.oninput = e => { r.door.pos = +e.target.value; draw(); }; dp.onchange = () => { commit(b0||snapshot()); }; }
     panel.querySelector("#rAuto").onchange = e => {
       const b=snapshot();
