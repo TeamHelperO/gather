@@ -18,54 +18,121 @@ p.sub{margin:0 0 8px;color:var(--mut)}
 .small{font-size:12px;color:var(--mut);margin-top:14px}
 #enviado{display:none;text-align:center}
 #enviado .ic{font-size:44px}
+.abas{display:flex;gap:4px;padding:4px;background:var(--chip,#f3f1ec);border-radius:12px;margin:8px 0 10px}
+.abas button{flex:1;padding:9px 6px;border-radius:9px;font-weight:700;font-size:14px;color:var(--mut)}
+.abas button.on{background:#fff;color:inherit;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.senha{position:relative}.senha input{width:100%;padding-right:44px}
+.senha button{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:8px;font-size:16px}
+.ok{color:#1f9e6e;font-size:14px;min-height:0}
+#links a{color:var(--brand);font-weight:650}
 </style>
 </head>
 <body>
 <form class="card" id="f" novalidate>
   <div class="logo"><span>N</span><div><b>Next Co.</b><div style="font-size:12px;color:var(--mut)">Escritório virtual</div></div></div>
   <div id="pedir">
-    <h1>Entrar</h1>
-    <p class="sub">Digite seu e-mail. Vamos mandar um link para você entrar, sem senha.</p>
+    <h1 id="titulo">Entrar</h1>
+    <div class="abas" role="tablist">
+      <button type="button" role="tab" data-modo="senha" class="on">E-mail e senha</button>
+      <button type="button" role="tab" data-modo="link">Link por e-mail</button>
+    </div>
+    <p class="sub" id="sub"></p>
+    <div class="field" id="boxNome"><label for="nome">Seu nome</label><input id="nome" type="text" autocomplete="name" maxlength="30" placeholder="Como quer ser chamado"></div>
     <div class="field"><label for="email">E-mail</label><input id="email" type="email" autocomplete="email" inputmode="email" placeholder="voce@nextco.com.br" required></div>
-    <div class="field"><label for="nome">Seu nome <span style="font-weight:400">(só no primeiro acesso)</span></label><input id="nome" type="text" autocomplete="name" maxlength="30" placeholder="Como quer ser chamado"></div>
-    <div class="err" id="err"></div>
-    <div class="row"><button class="btn pri" id="go" type="submit">Enviar link de acesso</button></div>
-    <p class="small">Tudo o que você faz no escritório fica salvo no seu e-mail.</p>
+    <div class="field" id="boxSenha"><label for="senha">Senha</label>
+      <div class="senha"><input id="senha" type="password" autocomplete="current-password" minlength="8" placeholder="Sua senha"><button type="button" id="ver" aria-label="Mostrar a senha">👁</button></div></div>
+    <div class="field" id="boxSenha2"><label for="senha2">Repita a senha</label><input id="senha2" type="password" autocomplete="new-password" minlength="8"></div>
+    <div class="err" id="err"></div><div class="ok" id="ok"></div>
+    <div class="row"><button class="btn pri" id="go" type="submit">Entrar</button></div>
+    <p class="small" id="links"></p>
   </div>
   <div id="enviado">
     <div class="ic">📬</div>
-    <h1>Confira seu e-mail</h1>
-    <p class="sub">Enviamos um link para <b id="emailEnviado"></b>. Abra o link <b>neste mesmo aparelho</b> para entrar.</p>
-    <p class="small">Não chegou? Veja o spam ou <a href="#" id="denovo">tente de novo</a>.</p>
+    <h1 id="enviadoTit">Confira seu e-mail</h1>
+    <p class="sub" id="enviadoTxt"></p>
+    <p class="small">Não chegou? Veja o spam ou <a href="#" id="denovo">volte e tente de outro jeito</a>.</p>
   </div>
 </form>
 <script src="js/vendor/supabase.js"></script>
 <script src="js/config.js"></script>
 <script src="js/dados.js"></script>
 <script>
-const f = document.getElementById("f"), email = document.getElementById("email"), nome = document.getElementById("nome"), err = document.getElementById("err");
-(async () => {
-  // voltou pelo link do e-mail (ou já tinha entrado)?
-  const u = await Dados.pronto;
-  if (u) { try { const p = await Dados.garantirPerfil(); location.replace(p.avatar ? "salas.html" : "avatar.html"); return; } catch (e) { err.textContent = "Erro ao abrir seu perfil: " + e.message; } }
-  const ult = localStorage.getItem("nextco_ultimo_email"); if (ult) email.value = ult;
-  const hashErr = new URLSearchParams(location.hash.slice(1)).get("error_description"); if (hashErr) err.textContent = "O link expirou ou já foi usado. Peça outro.";
-})();
-f.onsubmit = async e => {
-  e.preventDefault(); err.textContent = "";
-  const em = email.value.trim().toLowerCase();
-  if (!Dados.emailValido(em)) { err.textContent = "Digite um e-mail válido."; email.focus(); return; }
-  const b = document.getElementById("go"); b.disabled = true; b.textContent = "Enviando…";
-  try {
-    await Dados.enviarLink(em, nome.value);
-    localStorage.setItem("nextco_ultimo_email", em);
-    document.getElementById("emailEnviado").textContent = em;
-    document.getElementById("pedir").style.display = "none"; document.getElementById("enviado").style.display = "block";
-  } catch (x) {
-    err.textContent = /rate|seconds|limit/i.test(x.message || "") ? "Muitos pedidos seguidos. Espere um minuto e tente de novo." : "Não foi possível enviar: " + (x.message || x);
-  } finally { b.disabled = false; b.textContent = "Enviar link de acesso"; }
+const $ = id => document.getElementById(id);
+const f = $("f"), email = $("email"), nome = $("nome"), senha = $("senha"), senha2 = $("senha2"), err = $("err"), ok = $("ok"), go = $("go");
+/* modos: senha (entrar) · criar (nova conta com senha) · esqueci (mandar link para trocar a senha) · nova (definir a senha depois do link) · link (entrar sem senha) */
+let modo = "senha";
+const TXT = {
+  senha: ["Entrar", "Entre com seu e-mail e senha.", "Entrar", `Primeira vez? <a href="#" data-ir="criar">Criar conta</a> · <a href="#" data-ir="esqueci">Esqueci a senha</a>`],
+  criar: ["Criar conta", "Crie sua senha (mínimo 8 caracteres). Depois é só entrar com e-mail e senha.", "Criar conta", `Já tem conta? <a href="#" data-ir="senha">Entrar</a>`],
+  esqueci: ["Criar ou trocar a senha", "Mandamos um link para o seu e-mail. Ao abrir, você escolhe a senha nova. Serve também para quem sempre entrou pelo link e ainda não tem senha.", "Enviar link", `<a href="#" data-ir="senha">Voltar</a>`],
+  nova: ["Escolha sua senha", "Digite a senha nova (mínimo 8 caracteres).", "Salvar senha e entrar", ""],
+  link: ["Entrar", "Vamos mandar um link para você entrar, sem senha. O envio de e-mails tem limite por hora; se der erro, entre com senha.", "Enviar link de acesso", `Tudo o que você faz no escritório fica salvo no seu e-mail.`],
 };
-document.getElementById("denovo").onclick = e => { e.preventDefault(); document.getElementById("pedir").style.display = "block"; document.getElementById("enviado").style.display = "none"; };
+function mudar(m) {
+  modo = m; err.textContent = ""; ok.textContent = "";
+  const [tit, sub, bt, links] = TXT[m];
+  $("titulo").textContent = tit; $("sub").textContent = sub; go.textContent = bt; $("links").innerHTML = links;
+  $("boxNome").style.display = m === "criar" ? "" : "none";
+  $("boxSenha").style.display = ["senha", "criar", "nova"].includes(m) ? "" : "none";
+  $("boxSenha2").style.display = ["criar", "nova"].includes(m) ? "" : "none";
+  email.closest(".field").style.display = m === "nova" ? "none" : "";
+  senha.autocomplete = m === "senha" ? "current-password" : "new-password";
+  senha.placeholder = m === "senha" ? "Sua senha" : "mínimo 8 caracteres";
+  document.querySelector(".abas").style.display = ["senha", "link"].includes(m) ? "" : "none";
+  document.querySelectorAll(".abas button").forEach(b => b.classList.toggle("on", b.dataset.modo === (m === "link" ? "link" : "senha")));
+}
+document.querySelector(".abas").onclick = e => { const b = e.target.closest("[data-modo]"); if (b) { mudar(b.dataset.modo); localStorage.setItem("nextco_modo_login", b.dataset.modo); } };
+$("links").onclick = e => { const a = e.target.closest("[data-ir]"); if (a) { e.preventDefault(); mudar(a.dataset.ir); (modo === "criar" ? nome : email).focus(); } };
+$("ver").onclick = () => { const v = senha.type === "password"; senha.type = senha2.type = v ? "text" : "password"; $("ver").setAttribute("aria-label", v ? "Esconder a senha" : "Mostrar a senha"); };
+const traduz = x => {
+  const m = (x && x.message) || String(x || "");
+  if (m === "ja_existe" || /already registered|already exists/i.test(m)) return "Esse e-mail já tem conta. Entre com a senha ou use \"Esqueci a senha\".";
+  if (/invalid login credentials/i.test(m)) return "E-mail ou senha errados. Se você sempre entrou pelo link e ainda não tem senha, use \"Esqueci a senha\" ou entre pelo link e crie a senha em Configurações.";
+  if (/email not confirmed/i.test(m)) return "Confirme seu e-mail pelo link que enviamos antes de entrar.";
+  if (/rate|seconds|limit/i.test(m)) return "O envio de e-mails chegou no limite por agora. Entre com e-mail e senha ou tente de novo daqui a pouco.";
+  if (/weak|least|password should/i.test(m)) return "Senha fraca: use pelo menos 8 caracteres, misturando letras e números.";
+  return m;
+};
+async function entrarNoEscritorio() { const p = await Dados.garantirPerfil(); location.replace(p.avatar ? "salas.html" : "avatar.html"); }
+function mostrarEnviado(tit, txt) { $("enviadoTit").textContent = tit; $("enviadoTxt").innerHTML = txt; $("pedir").style.display = "none"; $("enviado").style.display = "block"; }
+
+(async () => {
+  mudar(localStorage.getItem("nextco_modo_login") === "link" ? "link" : "senha");
+  const ult = localStorage.getItem("nextco_ultimo_email"); if (ult) email.value = ult;
+  const u = await Dados.pronto;
+  // abriu o link de "criar ou trocar a senha": pede a senha nova antes de entrar
+  if (Dados.recuperandoSenha) { mudar("nova"); senha.focus(); }
+  else if (u) { try { await entrarNoEscritorio(); return; } catch (e) { err.textContent = "Erro ao abrir seu perfil: " + e.message; } }
+  Dados.aoRecuperarSenha(() => { mudar("nova"); senha.focus(); });
+  const hashErr = new URLSearchParams(location.hash.slice(1)).get("error_description"); if (hashErr) err.textContent = "O link expirou ou já foi usado. Entre com e-mail e senha ou peça outro.";
+})();
+
+f.onsubmit = async e => {
+  e.preventDefault(); err.textContent = ""; ok.textContent = "";
+  const em = email.value.trim().toLowerCase();
+  if (modo !== "nova" && !Dados.emailValido(em)) { err.textContent = "Digite um e-mail válido."; email.focus(); return; }
+  if (["criar", "nova"].includes(modo)) {
+    if (senha.value.length < 8) { err.textContent = "A senha precisa de pelo menos 8 caracteres."; senha.focus(); return; }
+    if (senha.value !== senha2.value) { err.textContent = "As duas senhas não são iguais."; senha2.focus(); return; }
+  }
+  if (modo === "senha" && !senha.value) { err.textContent = "Digite sua senha."; senha.focus(); return; }
+  if (modo === "criar" && !nome.value.trim()) { err.textContent = "Diga como quer ser chamado."; nome.focus(); return; }
+  const rot = go.textContent; go.disabled = true; go.textContent = "Aguarde…";
+  try {
+    if (em) localStorage.setItem("nextco_ultimo_email", em);
+    if (modo === "senha") { await Dados.entrarComSenha(em, senha.value); return await entrarNoEscritorio(); }
+    if (modo === "criar") {
+      const r = await Dados.criarConta(em, senha.value, nome.value);
+      if (r.confirmar) return mostrarEnviado("Confirme seu e-mail", `Enviamos um link de confirmação para <b>${em.replace(/</g, "&lt;")}</b>. Depois de confirmar, entre com e-mail e senha.`);
+      return await entrarNoEscritorio();
+    }
+    if (modo === "nova") { await Dados.definirSenha(senha.value); history.replaceState(null, "", location.pathname); return await entrarNoEscritorio(); }
+    if (modo === "esqueci") { await Dados.recuperarSenha(em); return mostrarEnviado("Confira seu e-mail", `Enviamos um link para <b>${em.replace(/</g, "&lt;")}</b>. Abra o link <b>neste mesmo aparelho</b> e escolha a senha nova.`); }
+    if (modo === "link") { await Dados.enviarLink(em); return mostrarEnviado("Confira seu e-mail", `Enviamos um link para <b>${em.replace(/</g, "&lt;")}</b>. Abra o link <b>neste mesmo aparelho</b> para entrar.`); }
+  } catch (x) { err.textContent = traduz(x); }
+  finally { go.disabled = false; go.textContent = rot; }
+};
+$("denovo").onclick = e => { e.preventDefault(); $("pedir").style.display = "block"; $("enviado").style.display = "none"; mudar("senha"); };
 </script>
 </body>
 </html>

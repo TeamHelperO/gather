@@ -46,6 +46,9 @@ window.Configuracoes = (function () {
       + bloco("Visual",
         (opt.modoSala() === "ambos" ? linha("Modo", `<div class="cfg-seg">${[["2d", "2D"], ["3d", "3D"]].map(([k, l]) => `<button data-cmodo="${k}" class="${(opt.em3d() ? "3d" : "2d") === k ? "on" : ""}">${l}</button>`).join("")}</div>`) : linha("Modo", MODOS[opt.modoSala()] + " (definido pela sala)"))
         + (opt.modoSala() !== "2d" ? linha("Câmera no 3D", `<div class="cfg-seg">${[["1p", "Primeira pessoa"], ["iso", "Visão de cima"]].map(([k, l]) => `<button data-cvista="${k}" class="${(window.Iso3D ? Iso3D.vista : "1p") === k ? "on" : ""}">${l}</button>`).join("")}</div>`) : ""))
+      + bloco("Senha", `<form class="cfg-form" data-cform="senha"><label>Nova senha<input name="s1" type="password" minlength="8" autocomplete="new-password" placeholder="mínimo 8 caracteres" required></label>
+          <label>Repita a senha<input name="s2" type="password" minlength="8" autocomplete="new-password" required></label><div class="cfg-acoes"><button class="btn pri">🔑 Salvar senha</button></div></form>`,
+        "Com uma senha você entra com e-mail e senha, sem esperar o link por e-mail. Serve para criar a primeira senha ou trocar a atual.")
       + bloco("Seus dados", linha("Tempo nesta sala", `<button class="btn" data-ctempo>📊 Meu tempo</button>`) + linha("Tutorial", `<button class="btn" data-ctour>🧭 Ver o tutorial de novo</button>`) + linha("Minimapa", `<button class="btn" data-cmapa>🗺️ ${window.Minimapa && Minimapa.ligado ? "Esconder" : "Mostrar"} (tecla M)</button>`) + linha("Exportar", `<button class="btn" data-cexp>💾 Baixar meus dados (JSON)</button>`) + linha("Conta", `<button class="btn dan" data-csair>🚪 Sair da conta</button>`));
   }
 
@@ -112,6 +115,13 @@ window.Configuracoes = (function () {
     if (window.IAConfig && IAConfig.clique) { const r = await IAConfig.clique(e, opt); if (r) desenhar(); }
   }
   async function enviar(f) {
+    if (f.dataset.cform === "senha") {
+      const s1 = f.s1.value, s2 = f.s2.value;
+      if (s1.length < 8) return opt.toast("A senha precisa de pelo menos 8 caracteres");
+      if (s1 !== s2) return opt.toast("As duas senhas não são iguais");
+      try { await Dados.definirSenha(s1); f.reset(); opt.toast("🔑 Senha salva. Da próxima vez, entre com e-mail e senha."); } catch (er) { opt.toast("Não consegui salvar a senha: " + (er.message || "")); }
+      return;
+    }
     if (f.dataset.cform === "sala") {
       const fd = new FormData(f), nome = String(fd.get("nome") || "").trim(), modo = fd.get("modo");
       if (!nome) return;

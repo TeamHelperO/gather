@@ -28,7 +28,8 @@
     if (usuarioAuth) await carregarPerfil();
     return usuarioAuth;
   })();
-  sb.auth.onAuthStateChange((_ev, sessao) => { usuarioAuth = sessao ? sessao.user : null; });
+  let aoRecuperar = null, recuperando = /type=recovery/.test(location.hash);
+  sb.auth.onAuthStateChange((ev, sessao) => { usuarioAuth = sessao ? sessao.user : null; if (ev === "PASSWORD_RECOVERY") { recuperando = true; aoRecuperar && aoRecuperar(); } });
 
   async function carregarPerfil() {
     const { data } = await sb.from("perfis").select("*").eq("id", usuarioAuth.id).maybeSingle();
@@ -55,6 +56,34 @@
       const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + "/", data: nome ? { nome: nome.trim() } : {} } });
       if (error) throw error;
     },
+    /* ---------- e-mail e senha (não depende do limite de e-mails do Supabase) ---------- */
+    async entrarComSenha(email, senha) {
+      email = limpaEmail(email); if (!emailValido(email)) throw new Error("E-mail inválido");
+      const { data, error } = await sb.auth.signInWithPassword({ email, password: senha });
+      if (error) throw error; usuarioAuth = data.user; await carregarPerfil(); return data.user;
+    },
+    // cria a conta; se o projeto exige confirmar o e-mail, devolve { confirmar: true } (sem sessão ainda)
+    async criarConta(email, senha, nome) {
+      email = limpaEmail(email); if (!emailValido(email)) throw new Error("E-mail inválido");
+      if (String(senha || "").length < 8) throw new Error("A senha precisa de pelo menos 8 caracteres");
+      const { data, error } = await sb.auth.signUp({ email, password: senha, options: { emailRedirectTo: location.origin + "/", data: nome ? { nome: nome.trim() } : {} } });
+      if (error) throw error;
+      // e-mail já cadastrado: o Supabase devolve um usuário sem identidades
+      if (data.user && Array.isArray(data.user.identities) && !data.user.identities.length) throw new Error("ja_existe");
+      if (!data.session) return { confirmar: true };
+      usuarioAuth = data.user; await carregarPerfil(); return { confirmar: false };
+    },
+    // quem entrou pelo link pode criar (ou trocar) a senha aqui, logado
+    async definirSenha(senha) {
+      if (String(senha || "").length < 8) throw new Error("A senha precisa de pelo menos 8 caracteres");
+      const { error } = await sb.auth.updateUser({ password: senha }); if (error) throw error; recuperando = false;
+    },
+    async recuperarSenha(email) {
+      email = limpaEmail(email); if (!emailValido(email)) throw new Error("E-mail inválido");
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + "/" }); if (error) throw error;
+    },
+    get recuperandoSenha() { return recuperando; },
+    aoRecuperarSenha(fn) { aoRecuperar = fn; if (recuperando) fn(); },
     /* Garante que quem acabou de entrar tem perfil. Retorna o usuário (com .novo). */
     async garantirPerfil() {
       await pronto; if (!usuarioAuth) return null;

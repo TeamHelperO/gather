@@ -997,6 +997,8 @@ function loop(now){
   telaoPerto = teloes.find(it => dentroDoTelao(it) && Math.hypot(it.x*T + 96 - P.px, it.y*T + 96 - P.py) < 120) || null;
   if (Telao.aberto && telaoSalaAberta && salaAtualId() !== telaoSalaAberta){ telaoSalaAberta = null; Telao.fechar(); toast("Você saiu da sala: o telão foi fechado"); }
   TI.atualizar(); Edicao.atualizar(); atualizarBotaoLuz(); AgentesVivos.atualizar(Date.now());
+  // no 3D os móveis ocupam mais chão que no 2D: quem está em pé dentro de um móvel é empurrado para a borda (só no desenho)
+  if (em3d() && Iso3D.empurrar) for (const a of [...outros, ...AgentesVivos.atores()]) if (a.visto !== false && !a.assento) { const [nx, ny] = Iso3D.empurrar(a.x, a.y, 0.16); a.x = nx; a.y = ny; }
   const perto = !!telaoPerto;
   const bt = document.getElementById("btnTelao"); const mostra = perto && !Telao.aberto ? "flex" : "none"; if (bt.style.display !== mostra) bt.style.display = mostra;
   for (const a of [P, ...visiveis]){ a.vozReal = now - (a.vozAtiva || -1e9) < 350; if (Voz.ligado) a.falando = a.vozReal; else if (a.vozReal) a.falando = true; }

@@ -149,7 +149,7 @@ function montar(S) {
   const tg = texturaPiso("f_grama"); tg.repeat.set((W + 40) / 2, (H + 40) / 2);
   const grama = new THREE.Mesh(new THREE.PlaneGeometry(W + 40, H + 40), new THREE.MeshStandardMaterial({ map: tg, roughness: 1 }));
   grama.rotation.x = -Math.PI / 2; grama.position.set(W / 2, 0, H / 2); grama.receiveShadow = true; objetos.add(grama);
-  const ALT = 2.4, ESP = 0.14;
+  const ALT = alturaParedes(), ESP = 0.14;
   for (const r of S.rooms) {
     const tipo = r.floor || TYPES[r.type].floor, tex = texturaPiso(tipo); tex.repeat.set(r.w / 2, r.h / 2);
     const chao = new THREE.Mesh(new THREE.BoxGeometry(r.w, 0.08, r.h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }));
@@ -224,9 +224,15 @@ function montar(S) {
   }
   montarPortas();
 }
+/* pé-direito padrão de todas as salas: 3,6 m, ou mais se algum telão/projeção da parede passar disso */
+function alturaParedes() {
+  let alto = 0;
+  for (const it of allItems()) { if (!NA_PAREDE.test(it.k) || !/^(telao|telao_tend|telao_rot|tv|projecao|quadro_branco)/.test(it.k)) continue; const a = ASSETS[it.k]; if (a) alto = Math.max(alto, 0.75 + a.h / T); }
+  return Math.max(3.6, Math.ceil((alto + 0.35) * 10) / 10);
+}
 /* portas de verdade nos vãos: abrem sozinhas quando alguém chega perto */
 function montarPortas() {
-  const vistas = new Set(), lista = portas3d.splice(0), ALT = 2.4, AP = 2.05;
+  const vistas = new Set(), lista = portas3d.splice(0), ALT = alturaParedes(), AP = 2.15;
   for (const { r, p, vidro, privada } of lista) {
     const horiz = p.side === "cima" || p.side === "baixo";
     const fixo = p.side === "cima" ? r.y : p.side === "baixo" ? r.y + r.h : p.side === "esquerda" ? r.x : r.x + r.w;
@@ -410,6 +416,14 @@ const Iso3D = {
   // para onde a câmera olha, em ângulo do canvas 2D (x para a direita, y para baixo); null fora da 1ª pessoa
   get olhar() { return ativo && fp() && yaw != null ? Math.atan2(-Math.cos(yaw), -Math.sin(yaw)) : null; },
   // colisão do 3D: o corpo (raio ~0,2 tile) não entra na área do móvel no chão
+  empurrar(px, py, raio = 0.2) {
+    let x = px / T, z = py / T;
+    for (let volta = 0; volta < 3; volta++) { let mexeu = false;
+      for (const b of solidos) { const x0 = b.x0 - raio, x1 = b.x1 + raio, z0 = b.z0 - raio, z1 = b.z1 + raio; if (x <= x0 || x >= x1 || z <= z0 || z >= z1) continue;
+        const opc = [[x0 - x, 0], [x1 - x, 0], [0, z0 - z], [0, z1 - z]].sort((p, q) => Math.abs(p[0] + p[1]) - Math.abs(q[0] + q[1]))[0]; x += opc[0]; z += opc[1]; mexeu = true; }
+      if (!mexeu) break; }
+    return [x * T, z * T];
+  },
   livre(px, py, raio = 0.2) { const x = px / T, z = py / T; for (const b of solidos) if (x > b.x0 - raio && x < b.x1 + raio && z > b.z0 - raio && z < b.z1 + raio) return false; return true; },
   get vista() { return vista; },
   trocarVista(v) { vista = v || (fp() ? "iso" : "1p"); if (fp() && eu) this.olharPara(eu.dir); try { localStorage.setItem("nextco_vista3d", vista); } catch (e) {} if (!fp()) for (const [, s] of pessoas) s.sp.visible = true; return vista; },
