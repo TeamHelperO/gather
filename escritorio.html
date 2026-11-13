@@ -188,6 +188,27 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 .av-i:hover{background:var(--chip)}.av-i b{font-weight:600;font-size:13.5px;display:block}.av-i small{color:var(--mut);font-size:11.5px;text-transform:capitalize}
 .av-i.novo{background:#3d5afe12}.av-i.novo b{font-weight:800}
 @media (max-width:760px){.soc-st span{display:none}.soc-st,.soc-ic{padding:8px 9px}.soc-chat{top:58px;bottom:76px}.ag-form .row3{grid-template-columns:1fr 1fr}}
+/* ---------- central de configurações ---------- */
+.cfg-win{width:min(900px,100%);height:min(640px,88vh);display:flex;flex-direction:column;overflow:hidden}
+.cfg-grade{flex:1;display:grid;grid-template-columns:200px 1fr;min-height:0}
+.cfg-nav{display:flex;flex-direction:column;gap:4px;padding:12px;border-right:1px solid var(--line)}
+.cfg-nav button{text-align:left;padding:10px 12px;border-radius:10px;font-weight:700;font-size:14px}
+.cfg-nav button:hover{background:var(--chip)}.cfg-nav button.on{background:var(--brand);color:#fff}
+.cfg-corpo{overflow:auto;padding:6px 18px 18px}
+.cfg-b{padding:12px 0;border-bottom:1px solid var(--line)}.cfg-b:last-child{border-bottom:0}
+.cfg-b h4{margin:0 0 8px;font-size:14.5px}.cfg-d{color:var(--mut);font-size:12.5px;margin:0 0 8px}
+.cfg-l{display:flex;align-items:center;gap:12px;padding:7px 0;flex-wrap:wrap}.cfg-l>span{flex:1;min-width:160px;font-size:13.5px;font-weight:600}
+.cfg-l .btn,.cfg-p .btn,.cfg-eu .btn{padding:8px 12px;font-size:13px;text-decoration:none;color:inherit}
+.cfg-l select{height:38px;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:0 10px}
+.cfg-seg{display:flex;background:var(--chip);border-radius:10px;padding:3px;gap:3px}.cfg-seg button{padding:7px 12px;border-radius:8px;font-weight:700;font-size:13px}.cfg-seg button.on{background:var(--panel);box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.cfg-eu{display:flex;align-items:center;gap:12px}.cfg-eu>div{flex:1}.cfg-eu small{display:block;color:var(--mut)}.cfg-eu .av{width:42px;height:42px;font-size:14px}
+.cfg-pessoas{display:flex;flex-direction:column;gap:6px}.cfg-p{display:flex;align-items:center;gap:10px;padding:6px 8px;background:var(--chip);border-radius:10px}.cfg-p b{flex:1}
+.cfg-form{display:flex;flex-direction:column;gap:10px}
+.cfg-form label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:700;color:var(--mut)}
+.cfg-form input:not([type=radio]),.cfg-form select,.cfg-form textarea{height:40px;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:0 10px;font:inherit;font-size:14px;font-weight:400}
+.cfg-form textarea{height:auto;padding:8px 10px;resize:vertical}
+.cfg-form .btn{align-self:flex-start}
+@media (max-width:760px){.cfg-grade{grid-template-columns:1fr;grid-template-rows:auto 1fr}.cfg-nav{flex-direction:row;overflow:auto;border-right:0;border-bottom:1px solid var(--line)}.cfg-nav button{white-space:nowrap}}
 /* ---------- painel do gestor ---------- */
 .gs-win{width:min(980px,100%)}
 .gs-corpo{padding:12px 18px 18px}
@@ -401,6 +422,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 <script src="js/social.js"></script>
 <script src="js/relatorio-core.js"></script>
 <script src="js/gestor.js"></script>
+<script src="js/configuracoes.js"></script>
 <script src="js/voz.js"></script>
 <script>
 /* ícones da barra (Lucide) */
@@ -475,6 +497,15 @@ async function boot(){
     aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; }, bloqueado: () => Telao.aberto || TI.aberto || Edicao.aberto || Acesso.aberto });
   Gestor.iniciar({ mapaId, toast, outros: () => outros.filter(o => o.visto), salaAtual: () => { const id = salaAtualId(); return id ? roomById(id) : null; },
     tarefas: () => tarefas, abrirTarefa: abrirTarefaPorId, ehNext: EH_NEXT, ehAdmin: () => Dados.ehAdmin(), podeVerEquipe: () => souDonoDaSala(), nomeSala: () => infoEspaco.nome,
+    aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
+  Configuracoes.iniciar({ mapaId, ehNext: EH_NEXT, toast, user: () => user, info: () => infoEspaco, modoSala: () => modoSala, idPublico,
+    souDono: () => souDonoDaSala(), ehAdminGeral: () => Dados.ehAdmin(), outros: () => outros.filter(o => o.visto),
+    em3d: () => em3d(), alternar3d: () => document.getElementById("b3d").click(), trocarVista: () => trocarVista(),
+    abrirAudio: () => abrirConfigAudio(), abrirTelao: () => abrirTelao(), acaoAdmin, readmitir,
+    salvarSala: async (nome, modo) => { const m = await Dados.configurarSala(mapaId, { nome, modo }); S.espaco = m.espaco; S.name = m.name; lerEspaco(); Dados.lembrarSala(mapaId, nome); aplicarModo3d(); atualizarBotaoVista && atualizarBotaoVista(); },
+    exportar: async () => { const dados = { usuario: await Dados.getUsuario(EMAIL), atividades: await Dados.listarAtividades(EMAIL, 1000) };
+      const blob = new Blob([JSON.stringify(dados, null, 2)], {type: "application/json"}); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `meus-dados-${EMAIL}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1500); },
+    sair: async () => { salvarPos(); await Dados.sair(); location.href = "index.html"; },
     aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
   SessaoUnica.iniciar({ aoCair(){ try { Sala.sair(); } catch (e) {} try { Voz.desligar(); } catch (e) {} try { Projecao.parar && Projecao.parar(false); } catch (e) {} keys.clear(); joyV = null; } });
   document.getElementById("load").remove();
@@ -1092,20 +1123,9 @@ document.getElementById("eu").onclick = async () => {
   menu.innerHTML = `<h3>${esc(user.nome)} <button class="x" data-close aria-label="Fechar">×</button></h3>
     <div style="color:var(--mut);font-size:13px;margin:-6px 0 8px">${esc(user.email)} · ${Sala.online} online agora</div>
     <div class="sala-info"><div><b>${esc(infoEspaco.nome)}</b><small>ID da sala: <code>${esc(idPublico())}</code> · ${({ "2d": "só 2D", "3d": "só 3D", ambos: "2D e 3D" })[modoSala]}</small></div><button class="btn" data-convite>Copiar convite</button></div>
-    <a class="mi" href="salas.html">🔁 Trocar de sala / criar sala</a>
-    ${souDonoDaSala() && !EH_NEXT ? `<button class="mi" data-cfgsala>⚙️ Configurar esta sala (nome, 2D/3D)</button>` : ""}
+    <button class="mi" data-config>⚙️ Configurações</button>
     <button class="mi" data-meutempo>📊 Meu tempo</button>
-    ${souDonoDaSala() ? `<button class="mi" data-gestor>📈 Painel do gestor (presença e relatório)</button>` : ""}
-    <a class="mi" href="avatar.html">🧍 Editar meu personagem</a>
-    <button class="mi" data-telao>📊 Telão da equipe</button>
-    <button class="mi" data-cfgaudio>🎚️ Áudio: microfone, saída e volumes</button>
-    ${EH_NEXT ? `<button class="mi" data-tend>📈 Tendências de mercado</button>
-    <button class="mi" data-edicao>🎬 Roteiros (Edição)</button>` : ""}
-    ${modoSala === "ambos" ? `<button class="mi" data-modo3d>🧊 Alternar 2D / 3D</button>` : ""}
-    ${modoSala !== "2d" ? `<button class="mi" data-vista3d>👁 3D: primeira pessoa / visão de cima</button>` : ""}
-    ${Dados.ehAdmin() ? `<button class="mi" data-admin>🛡️ Administração: salas, senhas e papéis</button>` : ""}
-    ${EH_NEXT || souDonoDaSala() ? `<a class="mi" href="editor.html?sala=${encodeURIComponent(mapaId)}">🛠️ Editor do mapa</a>` : ""}
-    <button class="mi" data-exp>💾 Baixar meus dados (JSON)</button>
+    <a class="mi" href="salas.html">🔁 Trocar de sala</a>
     <button class="mi" data-sair>🚪 Sair</button>
     <div class="sep"></div>
     <div style="font-weight:700;margin:8px 0 4px">O que eu fiz</div>
@@ -1117,6 +1137,7 @@ menu.onclick = async e => {
   if (e.target.closest("[data-telao]")) { menu.classList.add("hidden"); abrirTelao(); }
   if (e.target.closest("[data-convite]")) { const b = e.target.closest("[data-convite]"); const link = location.origin + location.pathname + "?sala=" + idPublico();
     navigator.clipboard.writeText(`Entre na sala "${infoEspaco.nome}": ${link}  (ID: ${idPublico()})`).then(() => { b.textContent = "Copiado ✓"; setTimeout(() => b.textContent = "Copiar convite", 1500); }); }
+  if (e.target.closest("[data-config]")) { menu.classList.add("hidden"); Configuracoes.abrir(); return; }
   if (e.target.closest("[data-cfgsala]")) { abrirConfigSala(); return; }
   if (e.target.closest("[data-meutempo]")) { menu.classList.add("hidden"); Gestor.abrirMeuTempo(); return; }
   if (e.target.closest("[data-gestor]")) { menu.classList.add("hidden"); Gestor.abrirPainel(); return; }
