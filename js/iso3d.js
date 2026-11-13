@@ -133,11 +133,11 @@ function atualizarTelas(desenhaveis, agora, rapido) {
 }
 
 /* ---------- montagem ---------- */
-const paredes = [];
+const paredes = [], cartazes = []; // cartazes: agentes, NPCs e pets em pixel art
 let objetos = null;
 function montar(S) {
   if (objetos) { cena.remove(objetos); objetos.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
-  objetos = new THREE.Group(); cena.add(objetos); paredes.length = 0; telas.length = 0; escuros.clear();
+  objetos = new THREE.Group(); cena.add(objetos); cartazes.length = 0; paredes.length = 0; telas.length = 0; escuros.clear();
   const W = S.w, H = S.h;
   const tg = texturaPiso("f_grama"); tg.repeat.set((W + 40) / 2, (H + 40) / 2);
   const grama = new THREE.Mesh(new THREE.PlaneGeometry(W + 40, H + 40), new THREE.MeshStandardMaterial({ map: tg, roughness: 1 }));
@@ -184,7 +184,7 @@ function montar(S) {
     const cx = it.x + a.w / T / 2;
     if (g.userData.parede) { const r = sala || roomAt(it.x * T + 16, it.y * T + a.h + 40); g.position.set(cx, g.userData.alturaParede, (r ? r.y : it.y + 2) + 0.09); }
     else if (g.userData.chao) g.position.set(cx, 0.04, it.y + a.h / T / 2);
-    else if (g.userData.billboard) g.position.set(cx, 0.06, it.y + a.h / T - 0.1);
+    else if (g.userData.billboard) { g.position.set(cx, 0.06, it.y + a.h / T - 0.1); cartazes.push(g); }
     else { const base = it.y + a.h / T; g.position.set(cx, g.userData.sobreMesa ? 0 : 0.08, base - g.userData.prof / 2 - 0.05); }
     if (it.rot) g.rotation.y += -it.rot * Math.PI / 180; if (it.flip) g.scale.x *= -1;
     g.traverse(o => { o.userData.item = it; });
@@ -200,20 +200,27 @@ function montar(S) {
 }
 
 /* ---------- luz e câmera ---------- */
-cena.add(new THREE.HemisphereLight(0xdfe8ff, 0x3a3048, 1.15));
+const hemi = new THREE.HemisphereLight(0xdfe8ff, 0x3a3048, 1.15); cena.add(hemi);
 const sol = new THREE.DirectionalLight(0xfff1dc, 1.9); sol.castShadow = true; sol.shadow.mapSize.set(1024, 1024); sol.shadow.bias = -0.0006; sol.shadow.normalBias = 0.02;
 cena.add(sol, sol.target);
 const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 400);
+/* primeira pessoa: câmera nos olhos do seu personagem (padrão do 3D); "iso" = visão de cima */
+const camFP = new THREE.PerspectiveCamera(70, 1, 0.05, 300);
+let vista = (() => { try { return localStorage.getItem("nextco_vista3d") || "1p"; } catch (e) { return "1p"; } })();
+let yaw = null, pitch = -0.04, eu = null;
+const fp = () => vista === "1p";
+const camAtual = () => (fp() ? camFP : camera);
+const CEU = new THREE.Color("#a9cdf0"), FUNDO = new THREE.Color("#1b1828");
 let giro = 0, giroAlvo = 0, meia = 9, VW = innerWidth, VH = innerHeight;
 const alvo = new THREE.Vector3(); let alvoPronto = false;
 let tamanho = "";
 function ajustar() {
   VW = innerWidth; VH = innerHeight;
   const k = VW + "x" + VH + "@" + renderer.getPixelRatio(); if (k !== tamanho) { tamanho = k; renderer.setSize(VW, VH, false); }
-  const asp = VW / VH; camera.left = -meia * asp; camera.right = meia * asp; camera.top = meia; camera.bottom = -meia; camera.updateProjectionMatrix();
+  const asp = VW / VH; camFP.aspect = asp; camFP.updateProjectionMatrix(); camera.left = -meia * asp; camera.right = meia * asp; camera.top = meia; camera.bottom = -meia; camera.updateProjectionMatrix();
 }
 addEventListener("resize", ajustar);
-const angulo = () => giro + Math.PI / 4;
+const angulo = () => (fp() && yaw != null ? yaw : giro + Math.PI / 4);
 
 /* ---------- pessoas: pixel art do avatar como "cartaz" de frente para a câmera ---------- */
 const pessoas = new Map(); // ator → { sp, c, g, tex }
@@ -248,6 +255,7 @@ function desenharPessoa(a, t) {
 
 /* ---------- paredes da frente ficam baixas (corte isométrico) ---------- */
 function cortarParedes() {
+  if (fp()) { for (const m of paredes) m.scale.y = 1; return; }
   const vx = Math.sin(angulo()), vz = Math.cos(angulo());
   for (const m of paredes) { const [nx, nz] = m.userData.normal, frente = nx * vx + nz * vz > 0.2; const y = frente ? 0.16 : 1; m.scale.y += (y - m.scale.y) * 0.25; }
 }
@@ -269,17 +277,23 @@ function medirDesempenho(dt) {
 /* ---------- API para o escritório ---------- */
 let ativo = false, montadoPara = null;
 const escuros = new Map(); // sala → { brilho, sombra }
+let apagadaFn = null;
 const Iso3D = {
   get ativo() { return ativo; },
   ligar(sim, S) { ativo = !!sim; cv.style.display = ativo ? "block" : "none"; if (ativo) { if (montadoPara !== S) { montar(S); montadoPara = S; } ajustar(); } },
   montar(S) { montar(S); montadoPara = S; },
   luzes(apagada) {
+    apagadaFn = apagada;
     for (const [id, e] of escuros) { const off = apagada(id); if (e.sombra && e.sombra.visible !== off) e.sombra.visible = off; if (e.brilho && e.brilho.visible === off) e.brilho.visible = !off; }
   },
-  girar(d) { giroAlvo += d * Math.PI / 2; },
+  girar(d) { if (fp()) { if (yaw != null) yaw -= d * Math.PI / 4; return; } giroAlvo += d * Math.PI / 2; },
   // teclas/joystick: "cima" é para dentro da tela, conforme o giro da câmera
   direcaoTeclas(vx, vy) {
     if (!vx && !vy) return [0, 0];
+    if (fp() && yaw != null) { // frente/trás na direção do olhar, lados = andar de lado
+      const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw), f = -vy, l = vx;
+      return [f * fx + l * rx, f * fz + l * rz];
+    }
     const c = Math.cos(giro), s = Math.sin(giro), ix = (vx - vy) * Math.SQRT1_2, iy = (vx + vy) * Math.SQRT1_2;
     return [ix * c - iy * s, ix * s + iy * c];
   },
@@ -288,30 +302,62 @@ const Iso3D = {
     medirDesempenho(dt);
     const m = 11.5 / Math.max(0.6, zoom); if (m !== meia) { meia = m; ajustar(); }
     giro += (giroAlvo - giro) * Math.min(1, (dt || 0.016) * 8);
+    eu = P;
     const foco = new THREE.Vector3(P.px / T, 0.6, P.py / T);
-    if (!alvoPronto) { alvo.copy(foco); alvoPronto = true; } else alvo.lerp(foco, Math.min(1, (dt || 0.016) * 6));
-    const d = 40, ang = angulo();
-    camera.position.set(alvo.x + Math.sin(ang) * d, alvo.y + d * 0.82, alvo.z + Math.cos(ang) * d); camera.lookAt(alvo); camera.updateMatrixWorld();
+    if (!alvoPronto) { alvo.copy(foco); alvoPronto = true; } else alvo.lerp(foco, Math.min(1, (dt || 0.016) * (fp() ? 30 : 6)));
+    if (fp()) {
+      if (yaw == null) yaw = [Math.PI, Math.PI / 2, -Math.PI / 2, 0][P.dir || 0];
+      const fov = Math.max(42, Math.min(88, 70 / Math.pow(Math.max(0.6, zoom) / 1.4, 0.35)));
+      if (Math.abs(camFP.fov - fov) > 0.3) { camFP.fov = fov; camFP.updateProjectionMatrix(); }
+      const olho = P.assento ? 1.18 : 1.55;
+      camFP.position.set(alvo.x, olho, alvo.z);
+      camFP.lookAt(alvo.x - Math.sin(yaw) * Math.cos(pitch), olho + Math.sin(pitch), alvo.z - Math.cos(yaw) * Math.cos(pitch)); camFP.updateMatrixWorld();
+      // luz apagada na sala em que você está: o ambiente escurece, só as telas brilham
+      const r = window.roomAt && roomAt(P.px, P.py - 4), escuro = !!(r && apagadaFn && apagadaFn(r.id));
+      hemi.intensity = escuro ? 0.12 : 1.55; sol.intensity = escuro ? 0.1 : 1.9;
+      cena.background = escuro ? FUNDO : CEU;
+    } else {
+      hemi.intensity = 1.15; sol.intensity = 1.9; cena.background = FUNDO;
+      const d = 40, ang = angulo();
+      camera.position.set(alvo.x + Math.sin(ang) * d, alvo.y + d * 0.82, alvo.z + Math.cos(ang) * d); camera.lookAt(alvo); camera.updateMatrixWorld();
+    }
     sol.position.set(alvo.x + 14, 26, alvo.z + 8); sol.target.position.copy(alvo);
-    const sc = sol.shadow.camera, raio = meia * 2.2; sc.left = -raio; sc.right = raio; sc.top = raio; sc.bottom = -raio; sc.near = 1; sc.far = 90; sc.updateProjectionMatrix();
+    const sc = sol.shadow.camera, raio = fp() ? 16 : meia * 2.2; sc.left = -raio; sc.right = raio; sc.top = raio; sc.bottom = -raio; sc.near = 1; sc.far = 90; sc.updateProjectionMatrix();
     const vivos = new Set(atores);
     for (const [a, s] of pessoas) if (!vivos.has(a)) { cena.remove(s.sp, s.sombra); s.tex.dispose(); pessoas.delete(a); }
-    for (const a of atores) desenharPessoa(a, t);
+    const perto = (x, z) => fp() && Math.hypot(x - alvo.x, z - alvo.z) < 1.4; // na 1ª pessoa, quem está colado na câmera some para não tapar a vista
+    for (const a of atores) { desenharPessoa(a, t); const s = pessoas.get(a), some = fp() && (a === P || perto(a.px / T, a.py / T)); s.sp.visible = !some; if (some) s.sombra.visible = false; }
+    for (const g of cartazes) { const v = !perto(g.position.x, g.position.z); if (g.visible !== v) g.visible = v; }
     const temVideo = window.Projecao && (Projecao.apresentando || document.querySelector("video[autoplay]"));
     atualizarTelas(desenhaveis, performance.now(), !!temVideo);
     cortarParedes();
-    renderer.render(cena, camera);
+    renderer.render(cena, camAtual());
   },
   // mundo (px do 2D, altura em px acima do chão) → tela (px CSS)
   tela(wx, wy, h = 0) {
-    const v = new THREE.Vector3(wx / T, 0.08 + h / T, wy / T).project(camera);
+    const v = new THREE.Vector3(wx / T, 0.08 + h / T, wy / T).project(camAtual());
+    if (v.z > 1 || v.z < -1) return [-1e4, -1e4]; // atrás da câmera
     return [(v.x + 1) / 2 * VW, (1 - v.y) / 2 * VH];
   },
-  escala() { return VH / (2 * meia) / T; }, // px de tela por px do mundo (em objetos de frente para a câmera)
+  escala() { return VH / (2 * meia) / T; },
+  // px de tela por px do mundo num ponto (na primeira pessoa depende da distância)
+  escalaEm(wx, wy) {
+    if (!fp()) return this.escala();
+    const a = this.tela(wx, wy, 0), b = this.tela(wx, wy, T); if (a[0] < -9e3 || b[0] < -9e3) return 0;
+    return Math.hypot(a[0] - b[0], a[1] - b[1]) / T;
+  },
+  get primeiraPessoa() { return ativo && fp(); },
+  get vista() { return vista; },
+  trocarVista(v) { vista = v || (fp() ? "iso" : "1p"); if (fp() && eu) this.olharPara(eu.dir); try { localStorage.setItem("nextco_vista3d", vista); } catch (e) {} if (!fp()) for (const [, s] of pessoas) s.sp.visible = true; return vista; },
+  virar(rad) { if (yaw != null) yaw += rad; },
+  olharPara(dir) { yaw = [Math.PI, Math.PI / 2, -Math.PI / 2, 0][dir || 0]; pitch = -0.04; },
+  inclinar(rad) { pitch = Math.max(-0.75, Math.min(0.6, pitch + rad)); },
+  // para onde você está olhando, como direção do 2D (0 baixo, 1 esquerda, 2 direita, 3 cima)
+  direcaoDoOlhar() { if (yaw == null) return 0; const fx = -Math.sin(yaw), fz = -Math.cos(yaw); return Math.abs(fx) > Math.abs(fz) ? (fx < 0 ? 1 : 2) : (fz < 0 ? 3 : 0); }, // px de tela por px do mundo (em objetos de frente para a câmera)
   // tela → mundo: o que está sob o dedo (telão, monitor, pessoa) ou o ponto do chão
   mundo(sx, sy) {
-    const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(sx / VW * 2 - 1, -(sy / VH) * 2 + 1), camera);
-    const alvos = [...[...pessoas.values()].map(s => s.sp), ...(objetos ? objetos.children : [])];
+    const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(sx / VW * 2 - 1, -(sy / VH) * 2 + 1), camAtual());
+    const alvos = [...[...pessoas].filter(([a]) => !(fp() && a === eu)).map(([, s]) => s.sp), ...(objetos ? objetos.children : [])];
     for (const h of ray.intersectObjects(alvos, true)) {
       const o = h.object;
       if (o.userData.ator) { const a = o.userData.ator; return [a.px, a.py - 14]; }

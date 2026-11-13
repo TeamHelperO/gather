@@ -242,7 +242,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
   <div class="pill hud" id="sala">Carregando…</div>
   <button class="pill hud" id="eu" aria-label="Menu"><canvas id="mini" class="px" width="32" height="32"></canvas><span id="nome"></span></button>
 </div>
-<div class="zoom pill hud"><button id="zin" aria-label="Aproximar"></button><button id="zout" aria-label="Afastar"></button><button id="b3d" title="Alternar 2D / 3D isométrico" aria-label="Alternar 2D e 3D"></button><button id="gEsq" title="Girar câmera (Q)" style="display:none"></button><button id="gDir" title="Girar câmera (E)" style="display:none"></button></div>
+<div class="zoom pill hud"><button id="zin" aria-label="Aproximar"></button><button id="zout" aria-label="Afastar"></button><button id="b3d" title="Alternar 2D / 3D isométrico" aria-label="Alternar 2D e 3D"></button><button id="bVista" title="Primeira pessoa ou visão de cima (V)" style="display:none"></button><button id="gEsq" title="Girar câmera (Q)" style="display:none"></button><button id="gDir" title="Girar câmera (E)" style="display:none"></button></div>
 <div class="emotes pill hud">
   <button id="btnAudio">Ligar áudio</button><button id="btnCfgAudio" title="Microfone, saída de áudio e volume de cada pessoa" aria-label="Configurar áudio"></button><i class="div"></i><button id="btnMont">Patinete</button><button id="btnMao" style="display:none">Levantar a mão</button><button data-emote="5" title="Acenar"></button><button data-emote="6" title="Dançar"></button><button data-emote="4" title="Sentar ou levantar"></button><button id="btnLuz" style="display:none" title="Acender ou apagar a luz desta sala (L)"></button>
 </div>
@@ -525,10 +525,19 @@ cv.addEventListener("pointerdown", e => {
   document.getElementById("menu").classList.add("hidden"); fecharConfigAudio();
   if (ptrs.size === 2){ const [a,b] = [...ptrs.values()]; pinch = {d: Math.hypot(a.x-b.x, a.y-b.y), z: zoom}; }
 });
-cv.addEventListener("pointermove", e => { if (!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY});
+let arrasto = null; // 1ª pessoa: arrastar a tela vira a cabeça
+cv.addEventListener("pointermove", e => { if (!ptrs.has(e.pointerId)) return;
+  if (ptrs.size === 1 && em3d() && Iso3D.primeiraPessoa){
+    const ant = ptrs.get(e.pointerId), dx = e.clientX - ant.x, dy = e.clientY - ant.y;
+    if (!arrasto) arrasto = { id: e.pointerId, total: 0 };
+    arrasto.total += Math.abs(dx) + Math.abs(dy);
+    if (arrasto.total > 6){ Iso3D.virar(dx*0.0055); Iso3D.inclinar(dy*0.004); }
+  }
+  ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY});
   if (pinch && ptrs.size === 2){ const [a,b] = [...ptrs.values()]; zoom = Math.max(0.6, Math.min(4, pinch.z * Math.hypot(a.x-b.x, a.y-b.y) / pinch.d)); } });
 const up = e => {
   const had = ptrs.get(e.pointerId); ptrs.delete(e.pointerId);
+  if (arrasto && arrasto.id === e.pointerId){ const foi = arrasto.total > 6; arrasto = null; if (foi) return; }
   if (pinch){ if (ptrs.size < 2){ pinch = null; pularUp = ptrs.size; } return; }
   if (pularUp > 0){ pularUp--; return; }
   if (!had || !grid || !P) return;
@@ -560,12 +569,29 @@ function aplicarModo3d(){
   const ok = quer3d && window.Iso3D && S;
   if (window.Iso3D && S) Iso3D.ligar(!!ok, S);
   document.getElementById("b3d").classList.toggle("on", !!ok); document.getElementById("b3d").textContent = ok ? "2D" : "3D";
-  for (const id of ["gEsq", "gDir"]) document.getElementById(id).style.display = ok ? "" : "none";
+  for (const id of ["gEsq", "gDir", "bVista"]) document.getElementById(id).style.display = ok ? "" : "none";
+  atualizarBotaoVista();
 }
+function atualizarBotaoVista(){
+  const b = document.getElementById("bVista"); if (!window.Iso3D) return;
+  const um = Iso3D.vista === "1p";
+  ROTULO(b, um ? "box" : "eye", ""); b.title = um ? "Ver de cima (V)" : "Primeira pessoa (V)";
+  document.getElementById("gEsq").title = um ? "Virar para a esquerda (Q ou ←)" : "Girar câmera (Q)";
+  document.getElementById("gDir").title = um ? "Virar para a direita (E ou →)" : "Girar câmera (E)";
+  const h = document.getElementById("hint"); if (h) h.textContent = em3d() && um ? "W/S andam · A/D andam de lado · Q/E ou ←/→ viram · arraste a tela para olhar · V troca a vista" : "Setas/WASD ou clique para andar · pare perto de uma cadeira para sentar";
+}
+function trocarVista(){ if (!window.Iso3D) return; const v = Iso3D.trocarVista(); atualizarBotaoVista(); toast(v === "1p" ? "👁 Primeira pessoa · arraste a tela para olhar em volta" : "🧊 Visão de cima"); }
+document.getElementById("bVista").onclick = trocarVista;
 document.getElementById("b3d").onclick = () => { quer3d = !quer3d; try { localStorage.setItem("nextco_modo3d", quer3d ? "1" : "0"); } catch (e) {} if (quer3d && !window.Iso3D){ toast("Carregando o 3D…"); window.carregar3D && carregar3D(); } aplicarModo3d(); };
 document.getElementById("gEsq").onclick = () => window.Iso3D && Iso3D.girar(-1);
 document.getElementById("gDir").onclick = () => window.Iso3D && Iso3D.girar(1);
-addEventListener("keydown", e => { if (!em3d() || e.target.matches("input,select,textarea")) return; if (e.key === "q" || e.key === "Q") Iso3D.girar(-1); if (e.key === "e" || e.key === "E") Iso3D.girar(1); });
+const virando = new Set();
+addEventListener("keydown", e => { if (!em3d() || e.target.matches("input,select,textarea") || Telao.aberto || TI.aberto || Edicao.aberto || Acesso.aberto) return;
+  if ((e.key === "v" || e.key === "V") && !e.ctrlKey && !e.metaKey) return trocarVista();
+  if (Iso3D.primeiraPessoa){ if (/^(q|Q|e|E|ArrowLeft|ArrowRight)$/.test(e.key)) { virando.add(e.key.toLowerCase()); e.preventDefault(); } return; }
+  if (e.key === "q" || e.key === "Q") Iso3D.girar(-1); if (e.key === "e" || e.key === "E") Iso3D.girar(1); });
+addEventListener("keyup", e => virando.delete(e.key.toLowerCase()));
+addEventListener("blur", () => virando.clear());
 addEventListener("iso3d-pronto", aplicarModo3d);
 document.getElementById("zin").onclick = () => zoom = Math.min(4, zoom*1.25);
 document.getElementById("zout").onclick = () => zoom = Math.max(0.6, zoom/1.25);
@@ -609,13 +635,16 @@ function loop(now){
   const dt = Math.min(0.05, (now - last)/1000); last = now; t += dt; dtQuadro = dt;
   // você
   let vx = 0, vy = 0;
-  for (const k of keys){ const d = DIRKEYS[k]; if (d){ vx += d[0]; vy += d[1]; } }
+  const umaP = em3d() && Iso3D.primeiraPessoa;
+  for (const k of keys){ if (umaP && (k === "ArrowLeft" || k === "ArrowRight")) continue; const d = DIRKEYS[k]; if (d){ vx += d[0]; vy += d[1]; } }
+  if (umaP && virando.size){ let g = 0; for (const k of virando) g += (k === "q" || k === "arrowleft") ? 1 : -1; Iso3D.virar(g*dt*2.4); }
   if (joyV){ vx = joyV[0]; vy = joyV[1]; }
   if ((vx || vy) && em3d()) [vx, vy] = Iso3D.direcaoTeclas(vx, vy); // no 3D, "cima" é para dentro da tela
   if ((vx || vy) && P.assento) P.levantar();
   if (!vx && !vy && !P.assento && P.path) [vx, vy] = seguirCaminho(P);
   Montaria.atualizar(P);
   if (!P.assento) moverAtor(P, dt, vx, vy, livreP, Montaria.velocidade()); else { P.moving = false; P.parado += dt; }
+  if (umaP && !P.assento && !P.moving) P.dir = Iso3D.direcaoDoOlhar(); // os outros veem para onde você olha
   if (P.moving){ P.emote = null; sujo = true; }
   if (P.emote != null){ P.emoteT += dt; if (P.emoteT > 3) P.emote = null; }
   if (P.saiuDe && Math.hypot(P.saiuDe.sx - P.x, P.saiuDe.sy - P.y) > 40) P.saiuDe = null;
@@ -743,8 +772,8 @@ function draw(){
   if (tres){
     if (Iso3D.luzes) Iso3D.luzes(luzApagada);
     Iso3D.render(atores, telasVivas, t, zoom, P, dtQuadro);
-    const k = Iso3D.escala();
-    for (const a of atores){ const [fx, fy] = Iso3D.tela(a.px, a.py, 0); ctx.setTransform(DPR*k, 0, 0, DPR*k, DPR*(fx - a.px*k), DPR*(fy - a.py*k)); a.balao(ctx, t); }
+    const umaP = Iso3D.primeiraPessoa;
+    for (const a of atores){ if (umaP && a === P) continue; const k = Math.min(2.4, Iso3D.escalaEm ? Iso3D.escalaEm(a.px, a.py) : Iso3D.escala()); if (!k) continue; const [fx, fy] = Iso3D.tela(a.px, a.py, 0); ctx.setTransform(DPR*k, 0, 0, DPR*k, DPR*(fx - a.px*k), DPR*(fy - a.py*k)); a.balao(ctx, t); }
   } else {
     ctx.setTransform(zoom*DPR, 0, 0, zoom*DPR, c.ox*DPR, c.oy*DPR);
     drawWorld(ctx, atores.map(a => ({ sort: a.sort(), draw: g => a.draw(g, t) })).concat(telasVivas));
@@ -757,6 +786,7 @@ function draw(){
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   if (!tres) vinheta();
   for (const a of atores){
+    if (tres && Iso3D.primeiraPessoa && (a === P || Math.hypot(a.px - P.px, a.py - P.py) > 22*T)) continue; // na 1ª pessoa: sem o seu nome e sem nomes muito longe
     const naMesa = a.assento && a.assento.trabalho;
     let sx, sy;
     if (tres) [sx, sy] = Iso3D.tela(a.px, a.py, a.assento ? 46 : 54);
@@ -789,7 +819,7 @@ function draw(){
   }
   if (!tres) TI.nomes(ctx, c, zoom, t);
   // selo de sala com senha/restrita
-  for (const r of S.rooms){
+  if (!(tres && Iso3D.primeiraPessoa)) for (const r of S.rooms){
     const selo = Acesso.selo(r); if (!selo) continue;
     const [sx, sy] = tres ? Iso3D.tela(r.x*T + 6, r.y*T + 6, 80) : [(r.x*T + 6)*zoom + c.ox, (r.y*T + 6)*zoom + c.oy];
     if (sx < -200 || sx > VW + 20 || sy < -20 || sy > VH + 20) continue;
@@ -815,7 +845,8 @@ document.getElementById("eu").onclick = async () => {
     <button class="mi" data-cfgaudio>🎚️ Áudio: microfone, saída e volumes</button>
     <button class="mi" data-tend>📈 Tendências de mercado</button>
     <button class="mi" data-edicao>🎬 Roteiros (Edição)</button>
-    <button class="mi" data-modo3d>🧊 Alternar 2D / 3D isométrico</button>
+    <button class="mi" data-modo3d>🧊 Alternar 2D / 3D</button>
+    <button class="mi" data-vista3d>👁 3D: primeira pessoa / visão de cima</button>
     ${Dados.ehAdmin() ? `<button class="mi" data-admin>🛡️ Administração: salas, senhas e papéis</button>` : ""}
     <a class="mi" href="editor.html">🛠️ Editor de salas</a>
     <button class="mi" data-exp>💾 Baixar meus dados (JSON)</button>
@@ -832,6 +863,7 @@ menu.onclick = async e => {
   if (e.target.closest("[data-tend]")) { menu.classList.add("hidden"); TI.abrirPainel(); }
   if (e.target.closest("[data-edicao]")) { menu.classList.add("hidden"); Edicao.abrirPainel(); }
   if (e.target.closest("[data-modo3d]")) { menu.classList.add("hidden"); document.getElementById("b3d").click(); }
+  if (e.target.closest("[data-vista3d]")) { menu.classList.add("hidden"); if (!em3d()) document.getElementById("b3d").click(); else trocarVista(); }
   if (e.target.closest("[data-admin]")) { menu.classList.add("hidden"); Acesso.abrirAdmin(); }
   if (e.target.closest("[data-sair]")) { salvarPos(); await Dados.sair(); location.href = "index.html"; }
   if (e.target.closest("[data-exp]")) {
