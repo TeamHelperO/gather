@@ -97,7 +97,13 @@ function movel(it, sala) {
   else if (k === "caixa_som") { prof = 0.45; add(caixaM(0.5, 1.1, 0.42, "#1d2028", 0, 0, 0)); add(cilindro(0.15, 0.02, "#3b414e", 0, 0.35, 0.215)); add(cilindro(0.08, 0.02, "#3b414e", 0, 0.8, 0.215)); }
   else if (k === "megafone") { prof = 0.3; add(cilindro(0.03, 1.0, "#2b2f39", 0, 0, 0)); add(caixaM(0.2, 0.18, 0.3, "#e5484d", 0, 1.0, 0)); }
   else if (k === "pufe") { prof = 0.5; add(cilindro(0.26, 0.4, "#e2b23a", 0, 0, 0, 20)); add(cilindro(0.27, 0.04, "#c9962a", 0, 0.38, 0, 20)); }
-  else if (k === "pulpito") { prof = 0.6; add(caixaM(0.7, 1.1, 0.5, "#8a5a32", 0, 0, 0)); add(caixaM(0.3, 0.3, 0.01, "#1d1d1f", 0, 0.55, 0.26, false)); }
+  else if (k === "pulpito") { prof = 0.6; add(caixaM(0.7, 1.1, 0.5, "#8a5a32", 0, 0, 0));
+    // logo do espaço na frente, encaixado sem esticar (painel de 0,56 x 0,42 m)
+    const logo = IMG.logo && IMG.logo.width && window.Decoracao ? Decoracao.recorteDoLogo(IMG.logo) : null;
+    add(caixaM(0.6, 0.46, 0.01, "#5a3a22", 0, 0.4, 0.255, false));
+    if (logo) { logo._hd = logo; const kk = Math.min(0.54 / logo.width, 0.4 / logo.height), lw = logo.width * kk, lh = logo.height * kk;
+      const pl = new THREE.Mesh(new THREE.PlaneGeometry(lw, lh), new THREE.MeshStandardMaterial({ map: texDe(logo), transparent: true, alphaTest: 0.05, roughness: 0.6 })); pl.position.set(0, 0.63, 0.262); add(pl); }
+  }
   else if (k === "f_palco" || k === "palco_frente") { g.add(caixaM(1, 0.3, 1, "#7f3636", 0, 0, 0)); g.userData.chao = true; prof = 1; }
   else if (/^agente_\d$/.test(k) && window.AvatarPixel && AvatarPixel.agenteFolha) { // agente sentado: cadeira de verdade e pose de frente, de lado ou de costas conforme a câmera
     const folha = AvatarPixel.agenteFolha(parseInt(k.split("_")[1]) || 1), tex = {};

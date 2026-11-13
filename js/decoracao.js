@@ -60,6 +60,19 @@
     for (let i = 0; i < 26; i++) { s = (s * 1103515245 + 12345) & 0x7fffffff; const x = s % 30; s = (s * 1103515245 + 12345) & 0x7fffffff; const y = s % 30; R(x, y, 2, i % 3 ? 1 : 2, cores[i % cores.length]); }
   }, "Confete", { z: "floor" });
 
+  A("deco_ovos", 32, 24, R => {
+    R(2, 14, 28, 9, "#c9962a"); R(2, 14, 28, 2, "#e8b83a"); for (let x = 4; x < 28; x += 4) R(x, 16, 2, 7, "#8a5a32");
+    for (const [x, c, d] of [[4, "#e07aa8", "#ffffff"], [11, "#8fd0f0", "#3d5afe"], [18, "#f2c14e", "#e5484d"], [24, "#3fbf5f", "#ffffff"]]) { R(x, 6, 6, 9, c); R(x + 1, 5, 4, 1, c); R(x, 9, 6, 1, d); R(x, 12, 6, 1, d); }
+  }, "Ovos de Páscoa");
+  A("deco_mascara", 32, 24, R => {
+    R(3, 6, 26, 10, "#7b4fd8"); R(1, 8, 4, 6, "#7b4fd8"); R(27, 8, 4, 6, "#7b4fd8"); R(7, 9, 6, 4, "#1b1b1f"); R(19, 9, 6, 4, "#1b1b1f");
+    R(14, 12, 4, 4, "#f2c14e"); R(4, 2, 3, 6, "#e5484d"); R(8, 0, 3, 7, "#3fbf5f"); R(25, 2, 3, 6, "#f2c14e"); R(12, 16, 8, 2, "#e07aa8"); for (let x = 5; x < 28; x += 4) R(x, 6, 2, 1, "#f2c14e");
+  }, "Máscara de carnaval");
+  A("deco_fogos", 64, 32, R => {
+    const fogo = (cx, cy, c) => { for (let a = 0; a < 12; a++) { const ang = a * Math.PI / 6; for (let r = 3; r < 11; r += 2) R(Math.round(cx + Math.cos(ang) * r), Math.round(cy + Math.sin(ang) * r * 0.9), 1, 1, c); } R(cx - 1, cy - 1, 2, 2, "#ffffff"); };
+    fogo(14, 14, "#f2c14e"); fogo(36, 12, "#e07aa8"); fogo(54, 17, "#8fd0f0");
+  }, "Fogos de artifício", { z: "wall" });
+
   /* faixa com texto: um desenho por texto (criado na hora) */
   function faixa(texto, cor) {
     const k = "deco_faixa_" + (texto + cor).replace(/[^a-z0-9]/gi, "").slice(0, 40);
@@ -80,8 +93,37 @@
     natal: { nome: "🎄 Natal", faixa: t => "FELIZ NATAL!", cor: "#1f7a46", cantos: ["deco_arvore", "deco_presentes", "deco_presentes"], centro: [], parede: "deco_luzes" },
     halloween: { nome: "🎃 Halloween", faixa: t => "HALLOWEEN", cor: "#e07a1f", cantos: ["deco_abobora", "deco_abobora", "deco_abobora", "deco_abobora"], centro: [], parede: "deco_teia" },
     junina: { nome: "🌽 Festa junina", faixa: t => "ARRAIÁ!", cor: "#c4601a", cantos: ["deco_fogueira"], centro: [], parede: "deco_bandeirinhas", parede2: "deco_bandeirinhas" },
+    ano_novo: { nome: "🥂 Ano novo", faixa: t => "FELIZ ANO NOVO!", cor: "#1d2040", cantos: ["deco_baloes_ouro", "deco_baloes_ouro", "deco_baloes_ouro", "deco_baloes_ouro"], centro: [], parede: "deco_fogos", chao: "deco_confete" },
+    carnaval: { nome: "🎭 Carnaval", faixa: t => "CARNAVAL!", cor: "#7b4fd8", cantos: ["deco_mascara", "deco_baloes", "deco_mascara", "deco_baloes"], centro: [], parede: "deco_bandeirinhas", chao: "deco_confete" },
+    pascoa: { nome: "🐣 Páscoa", faixa: t => "FELIZ PÁSCOA!", cor: "#e07aa8", cantos: ["deco_ovos", "deco_ovos", "deco_ovos"], centro: [], parede: "deco_bandeirinhas" },
     comemoracao: { nome: "🎊 Comemoração", faixa: t => (t || "PARABÉNS, EQUIPE!").toUpperCase().slice(0, 26), cor: "#3d5afe", cantos: ["deco_baloes_ouro", "deco_baloes_ouro", "deco_baloes_ouro", "deco_baloes_ouro"], centro: [], parede: "deco_bandeirinhas", chao: "deco_confete" },
   };
+
+  /* datas comemorativas do ano (o admin liga e escolhe as salas em Configurações → Administração) */
+  function pascoaDe(ano) { // algoritmo de Meeus/Jones/Butcher
+    const a = ano % 19, b = Math.floor(ano / 100), c = ano % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3),
+      h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451),
+      mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(ano, mes - 1, dia);
+  }
+  const somaDias = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const ANUAIS = {
+    ano_novo: { tema: "ano_novo", nome: "Ano novo", quando: "27/dez a 3/jan", periodo: a => [new Date(a, 11, 27), new Date(a + 1, 0, 3)] },
+    carnaval: { tema: "carnaval", nome: "Carnaval", quando: "sábado de carnaval até a Quarta de Cinzas", periodo: a => { const p = pascoaDe(a); return [somaDias(p, -50), somaDias(p, -46)]; } },
+    pascoa: { tema: "pascoa", nome: "Páscoa", quando: "semana da Páscoa", periodo: a => { const p = pascoaDe(a); return [somaDias(p, -7), somaDias(p, 1)]; } },
+    junina: { tema: "junina", nome: "Festa junina", quando: "1º a 30/jun", periodo: a => [new Date(a, 5, 1), new Date(a, 5, 30)] },
+    halloween: { tema: "halloween", nome: "Halloween", quando: "24 a 31/out", periodo: a => [new Date(a, 9, 24), new Date(a, 9, 31)] },
+    natal: { tema: "natal", nome: "Natal", quando: "1º a 26/dez", periodo: a => [new Date(a, 11, 1), new Date(a, 11, 26)] },
+  };
+  function anuaisAtivos(datas, agora = new Date()) {
+    const out = [];
+    for (const [id, d] of Object.entries(ANUAIS)) {
+      const cfg = datas && datas[id]; if (!cfg || !cfg.ativo) continue;
+      for (const ano of [agora.getFullYear() - 1, agora.getFullYear()]) { const [i, f] = d.periodo(ano); if (agora >= i && agora < somaDias(f, 1)) { out.push({ id, tema: d.tema, salas: cfg.salas || [] }); break; } }
+    }
+    return out;
+  }
+  const periodoTexto = (id, ano = new Date().getFullYear()) => { const [i, f] = ANUAIS[id].periodo(ano), fm = d => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", ""); return `${fm(i)} a ${fm(f)}`; };
 
   /* tema guardado no fim da pauta: "⟦tema:natal⟧" (não precisa de coluna nova no banco) */
   const MARCA = /\s*⟦tema:([a-z]+)⟧\s*$/;
@@ -140,13 +182,18 @@
     if (!window.S && typeof S === "undefined") return; if (!opt.reunioes) return;
     if (S !== mapaDe) { mapaDe = S; assinatura = ""; } // mapa novo: monta de novo
     const agora = Date.now(), ativos = (opt.reunioes() || []).filter(r => r.sala_id && temaDe(r) && new Date(r.inicio).getTime() - 30 * 60e3 <= agora && new Date(r.fim).getTime() + 15 * 60e3 >= agora);
-    const nova = ativos.map(r => r.id + ":" + temaDe(r) + ":" + r.sala_id + ":" + r.titulo).sort().join("|");
+    // datas do ano ligadas pelo admin (uma sala com evento da agenda decorado fica com a decoração do evento)
+    const anuais = anuaisAtivos((opt.espaco && opt.espaco() || {}).datas), comEvento = new Set(ativos.map(r => r.sala_id)), doAno = [];
+    for (const a of anuais) for (const id of (a.salas.includes("*") ? S.rooms.filter(r => r.type !== "corredor" && !(window.TYPES && TYPES[r.type] && TYPES[r.type].noWalls)).map(r => r.id) : a.salas))
+      if (!comEvento.has(id) && !doAno.some(x => x.sala === id)) doAno.push({ sala: id, tema: a.tema });
+    const nova = ativos.map(r => r.id + ":" + temaDe(r) + ":" + r.sala_id + ":" + r.titulo).concat(doAno.map(x => "ano:" + x.tema + ":" + x.sala)).sort().join("|");
     if (nova === assinatura) return; assinatura = nova;
     const itens = [];
     for (const r of ativos) { const sala = S.rooms.find(q => q.id === r.sala_id); if (sala) itens.push(...montarTema(sala, temaDe(r), r.titulo)); }
+    for (const x of doAno) { const sala = S.rooms.find(q => q.id === x.sala); if (sala) itens.push(...montarTema(sala, x.tema, null)); }
     window.DECORACAO = itens.length ? itens : null;
     try { _itensDe = null; } catch (e) {}
-    opt.aoMudar && opt.aoMudar(ativos);
+    opt.aoMudar && opt.aoMudar(ativos, doAno);
   }
   function iniciar(o) { opt = o || {}; atualizar(); setInterval(atualizar, 30000); }
 
@@ -155,14 +202,45 @@
   function aplicarLogo(dataUrl) {
     if (typeof IMG === "undefined") return;
     if (!logoOriginal) logoOriginal = IMG.logo;
-    if (!dataUrl) { if (logoOriginal) IMG.logo = logoOriginal; return; }
+    if (!dataUrl) { if (logoOriginal) IMG.logo = logoOriginal; const fim = () => { montarPulpito(IMG.logo); opt.aoLogo && opt.aoLogo(); }; if (IMG.logo.complete === false) IMG.logo.onload = fim; else fim(); return; }
     const im = new Image();
     im.onload = () => { const a = ASSETS.logo, c = document.createElement("canvas"); c.width = a.w; c.height = a.h; const g = c.getContext("2d");
       const k = Math.min(a.w / im.width, a.h / im.height), w = im.width * k, h = im.height * k; g.imageSmoothingEnabled = true; g.drawImage(im, (a.w - w) / 2, (a.h - h) / 2, w, h);
       // cópia com 4x mais resolução para o 3D (de perto o logo fica nítido)
       const hd = document.createElement("canvas"); hd.width = a.w * 4; hd.height = a.h * 4; hd.getContext("2d").drawImage(im, (hd.width - w * 4) / 2, (hd.height - h * 4) / 2, w * 4, h * 4);
-      c._hd = hd; IMG.logo = c; opt.aoLogo && opt.aoLogo(); };
+      c._hd = hd; IMG.logo = c; montarPulpito(c); opt.aoLogo && opt.aoLogo(); };
     im.src = dataUrl;
+  }
+  /* púlpito com o logo do espaço na frente, na proporção certa (não estica) */
+  let pulpitoOriginal = null;
+  function montarPulpito(logo) {
+    if (typeof IMG === "undefined" || !IMG.pulpito) return;
+    if (!pulpitoOriginal) pulpitoOriginal = IMG.pulpito;
+    const base = pulpitoOriginal; if (!base.width || !logo || !logo.width) return;
+    const c = document.createElement("canvas"); c.width = 32; c.height = 32; const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
+    g.drawImage(base, 0, 0);
+    // painel da frente (x 7..24, y 12..23): madeira escura e o logo encaixado
+    g.fillStyle = "#5a3a22"; g.fillRect(7, 12, 18, 12); g.fillStyle = "#2a1a10"; g.fillRect(7, 12, 18, 1); g.fillRect(7, 23, 18, 1); g.fillRect(7, 12, 1, 12); g.fillRect(24, 12, 1, 12);
+    const fonte = recorteDoLogo(logo), k = Math.min(16 / fonte.width, 10 / fonte.height), w = fonte.width * k, h = fonte.height * k;
+    g.imageSmoothingEnabled = true; g.drawImage(fonte, 16 - w / 2, 18 - h / 2, w, h);
+    // cópia 8x: a madeira continua em pixel art e o logo sai nítido, sem esticar
+    const E = 8, n = document.createElement("canvas"); n.width = 32 * E; n.height = 32 * E; const q = n.getContext("2d");
+    q.imageSmoothingEnabled = false; q.drawImage(c, 0, 0, n.width, n.height);
+    q.fillStyle = "#5a3a22"; q.fillRect(8 * E, 13 * E, 16 * E, 10 * E);
+    q.imageSmoothingEnabled = true; q.imageSmoothingQuality = "high";
+    const kk = Math.min(15 * E / fonte.width, 9 * E / fonte.height), nw = fonte.width * kk, nh = fonte.height * kk;
+    q.drawImage(fonte, 16 * E - nw / 2, 18 * E - nh / 2, nw, nh);
+    c._nitido = n; IMG.pulpito = c;
+  }
+  // tira a parte transparente em volta do logo, para ele ocupar o painel
+  function recorteDoLogo(img) {
+    const src = img._hd || img, c = document.createElement("canvas"); c.width = src.width; c.height = src.height; const g = c.getContext("2d"); g.drawImage(src, 0, 0);
+    let d; try { d = g.getImageData(0, 0, c.width, c.height).data; } catch (e) { return src; }
+    let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 20) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 < 0) return src;
+    const r = document.createElement("canvas"); r.width = x1 - x0 + 1; r.height = y1 - y0 + 1; r.getContext("2d").drawImage(c, x0, y0, r.width, r.height, 0, 0, r.width, r.height);
+    return r;
   }
   // reduz a imagem enviada (máx. 384x256) para guardar no mapa
   function prepararLogo(arquivo) {
@@ -177,5 +255,5 @@
     });
   }
 
-  window.Decoracao = { TEMAS, temaDe, pautaSemTema, comTema, iniciar, atualizar, aplicarLogo, prepararLogo, get itens() { return window.DECORACAO || []; } };
+  window.Decoracao = { TEMAS, ANUAIS, anuaisAtivos, periodoTexto, recorteDoLogo, temaDe, pautaSemTema, comTema, iniciar, atualizar, aplicarLogo, prepararLogo, get itens() { return window.DECORACAO || []; } };
 })();

@@ -81,7 +81,23 @@ window.Configuracoes = (function () {
       + bloco(`Pessoas na sala agora (${online.length})`, online.length ? `<div class="cfg-pessoas">${online.map(o => `<div class="cfg-p"><span class="av" style="background:${corNome(o.nome)}">${esc(iniciais(o.nome))}</span><b>${esc(o.nome)}</b>
           ${o.proj || o.tela ? `<button class="btn" data-cparar="${esc(o.id)}">⛔ Encerrar projeção</button>` : ""}<button class="btn dan" data-cremover="${esc(o.id)}">🚪 Remover</button></div>`).join("")}</div>` : `<p class="cfg-d">Só você por aqui.</p>`,
         "Remover tira a pessoa na hora e impede que ela entre de novo até você readmitir.")
+      + blocoDatas(i)
       + bloco("Removidos", (i.banidos || []).length ? `<div class="cfg-pessoas">${i.banidos.map(id => `<div class="cfg-p"><span class="av" style="background:${corNome(nome(id))}">${esc(iniciais(nome(id)))}</span><b>${esc(nome(id))}</b><button class="btn" data-creadmitir="${esc(id)}">Readmitir</button></div>`).join("")}</div>` : `<p class="cfg-d">Ninguém foi removido desta sala.</p>`);
+  }
+
+  /* datas comemorativas do ano: o admin liga cada uma e escolhe as salas que se enfeitam */
+  function blocoDatas(i) {
+    if (!window.Decoracao) return "";
+    const datas = i.datas || {}, salas = (opt.salas ? opt.salas() : []).filter(r => r.type !== "corredor");
+    const linhas = Object.entries(Decoracao.ANUAIS).map(([id, d]) => {
+      const c = datas[id] || {}, sel = new Set(c.salas || []), tema = Decoracao.TEMAS[d.tema];
+      return `<div class="cfg-data ${c.ativo ? "on" : ""}">
+        <label class="cfg-data-h"><input type="checkbox" name="ativo_${id}" ${c.ativo ? "checked" : ""}><b>${esc(tema ? tema.nome : d.nome)}</b><small>${esc(Decoracao.periodoTexto(id))}</small></label>
+        <div class="cfg-data-salas"><label class="chip"><input type="checkbox" name="sala_${id}" value="*" ${sel.has("*") ? "checked" : ""}>Todas as salas</label>
+          ${salas.map(r => `<label class="chip"><input type="checkbox" name="sala_${id}" value="${esc(r.id)}" ${sel.has(r.id) ? "checked" : ""}>${esc(r.name)}</label>`).join("")}</div></div>`;
+    }).join("");
+    return bloco("Datas comemorativas", `<form class="cfg-form" data-cform="datas">${linhas}<div class="cfg-acoes"><button class="btn pri">Salvar datas</button></div></form>`,
+      "Ligue as datas e escolha as salas: todo ano, nesses dias, elas se enfeitam sozinhas no 2D e no 3D (sem mexer no mapa). Uma sala com evento decorado na agenda usa a decoração do evento.");
   }
 
   /* ---------- IA e agentes ---------- */
@@ -125,6 +141,14 @@ window.Configuracoes = (function () {
       if (s1.length < 8) return opt.toast("A senha precisa de pelo menos 8 caracteres");
       if (s1 !== s2) return opt.toast("As duas senhas não são iguais");
       try { await Dados.definirSenha(s1); f.reset(); opt.toast("🔑 Senha salva. Da próxima vez, entre com e-mail e senha."); } catch (er) { opt.toast("Não consegui salvar a senha: " + (er.message || "")); }
+      return;
+    }
+    if (f.dataset.cform === "datas") {
+      const fd = new FormData(f), datas = {};
+      for (const id of Object.keys(Decoracao.ANUAIS)) { const salas = fd.getAll("sala_" + id); datas[id] = { ativo: fd.has("ativo_" + id), salas: salas.includes("*") ? ["*"] : salas }; }
+      const sem = Object.entries(datas).filter(([, d]) => d.ativo && !d.salas.length).map(([id]) => Decoracao.ANUAIS[id].nome);
+      if (sem.length) return opt.toast(`Escolha pelo menos uma sala para: ${sem.join(", ")}`);
+      try { await opt.salvarDatas(datas); opt.toast("🎉 Datas comemorativas salvas"); desenhar(); } catch (er) { opt.toast("Não consegui salvar: " + (er.message || "")); }
       return;
     }
     if (f.dataset.cform === "sala") {

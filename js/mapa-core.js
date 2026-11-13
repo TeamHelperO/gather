@@ -266,10 +266,11 @@ function frenteDoEstofado(it){
   return op.length ? op[0][1] : 0;
 }
 function desenharItem(c, it, im, px, py){
-  if (!it.rot && !it.flip){ c.drawImage(im, px, py); return; }
+  const n = im._nitido; // versão em alta resolução (ex.: púlpito com o logo): desenhada no tamanho do sprite
+  if (!it.rot && !it.flip){ if (n) c.drawImage(n, px, py, im.width, im.height); else c.drawImage(im, px, py); return; }
   const a = ASSETS[it.k], b = caixa(it);
   c.save(); c.translate(Math.round(b.cx), Math.round(b.cy)); if (b.rot) c.rotate(b.rot * Math.PI / 180); if (it.flip) c.scale(-1, 1);
-  c.drawImage(im, -a.w/2, -a.h/2); c.restore();
+  if (n) c.drawImage(n, -a.w/2, -a.h/2, im.width, im.height); else c.drawImage(im, -a.w/2, -a.h/2); c.restore();
 }
 /* No escritório (window.CACHE_ITENS) a lista de móveis é calculada uma vez por mapa: antes era refeita várias vezes por quadro. */
 let _itensCache = null, _itensDe = null;
