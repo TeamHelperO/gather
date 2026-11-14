@@ -161,6 +161,18 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 #faixaVideo .fv-n{position:absolute;left:6px;bottom:6px;max-width:calc(100% - 12px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(0,0,0,.55);color:#fff;font:600 11.5px system-ui,sans-serif;padding:2px 7px;border-radius:7px}
 .emotes.hud #btnCam.on{background:#3fbf5f;color:#fff}
 @media (max-width:700px){#faixaVideo .fv-b{width:120px;height:90px}#faixaVideo .fv-b.grande{width:240px;height:180px}}
+#assPill{position:fixed;left:12px;top:62px;z-index:45;background:#3d5afe;color:#fff;border:0;font-weight:700;cursor:pointer}
+#assBloqueio,#assModal{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:rgba(14,12,22,.72);backdrop-filter:blur(3px);padding:16px}
+#assModal{display:none}#assModal.on{display:flex}
+.ass-caixa{position:relative;background:var(--panel,#fff);color:var(--ink,#1d1b26);border-radius:18px;padding:26px 24px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center}
+.ass-caixa h2{margin:6px 0 8px;font-size:21px}.ass-caixa p{color:var(--mut,#6f6a7d);line-height:1.5}.ass-ic{font-size:40px}.ass-ac{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.ass-x{position:absolute;right:12px;top:10px;border:0;background:none;font-size:22px;cursor:pointer;color:inherit}
+.ass-planos{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0;text-align:left}
+.ass-plano{display:flex;flex-direction:column;gap:4px;border:2px solid rgba(127,127,127,.3);border-radius:14px;padding:12px;cursor:pointer}.ass-plano:has(input:checked){border-color:#3d5afe;background:#3d5afe12}
+.ass-plano input{display:none}.ass-plano span{font-size:18px;font-weight:800}.ass-plano small{color:var(--mut,#6f6a7d);font-weight:500}
+.ass-pessoas{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:600}.ass-pessoas input{width:90px;padding:8px;border-radius:10px;border:1px solid rgba(127,127,127,.4);font-size:16px;text-align:center}
+.ass-total b{color:var(--ink,#1d1b26);font-size:17px}.ass-erro{color:#e5484d!important;min-height:1em}
+@media (max-width:520px){.ass-planos{grid-template-columns:1fr}}
 .reu-convite{position:fixed;z-index:72;left:50%;top:76px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:min(560px,94vw);background:var(--panel,#fff);color:var(--ink,#1d1b26);border:2px solid #3d5afe;border-radius:16px;padding:12px 14px;box-shadow:0 12px 40px rgba(0,0,0,.35);animation:reuIn .35s ease}
 .reu-convite .rc-ic{font-size:28px}.reu-convite .rc-tx{display:flex;flex-direction:column;gap:2px;flex:1;min-width:180px}.reu-convite .rc-tx b{font-size:15px}.reu-convite .rc-tx small{color:var(--mut,#8a857c);font-size:12px}
 .reu-convite .rc-ac{display:flex;gap:8px}@keyframes reuIn{from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)}}
@@ -464,6 +476,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 <script src="js/sessao-unica.js"></script>
 <script src="js/social.js"></script>
 <script src="js/reuniao.js"></script>
+<script src="js/assinatura.js"></script>
 <script src="js/relatorio-core.js"></script>
 <script src="js/gestor.js"></script>
 <script src="js/configuracoes.js"></script>
@@ -554,6 +567,7 @@ async function boot(){
     aoMudar: ativos => { grid = buildBlocked(); if (em3d()) Iso3D.montar(S); for (const r of ativos) { const sala = roomById(r.sala_id); if (sala) toast(`🎉 ${sala.name} decorada: ${Decoracao.TEMAS[Decoracao.temaDe(r)].nome.replace(/^\S+\s/, "")} (${r.titulo})`); } } });
   // o púlpito ganha o logo assim que o mapa está pronto (mesmo sem logo enviado: usa o logo padrão)
   Decoracao.aplicarLogo(infoEspaco.logo);
+  Assinatura.verificar({ mapaId, toast }); // teste grátis / assinatura do espaço (a sala da Next não é cobrada)
   Minimapa.iniciar({ irPara: (x, y) => andarAte(x, y, 48), bloqueado: () => Telao.aberto || TI.aberto || Edicao.aberto || Acesso.aberto });
   document.getElementById("bMapa").onclick = () => Minimapa.alternar();
   setTimeout(() => Tour.iniciar({ eu: () => P, modoSala: () => modoSala, vista: v => { if ((v === "3d") !== !!quer3d) document.getElementById("b3d").click(); } }), 1800);
