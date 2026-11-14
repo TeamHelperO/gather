@@ -1,0 +1,56 @@
+// Andar Status: descobre o app em uso e avisa as abas do Andar.
+// - navegador em foco: o site da aba ativa (só os da lista em apps.js)
+// - outro programa em foco: pergunta ao "Andar Status para PC" (http://127.0.0.1:47321), se instalado
+importScripts("apps.js");
+
+let focoNoNavegador = true, appNavegador = null, appPC = null, pcAtivo = false, ultimoEnviado;
+const portas = new Set();
+
+async function lerAbaAtiva() {
+  try {
+    const [aba] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    appNavegador = aba ? appDoSite(aba.url || "") : null;
+  } catch (e) { appNavegador = null; }
+}
+async function lerPC() {
+  try {
+    const r = await fetch("http://127.0.0.1:47321/status", { cache: "no-store" });
+    const j = await r.json(); pcAtivo = true; appPC = j.app && j.app !== "navegador" ? j.app : null;
+    if (j.app === "navegador") focoNoNavegador = true; // o PC confirma que o navegador está na frente
+  } catch (e) { pcAtivo = false; appPC = null; }
+}
+function atual() {
+  if (focoNoNavegador) return appNavegador === "andar" ? null : appNavegador;
+  return appPC;
+}
+function enviar(forcar) {
+  const app = atual();
+  if (!forcar && app === ultimoEnviado) return;
+  ultimoEnviado = app;
+  const msg = { tipo: "app", app, pc: pcAtivo };
+  for (const p of portas) { try { p.postMessage(msg); } catch (e) {} }
+  chrome.storage.session.set({ app, pc: pcAtivo }).catch(() => {});
+}
+async function atualizar(forcar) { await lerAbaAtiva(); enviar(forcar); }
+
+chrome.tabs.onActivated.addListener(() => atualizar());
+chrome.tabs.onUpdated.addListener((id, mud, aba) => { if (mud.url || mud.status === "complete") atualizar(); });
+chrome.windows.onFocusChanged.addListener(async w => {
+  focoNoNavegador = w !== chrome.windows.WINDOW_ID_NONE;
+  if (!focoNoNavegador) await lerPC();
+  atualizar();
+});
+
+// cada aba do Andar abre uma porta; enquanto houver porta aberta, a extensão fica acordada e consulta o PC
+chrome.runtime.onConnect.addListener(p => {
+  if (p.name !== "andar") return;
+  portas.add(p);
+  p.onDisconnect.addListener(() => portas.delete(p));
+  p.onMessage.addListener(m => { if (m && m.tipo === "ping") tique(); });
+  lerPC().then(() => atualizar(true));
+});
+let ocupado = false;
+async function tique() {
+  if (ocupado) return; ocupado = true;
+  try { await lerPC(); if (!focoNoNavegador || !pcAtivo) await lerAbaAtiva(); enviar(); } finally { ocupado = false; }
+}

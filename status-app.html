@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status do app em tempo real – Andar</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/marca/favicon-32.png">
+<style>
+@font-face{font-family:Inter;src:url(assets/fonts/inter-latin-600-normal.woff2) format("woff2");font-weight:600}
+@font-face{font-family:Inter;src:url(assets/fonts/inter-latin-800-normal.woff2) format("woff2");font-weight:800}
+@font-face{font-family:Silkscreen;src:url(assets/fonts/silkscreen-latin-400-normal.woff2) format("woff2")}
+:root{--verde:#1a7f4b;--tinta:#16141f;--mut:#6f6a7d;--papel:#fbf8f2;--creme:#f2ece0;--borda:rgba(22,20,31,.1)}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;font-weight:600;color:var(--tinta);background:var(--papel);line-height:1.6}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px}
+header{border-bottom:1px solid var(--borda)}header .wrap{display:flex;align-items:center;gap:10px;height:64px}
+header img{width:32px;height:32px;image-rendering:pixelated;border-radius:6px}header b{font-family:Silkscreen,monospace;font-weight:400;font-size:22px}
+h1{font-size:clamp(30px,5vw,44px);line-height:1.1;letter-spacing:-.03em;margin:48px 0 12px;font-weight:800}
+.sub{color:var(--mut);font-size:18px;margin:0 0 30px}
+.passo{background:#fff;border:1px solid var(--borda);border-radius:20px;padding:24px;margin-bottom:16px}
+.passo h2{margin:0 0 6px;font-size:21px;font-weight:800;display:flex;gap:10px;align-items:center}
+.passo h2 i{font-style:normal;background:var(--verde);color:#fff;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:15px}
+.passo p,.passo li{color:#3d3a48}.passo ol{padding-left:20px;margin:10px 0}
+.tag{display:inline-block;font-size:12px;background:var(--creme);border-radius:99px;padding:2px 10px;margin-left:6px;color:var(--mut)}
+.bts{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.bt{display:inline-flex;align-items:center;gap:8px;text-decoration:none;font-weight:800;padding:12px 18px;border-radius:12px;background:var(--verde);color:#fff}
+.bt.sec{background:#fff;color:var(--tinta);border:1.5px solid var(--borda)}
+code{background:var(--creme);padding:1px 6px;border-radius:6px;font-size:14px}
+.priv{background:var(--creme);border-radius:16px;padding:18px 22px;margin:24px 0 60px;color:#3d3a48}
+</style>
+</head>
+<body>
+<header><div class="wrap"><img src="assets/marca/andar-icone.svg" alt=""><b>Andar</b></div></header>
+<main class="wrap">
+  <h1>Status do app em tempo real</h1>
+  <p class="sub">Um selinho ao lado do seu nome mostra o app de trabalho que você está usando (Figma, Notion, VS Code, Planilhas…). Assim a equipe sabe se é uma boa hora para chegar perto. Você escolhe quais apps aparecem.</p>
+
+  <section class="passo">
+    <h2><i>1</i>Extensão para o navegador <span class="tag">Chrome, Edge, Brave</span></h2>
+    <p>Detecta os sites de trabalho: Figma, Notion, Canva, Google Docs e Planilhas, Gerenciador de Anúncios, GitHub, Trello e outros.</p>
+    <ol>
+      <li>Baixe e descompacte o arquivo da extensão.</li>
+      <li>Abra <code>chrome://extensions</code> (no Edge, <code>edge://extensions</code>) e ligue o <b>Modo do desenvolvedor</b>, no canto de cima.</li>
+      <li>Clique em <b>Carregar sem compactação</b> e escolha a pasta que você descompactou.</li>
+      <li>Recarregue a aba do Andar.</li>
+    </ol>
+    <div class="bts"><a class="bt" href="downloads/andar-status-extensao.zip" download>Baixar extensão</a></div>
+  </section>
+
+  <section class="passo">
+    <h2><i>2</i>App para o computador <span class="tag">opcional</span></h2>
+    <p>Detecta programas instalados: VS Code, Photoshop, Premiere, Excel, Word, Figma e Notion de desktop, Slack, Teams, Zoom e outros. Precisa da extensão do passo 1.</p>
+    <ol>
+      <li><b>Windows:</b> abra o <code>AndarStatus.exe</code>. Se aparecer o aviso azul do Windows, clique em <b>Mais informações → Executar assim mesmo</b>. Ele passa a abrir sozinho com o computador.</li>
+      <li><b>Mac:</b> descompacte, clique com o botão direito em <b>Instalar Andar Status</b> → <b>Abrir</b> → <b>Abrir</b>.</li>
+    </ol>
+    <div class="bts"><a class="bt" href="downloads/AndarStatus.exe" download>Baixar para Windows</a><a class="bt sec" href="downloads/AndarStatus-mac.zip" download>Baixar para Mac</a></div>
+  </section>
+
+  <section class="passo">
+    <h2><i>3</i>Escolha o que aparece</h2>
+    <p>No Andar, clique no seu status (no alto da tela). Em <b>App em uso</b> você liga ou desliga, escolhe à mão (“Estou no Figma”) e marca quais apps podem aparecer para a equipe.</p>
+    <div class="bts"><a class="bt sec" href="index.html">Abrir o Andar</a></div>
+  </section>
+
+  <div class="priv"><b>Privacidade:</b> o Andar recebe só o nome do app que está na frente, e só se ele estiver na lista. Não vê o título das janelas, os arquivos, os sites fora da lista nem o que você faz dentro dos apps. O app para computador conversa só com a extensão, dentro do seu computador.</div>
+</main>
+</body>
+</html>

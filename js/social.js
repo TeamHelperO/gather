@@ -107,8 +107,9 @@ window.Social = (function () {
     const r = bt.getBoundingClientRect();
     const pop = abrirPop(r.left, r.bottom + 6, `<div class="soc-menu">${Object.entries(STATUS).map(([k, s]) =>
       `<button data-set="${k}" class="${status === k ? "on" : ""}"><i class="dot" style="background:${s.cor}"></i>${s.nome}</button>`).join("")}
-      <p>Fica "Ausente" sozinho depois de ${AUSENTE_MIN} min parado (e o microfone é mutado).</p></div>`);
+      <p>Fica "Ausente" sozinho depois de ${AUSENTE_MIN} min parado (e o microfone é mutado).</p>${window.AppStatus ? AppStatus.secaoMenu() : ""}</div>`);
     pop.onclick = e => { const b = e.target.closest("[data-set]"); if (b) { mudarStatus(b.dataset.set); fecharPop(); opt.toast(`Status: ${STATUS[b.dataset.set].nome}`); } };
+    if (window.AppStatus) AppStatus.ligarMenu(pop, () => menuStatus(bt));
   }
 
   /* ================= POPOVER (cartão da pessoa, menus) ================= */
@@ -128,7 +129,7 @@ window.Social = (function () {
     const st = STATUS[a.status] || STATUS.disponivel;
     const p = abrirPop(x + 10, y - 20, `<div class="soc-card">
       <div class="sc-top"><span class="av" style="background:${corNome(a.nome)}">${esc(iniciais(a.nome))}</span>
-        <div><b>${esc(a.nome)}</b><small><i class="dot" style="background:${st.cor}"></i>${st.nome}${a.sala ? " · " + esc(a.sala) : ""}</small></div></div>
+        <div><b>${esc(a.nome)}</b><small><i class="dot" style="background:${st.cor}"></i>${st.nome}${a.sala ? " · " + esc(a.sala) : ""}</small>${a.app && window.AppStatus && AppStatus.nome(a.app) ? `<small>${AppStatus.seloHtml(a.app)}Usando ${esc(AppStatus.nome(a.app))}</small>` : ""}</div></div>
       <div class="sc-acoes">
         <button data-a="ir">🚶 Ir até</button><button data-a="chamar">🔔 Chamar</button>
         <button data-a="msg">💬 Mensagem</button><button data-a="vol">🎚️ Volume</button>

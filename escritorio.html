@@ -477,6 +477,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 <script src="js/telao.js"></script>
 <script src="js/sala.js"></script>
 <script src="js/sessao-unica.js"></script>
+<script src="js/app-status.js"></script>
 <script src="js/social.js"></script>
 <script src="js/reuniao.js"></script>
 <script src="js/assinatura.js"></script>
@@ -560,7 +561,7 @@ async function boot(){
     salaAtual: () => { const id = salaAtualId(); return id ? roomById(id) : null; }, salas: () => S.rooms, nomeSalaAtual: () => { const id = salaAtualId(); const r = id && roomById(id); return r ? r.name : ""; },
     irAte: a => andarAte(a.px, a.py + 18, 26), irParaSala: id => { const r = roomById(id); if (r) andarAte((r.x + r.w/2)*T, (r.y + r.h/2)*T, 80); },
     abrirVolume: id => abrirConfigAudio(id), verTela: a => verTelaDe(a), souAdmin: () => souDonoDaSala(), acaoAdmin, abrirTarefa: abrirTarefaPorId, idPublico,
-    presencaMudou: () => Sala.atualizarPresenca({ id: P.id, nome: user.nome, avatar: user.avatar, status: Social.status }),
+    presencaMudou: () => Sala.atualizarPresenca(minhaPresenca()),
     mutar: () => { if (Voz.ligado && Voz.micAberto) { Voz.alternarMic(); atualizarBotaoAudio(); } }, micMudo: () => Voz.ligado && !Voz.micAberto,
     aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; }, bloqueado: () => Telao.aberto || TI.aberto || Edicao.aberto || Acesso.aberto });
   Gestor.iniciar({ mapaId, toast, outros: () => outros.filter(o => o.visto), salaAtual: () => { const id = salaAtualId(); return id ? roomById(id) : null; },
@@ -659,15 +660,18 @@ const idPublico = () => EH_NEXT ? "nextco" : mapaId;
 const sheets = {};
 function montarSheet(av){ const k = JSON.stringify(av || {}); return sheets[k] || (sheets[k] = Avatar.montar(av)); }
 const posPendente = new Map(); // posições recebidas antes de a pessoa aparecer na presença
+// presença: nome, personagem, status e o app em uso agora (Status do App em Tempo Real)
+function minhaPresenca(){ return { id: P.id, nome: user.nome, avatar: user.avatar, status: window.Social ? Social.status : "disponivel", app: window.AppStatus ? AppStatus.atual() : null }; }
+if (window.AppStatus) AppStatus.aoMudar = () => { if (P && user) Sala.atualizarPresenca(minhaPresenca()); };
 function conectarSala(){
   Sala.entrar({
     id: P.id, canal: EH_NEXT ? "escritorio-principal" : "escritorio-" + mapaId,
-    presenca: () => ({ id: P.id, nome: user.nome, avatar: user.avatar, status: window.Social ? Social.status : "disponivel" }),
+    presenca: minhaPresenca,
     aoEntrar(id, m){ if (outros.some(o => o.id === id)) return;
-      const a = new Ator({ id, nome: m.nome, sheet: null, x: 0, y: 0, visto: false }); a.status = m.status || "disponivel"; outros.push(a);
+      const a = new Ator({ id, nome: m.nome, sheet: null, x: 0, y: 0, visto: false }); a.status = m.status || "disponivel"; a.app = m.app || null; outros.push(a);
       montarSheet(m.avatar).then(sh => a.sheet = sh); toast(`${m.nome} entrou no escritório`);
       const pend = posPendente.get(id); if (pend){ posPendente.delete(id); this.aoMover(id, pend); } }, // a posição chegou antes da presença
-    aoMudar(id, m){ const a = outros.find(o => o.id === id); if (!a) return; a.nome = m.nome; a.status = m.status || "disponivel"; montarSheet(m.avatar).then(sh => a.sheet = sh); },
+    aoMudar(id, m){ const a = outros.find(o => o.id === id); if (!a) return; a.nome = m.nome; a.status = m.status || "disponivel"; a.app = m.app || null; montarSheet(m.avatar).then(sh => a.sheet = sh); },
     aoSair(id){ const i = outros.findIndex(o => o.id === id); if (i < 0) return; const a = outros[i];
       if (a.assento) { a.assento.ocupante = null; a.assento = null; } outros.splice(i, 1); toast(`${a.nome} saiu`); },
     aoMover(id, st){
@@ -1312,6 +1316,8 @@ function draw(){
     ctx.fillStyle = a === P ? "rgba(61,90,254,.95)" : "rgba(22,20,31,.82)"; ctx.beginPath(); ctx.roundRect(sx - w/2, sy - 20, w, 19, 9); ctx.fill(); ctx.restore();
     ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(txt, sx - w/2 + 8, sy - 10);
     const stA = a === P ? Social.status : a.status; // bolinha de status
+    const appA = a === P ? (window.AppStatus && AppStatus.atual()) : a.app; // selo do app em uso, à direita da etiqueta
+    if (appA && window.AppStatus) AppStatus.desenharSelo(ctx, sx + w/2 + 4, sy - 10.5, appA);
     if (stA && stA !== "disponivel"){ ctx.fillStyle = (Social.STATUS[stA] || {}).cor || "#9aa0ad"; ctx.strokeStyle = "#16141f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx - w/2 + 2, sy - 18, 4.5, 0, Math.PI*2); ctx.fill(); ctx.stroke(); }
     if (a.falaChat && performance.now() < a.falaChatAte){ // balão com a última mensagem do chat
       const msg = a.falaChat.length > 46 ? a.falaChat.slice(0, 44) + "…" : a.falaChat;
