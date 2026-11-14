@@ -182,15 +182,17 @@
     const art = pose.art; // pose com juntas: { bE:[ombro, cotovelo], bD:[…], pE:[quadril, joelho], pD:[…], quadril:dx }
     const pernaArt = (x0, y0, ang, joelho, dir, frente) => {
       const curtoAte = baixo === "short" ? 4 : baixo === "saia" || baixo === "nenhuma" || est === "vestido" ? 5 : 99;
+      // a perna de trás (no perfil) fica num tom mais escuro para as duas não virarem um borrão
       const corPerna = (t, l) => { const pele = t > curtoAte; const lado = l > 0.45 ? 1 : l < -0.45 && frente ? -1 : 0;
+        if (!frente) return pele ? [P.s, "pele"] : [lado > 0 ? Bx.ss : Bx.s, "baixo"];
         return pele ? [lado > 0 ? P.s : P.b, "pele"] : [lado > 0 ? Bx.s : lado < 0 ? Bx.h : Bx.b, "baixo"]; };
       const [jx, jy] = seg(q, x0, y0 + dy, ang, 5.5, 4, dir, corPerna, "baixo");
       const [px2, py2] = seg(q, jx, jy, ang + joelho, 5, 4, dir, (t, l) => corPerna(t + 5.5, l), "baixo");
       // pé (aponta para a frente no perfil; no de frente/costas fica embaixo)
-      const fx = Math.round(px2 - 2 - (L ? 1 : 0)), fy = Math.round(py2);
-      q.ret(fx, fy, 5, 2, S.b, "pe"); q.px(fx + 1, fy, S.h, "pe"); q.ret(fx, fy + 2, 5, 1, pe === "sapato" ? S.s : "#f4f1ea", "pe");
+      const fx = Math.round(px2 - (L ? 3.5 : 2.5)), fy = Math.round(py2 - 0.5), cs = frente ? S : { b: S.s, h: S.b, s: S.ss };
+      q.ret(fx, fy, 5, 2, cs.b, "pe"); q.px(fx + 1, fy, cs.h, "pe"); q.ret(fx, fy + 2, 5, 1, pe === "sapato" ? cs.s : frente ? "#f4f1ea" : "#d8d4cc", "pe");
     };
-    if (art && !sent && (F || B)) { const qx = art.quadril || 0; pernaArt(13.5 + qx, 32, (art.pE || [0, 0])[0], (art.pE || [0, 0])[1], -1, true); pernaArt(18.5 + qx, 32, (art.pD || [0, 0])[0], (art.pD || [0, 0])[1], 1, true); }
+    if (art && art.pE && !sent && (F || B)) { const qx = art.quadril || 0; pernaArt(13.5 + qx, 32, (art.pE || [0, 0])[0], (art.pE || [0, 0])[1], -1, true); pernaArt(18.5 + qx, 32, (art.pD || [0, 0])[0], (art.pD || [0, 0])[1], 1, true); }
     else if (art && !sent && L) { // perfil: perna de trás primeiro (mais escura não precisa: o contorno separa)
       pernaArt(15.5, 32, (art.pD || [0, 0])[0], (art.pD || [0, 0])[1], -1, false); pernaArt(15.5, 32, (art.pE || [0, 0])[0], (art.pE || [0, 0])[1], -1, true); }
     else if (sent && B) { /* sentado de costas: as pernas ficam escondidas pela cadeira */ }
@@ -311,19 +313,19 @@
     const g = c.getContext("2d");
     const q = (pose, col, row, esp) => figura(av, cores, pose).para(g, col * FW, row * FH, esp);
     // andar com juntas: quadril, joelho, ombro e cotovelo em cada passo (col. 0 parado, 1–4 o ciclo)
-    const ANDAR_PERFIL = [ // [pE (frente), pD (trás), braço da frente]
-      { pE: [0, 0], pD: [0, 0], bE: [0, 6] },
-      { pE: [28, -6], pD: [-22, 30], bE: [-26, 22] },
-      { pE: [6, 2], pD: [-4, 18], bE: [-4, 12] },
-      { pE: [-22, 30], pD: [28, -6], bE: [26, 18] },
-      { pE: [-4, 18], pD: [6, 2], bE: [4, 12] },
+    const ANDAR_PERFIL = [ // [pE (perna da frente), pD (perna de trás), braço] — passada curta e natural
+      { pE: [0, 0], pD: [0, 0], bE: [0, 4] },
+      { pE: [18, 0], pD: [-16, 18], bE: [-16, 10] },
+      { pE: [4, 6], pD: [-4, 10], bE: [-4, 6] },
+      { pE: [-16, 18], pD: [18, 0], bE: [16, 12] },
+      { pE: [-4, 10], pD: [4, 6], bE: [4, 6] },
     ];
-    const ANDAR_FRENTE = [
-      { pE: [0, 0], pD: [0, 0], bE: [6, 0], bD: [6, 0] },
-      { pE: [-4, 22], pD: [3, 0], bE: [16, 14], bD: [2, 4] },
-      { pE: [0, 6], pD: [0, 0], bE: [8, 4], bD: [8, 4] },
-      { pE: [3, 0], pD: [-4, 22], bE: [2, 4], bD: [16, 14] },
-      { pE: [0, 0], pD: [0, 6], bE: [8, 4], bD: [8, 4] },
+    const ANDAR_FRENTE = [ // de frente/costas só os braços balançam (as pernas usam o passo de sempre)
+      { bE: [4, 0], bD: [4, 0] },
+      { bE: [10, 6], bD: [2, 2] },
+      { bE: [5, 2], bD: [5, 2] },
+      { bE: [2, 2], bD: [10, 6] },
+      { bE: [5, 2], bD: [5, 2] },
     ];
     for (let f = 0; f < 5; f++) {
       const bob = f === 2 || f === 4 ? -1 : 0;
