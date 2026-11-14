@@ -92,12 +92,12 @@ window.Configuracoes = (function () {
     const linhas = Object.entries(Decoracao.ANUAIS).map(([id, d]) => {
       const c = datas[id] || {}, sel = new Set(c.salas || []), tema = Decoracao.TEMAS[d.tema];
       return `<div class="cfg-data ${c.ativo ? "on" : ""}">
-        <label class="cfg-data-h"><input type="checkbox" name="ativo_${id}" ${c.ativo ? "checked" : ""}><b>${esc(tema ? tema.nome : d.nome)}</b><small>${esc(Decoracao.periodoTexto(id))}</small></label>
+        <div class="cfg-data-h"><label class="cfg-data-h"><input type="checkbox" name="ativo_${id}" ${c.ativo ? "checked" : ""}><b>${esc(tema ? tema.nome : d.nome)}</b></label><small>${esc(Decoracao.periodoTexto(id))}</small><button type="button" class="chip-b" data-cprevia="${id}" title="Mostra a decoração agora, só para você">👁️ Ver agora</button></div>
         <div class="cfg-data-salas"><label class="chip"><input type="checkbox" name="sala_${id}" value="*" ${sel.has("*") ? "checked" : ""}>Todas as salas</label>
           ${salas.map(r => `<label class="chip"><input type="checkbox" name="sala_${id}" value="${esc(r.id)}" ${sel.has(r.id) ? "checked" : ""}>${esc(r.name)}</label>`).join("")}</div></div>`;
     }).join("");
     return bloco("Datas comemorativas", `<form class="cfg-form" data-cform="datas">${linhas}<div class="cfg-acoes"><button class="btn pri">Salvar datas</button></div></form>`,
-      "Ligue as datas e escolha as salas: todo ano, nesses dias, elas se enfeitam sozinhas no 2D e no 3D (sem mexer no mapa). Uma sala com evento decorado na agenda usa a decoração do evento.");
+      "Ligue as datas e escolha as salas: todo ano, nesses dias, elas se enfeitam sozinhas no 2D e no 3D (sem mexer no mapa). Fora do período nada aparece; use \"Ver agora\" para conferir antes. Uma sala com evento decorado na agenda usa a decoração do evento (de 30 min antes até 15 min depois).");
   }
 
   /* ---------- IA e agentes ---------- */
@@ -117,6 +117,10 @@ window.Configuracoes = (function () {
     if ("ctempo" in d) { fechar(); return Gestor.abrirMeuTempo(); }
     if ("ctour" in d) { fechar(); return window.Tour && Tour.iniciar(null, true); }
     if ("cmapa" in d) { const on = window.Minimapa && Minimapa.alternar(); t.textContent = `🗺️ ${on ? "Esconder" : "Mostrar"} (tecla M)`; return; }
+    if (d.cprevia) { // prévia: mostra a decoração agora nas salas marcadas (ou em todas), só nesta tela
+      const f = t.closest("form"), salas = f ? new FormData(f).getAll("sala_" + d.cprevia) : [];
+      Decoracao.previa(d.cprevia, salas.length ? salas : ["*"]); fechar(); return;
+    }
     if ("cexp" in d) return opt.exportar();
     if ("csair" in d) return opt.sair();
     if ("clogotira" in d) { if (!d.ok) { d.ok = 1; t.textContent = "Confirmar"; return; } try { await opt.salvarLogo(null); opt.toast("Logo padrão de volta"); desenhar(); } catch (er) { opt.toast("Não consegui: " + (er.message || "")); } return; }

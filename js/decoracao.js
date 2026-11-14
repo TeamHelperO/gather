@@ -183,7 +183,9 @@
     if (S !== mapaDe) { mapaDe = S; assinatura = ""; } // mapa novo: monta de novo
     const agora = Date.now(), ativos = (opt.reunioes() || []).filter(r => r.sala_id && temaDe(r) && new Date(r.inicio).getTime() - 30 * 60e3 <= agora && new Date(r.fim).getTime() + 15 * 60e3 >= agora);
     // datas do ano ligadas pelo admin (uma sala com evento da agenda decorado fica com a decoração do evento)
-    const anuais = anuaisAtivos((opt.espaco && opt.espaco() || {}).datas), comEvento = new Set(ativos.map(r => r.sala_id)), doAno = [];
+    const anuais = anuaisAtivos((opt.espaco && opt.espaco() || {}).datas).filter(a => !emPrevia || a.id !== emPrevia.id);
+    if (emPrevia) anuais.unshift(emPrevia);
+    const comEvento = new Set(ativos.map(r => r.sala_id)), doAno = [];
     for (const a of anuais) for (const id of (a.salas.includes("*") ? S.rooms.filter(r => r.type !== "corredor" && !(window.TYPES && TYPES[r.type] && TYPES[r.type].noWalls)).map(r => r.id) : a.salas))
       if (!comEvento.has(id) && !doAno.some(x => x.sala === id)) doAno.push({ sala: id, tema: a.tema });
     const nova = ativos.map(r => r.id + ":" + temaDe(r) + ":" + r.sala_id + ":" + r.titulo).concat(doAno.map(x => "ano:" + x.tema + ":" + x.sala)).sort().join("|");
@@ -194,6 +196,17 @@
     window.DECORACAO = itens.length ? itens : null;
     try { _itensDe = null; } catch (e) {}
     opt.aoMudar && opt.aoMudar(ativos, doAno);
+  }
+  /* prévia de uma data do ano fora do período (só nesta tela, não salva nada) */
+  let emPrevia = null, pilula = null;
+  function previa(id, salas) {
+    emPrevia = id && ANUAIS[id] ? { id, tema: ANUAIS[id].tema, salas: salas && salas.length ? salas : ["*"] } : null;
+    assinatura = "-"; atualizar();
+    if (!pilula) { pilula = document.createElement("button"); pilula.id = "decoPrevia"; pilula.onclick = () => previa(null);
+      pilula.style.cssText = "position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:60;border:0;border-radius:999px;padding:8px 14px;background:#3d5afe;color:#fff;font:600 13px system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer";
+      document.body.appendChild(pilula); }
+    pilula.style.display = emPrevia ? "" : "none";
+    if (emPrevia) { const t = TEMAS[emPrevia.tema]; pilula.textContent = `👁️ Prévia: ${t ? t.nome : id} · clique para sair`; }
   }
   function iniciar(o) { opt = o || {}; atualizar(); setInterval(atualizar, 30000); }
 
@@ -255,5 +268,5 @@
     });
   }
 
-  window.Decoracao = { TEMAS, ANUAIS, anuaisAtivos, periodoTexto, recorteDoLogo, temaDe, pautaSemTema, comTema, iniciar, atualizar, aplicarLogo, prepararLogo, get itens() { return window.DECORACAO || []; } };
+  window.Decoracao = { TEMAS, ANUAIS, anuaisAtivos, periodoTexto, recorteDoLogo, previa, temaDe, pautaSemTema, comTema, iniciar, atualizar, aplicarLogo, prepararLogo, get itens() { return window.DECORACAO || []; } };
 })();
