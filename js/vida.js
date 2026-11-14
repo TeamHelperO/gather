@@ -189,7 +189,7 @@ const DANCAS = {
   // requebra: balança o corpo de um lado para o outro
   14: t => ({ row: 0, col: 1 + (Math.floor(t * 6) % 4), rot: Math.sin(t * 7) * 0.22, dx: Math.sin(t * 7) * 2 }),
   // moonwalk: desliza para trás de costas, passos ao contrário
-  15: t => { const ciclo = (t * 18) % 36; return { row: 1, col: 4 - (Math.floor(t * 8) % 4), dx: 18 - ciclo }; },
+  15: t => { const ciclo = (t * 18) % 36; return { row: 1, col: 4 - (Math.floor(t * 8) % 4), dx: ciclo - 18 }; },
 };
 // com juntas (folhas novas, linhas 7–12): a pose vem desenhada; aqui só o ritmo e o deslocamento
 const DANCAS_ART = {
@@ -198,7 +198,7 @@ const DANCAS_ART = {
   12: t => { const f = Math.floor(t * 6) % 6; return { row: 8, col: f, dy: [2, -4, -8, -4, 1, 0][f] }; },        // pulinho
   13: t => ({ row: 9, col: Math.floor(t * 3.5) % 6 }),                                                          // robô
   14: t => { const f = Math.floor(t * 5) % 6; return { row: 10, col: f, rot: Math.sin(t * 5 * Math.PI / 3) * 0.08 }; }, // requebra
-  15: t => { const f = Math.floor(t * 7) % 6; return { row: 11, col: f, dx: 16 - ((t * 14) % 32) }; },            // moonwalk
+  15: t => { const f = Math.floor(t * 7) % 6; return { row: 11, col: f, dx: ((t * 14) % 32) - 16 }; },            // moonwalk: olha para a esquerda e desliza para a direita (para trás)
 };
 const NOMES_DANCA = { 6: "Dança clássica", 10: "Passinho", 11: "Giro", 12: "Pulinho", 13: "Robô", 14: "Requebra", 15: "Moonwalk" };
 
