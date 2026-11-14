@@ -98,9 +98,41 @@ footer{padding:46px 0;color:var(--mut);font-size:14px}footer .wrap{display:flex;
 /* aparecer ao rolar */
 .ver{opacity:0;transform:translateY(18px);transition:opacity .6s,transform .6s}.ver.on{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){.ver{opacity:1;transform:none}.btn:hover{transform:none}}
+
+/* faixa de oferta */
+.oferta{background:var(--tinta);color:#fff;text-align:center;font-size:14px;font-weight:600;padding:9px 16px}.oferta a{color:#ffd23e;margin-left:8px}
+/* abas do hero */
+.abas{display:inline-flex;gap:6px;background:#fff;border:1px solid var(--borda);border-radius:14px;padding:6px;margin:34px auto 0;flex-wrap:wrap;justify-content:center}
+.abas button{border:0;background:none;padding:9px 16px;border-radius:10px;font:700 15px inherit;font-family:inherit;color:var(--tinta2);cursor:pointer}
+.abas button.on{background:var(--azul);color:#fff}
+.tela img{transition:opacity .35s}.tela .legenda{position:absolute;left:16px;bottom:16px;background:rgba(22,20,31,.82);color:#fff;border-radius:12px;padding:10px 14px;font-size:14px;max-width:420px;text-align:left}
+/* faixa de público */
+.publico{text-align:center;margin-top:60px}.publico p{color:var(--mut);font-weight:600;margin:0 0 14px}
+.chips{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}.chips span{background:#fff;border:1px solid var(--borda);border-radius:999px;padding:8px 14px;font-weight:600;font-size:14.5px}
+/* lista de pontos com ícone */
+.pontos{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:22px 0 26px}
+@media(max-width:600px){.pontos{grid-template-columns:1fr}}
+.pontos div{display:flex;gap:12px}.pontos i{flex:none;width:40px;height:40px;border-radius:11px;background:var(--creme);display:grid;place-items:center;font-style:normal;font-size:20px}
+.pontos b{display:block}.pontos span{color:var(--mut);font-size:14.5px}
+/* blocos empilhados com imagem */
+.blocos{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+@media(max-width:900px){.blocos{grid-template-columns:1fr}}
+.bloco{background:#fff;border:1px solid var(--borda);border-radius:20px;overflow:hidden}.bloco img{aspect-ratio:16/10;object-fit:cover;width:100%}
+.bloco div{padding:20px 22px}.bloco h3{margin:0 0 6px}.bloco p{margin:0;color:var(--mut)}
+/* comparação */
+.compara{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:800px){.compara{grid-template-columns:1fr}}
+.compara > div{border-radius:22px;padding:28px}.compara h3{margin:0 0 16px;font-size:20px}
+.antes{background:#fff;border:1px solid var(--borda)}.depois{background:var(--azul);color:#fff}
+.compara ul{list-style:none;padding:0;margin:0;display:grid;gap:12px}.compara li{display:flex;gap:10px}
+.antes li:before{content:"✕";color:#e5484d;font-weight:900}.depois li:before{content:"✓";color:#ffd23e;font-weight:900}
+.passo small{display:inline-block;margin-top:10px;background:var(--creme);border-radius:999px;padding:3px 10px;font-weight:700;color:var(--tinta2)}
+footer .cols{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:24px;width:100%}footer h4{margin:0 0 10px;color:var(--tinta)}footer .cols a{display:block;text-decoration:none;margin:6px 0}
+@media(max-width:700px){footer .cols{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
+<div class="oferta">🎁 7 dias grátis para até 10 pessoas, sem cartão <a href="index.html?criar=1">Criar meu escritório →</a></div>
 <nav><div class="wrap">
   <a class="marca" href="#"><i></i><span data-marca>Escritório Virtual</span></a>
   <div class="links"><a href="#recursos">Recursos</a><a href="#como">Como funciona</a><a href="#planos">Planos</a><a href="#faq">Dúvidas</a><a href="index.html">Entrar</a><a class="btn pri" href="index.html?criar=1">Teste grátis</a></div>
@@ -112,9 +144,12 @@ footer{padding:46px 0;color:var(--mut);font-size:14px}footer .wrap{display:flex;
   <p class="sub">Um escritório virtual em 2D e 3D onde cada pessoa é um personagem. Ande até a mesa do colega e converse, entre na sala de reunião, veja quem está ocupado — sem marcar call para tudo.</p>
   <div class="ctas"><a class="btn pri" href="index.html?criar=1">Começar teste grátis →</a><a class="btn sec" href="#planos">Ver planos</a></div>
   <p class="nota">Funciona no navegador, no computador e no celular. Nada para instalar.</p>
-  <div class="tela ver"><div class="barra"><i></i><i></i><i></i></div><img src="assets/lp/2d.jpg" alt="Visão de cima do escritório virtual com recepção, área de trabalho, salas de reunião, auditório e área silenciosa" loading="eager">
-    <div class="flutua f1">🎧<span>Áudio por proximidade<small>quem está perto se ouve</small></span></div>
-    <div class="flutua f2">📅<span>Reunião começando<small>entre já sentado na sala</small></span></div></div>
+  <div class="abas" role="tablist">
+    <button class="on" data-aba="0">🏢 Escritório</button><button data-aba="1">📅 Reuniões</button><button data-aba="2">💬 Chat</button><button data-aba="3">🧊 3D</button>
+  </div>
+  <div class="tela ver"><div class="barra"><i></i><i></i><i></i></div><img data-tela src="assets/lp/2d.jpg" alt="O escritório virtual visto de cima" loading="eager">
+    <div class="legenda" data-legenda>Todo mundo no mesmo mapa: veja quem está em cada sala e chegue perto para conversar.</div></div>
+  <div class="publico ver"><p>Feito para equipes remotas e híbridas</p><div class="chips"><span>Agências</span><span>Times de marketing</span><span>Software</span><span>Atendimento</span><span>Escritórios de contabilidade</span><span>Escolas e cursos</span></div></div>
   <div class="numeros ver"><div><b>2D + 3D</b><span>o mesmo escritório nas duas vistas</span></div><div><b>0 instalação</b><span>abre direto no navegador</span></div><div><b>Salas ilimitadas</b><span>monte o seu do seu jeito</span></div><div><b>PIX</b><span>cartão ou boleto</span></div></div>
 </div></header>
 
@@ -130,6 +165,38 @@ footer{padding:46px 0;color:var(--mut);font-size:14px}footer .wrap{display:flex;
     <div class="card ver"><div class="ic">🔴</div><h3>Status automático</h3><p>Sentado em silêncio? Vira "Ocupado". Parado há muito tempo? Vai para a área silenciosa. Sem interromper ninguém.</p></div>
     <div class="card ver"><div class="ic">🎄</div><h3>Datas comemorativas</h3><p>Natal, Halloween, Páscoa: o escritório se enfeita sozinho, com neve, folhas e pisca-pisca.</p></div>
     <div class="card ver"><div class="ic">🏢</div><h3>Do seu jeito</h3><p>Editor de mapa com móveis, salas com senha, logo da empresa no púlpito e nas paredes.</p></div>
+  </div>
+</div></section>
+
+<section style="padding-top:20px"><div class="wrap">
+  <div class="lado">
+    <div class="ver"><span class="etq">Colaboração na hora</span><h2>A conversa de corredor que o remoto tinha perdido</h2>
+      <p style="color:var(--mut);font-size:17px;margin:0">Nada de mandar link de chamada para tirar uma dúvida de 30 segundos. Vá até a mesa da pessoa e fale.</p>
+      <div class="pontos">
+        <div><i>👀</i><p style="margin:0"><b>Veja quem está livre</b><span>Status e lugar de cada um no mapa.</span></p></div>
+        <div><i>👋</i><p style="margin:0"><b>Acene para chamar</b><span>Um toque e a pessoa sabe que você quer falar.</span></p></div>
+        <div><i>🎧</i><p style="margin:0"><b>Ouça quem está perto</b><span>O volume cai com a distância, como num escritório.</span></p></div>
+        <div><i>🚪</i><p style="margin:0"><b>Entre com um clique</b><span>Clique na sala e o personagem anda até lá.</span></p></div>
+      </div>
+      <a class="btn pri" href="index.html?criar=1">Começar teste grátis</a></div>
+    <div class="img ver"><img src="assets/lp/2d.jpg" alt="Pessoas no escritório virtual" loading="lazy"></div>
+  </div>
+</div></section>
+
+<section style="background:var(--creme)"><div class="wrap">
+  <div class="titulo ver"><span class="etq">Foco</span><h2>Perto quando precisa, quieto quando quer focar</h2><p>Estar junto não precisa significar ser interrompido o tempo todo.</p></div>
+  <div class="blocos">
+    <div class="bloco ver"><img src="assets/lp/silencio.jpg" alt="Área silenciosa" loading="lazy"><div><h3>🤫 Área silenciosa</h3><p>Uma sala sem áudio, só com chat escrito. Quem fica parado muito tempo vai para lá sozinho.</p></div></div>
+    <div class="bloco ver"><img src="assets/lp/chat.jpg" alt="Chat da sala" loading="lazy"><div><h3>💬 Chat por sala e direto</h3><p>Converse por escrito com a sala, com todo mundo ou em particular, e chame alguém com @nome.</p></div></div>
+    <div class="bloco ver"><img src="assets/lp/reuniao.jpg" alt="Status e reunião" loading="lazy"><div><h3>🔴 Status que se ajusta</h3><p>Sentado e concentrado vira "Ocupado"; em reunião, "Em reunião". Todo mundo sabe quando chamar.</p></div></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="titulo ver"><span class="etq">Por que mudar</span><h2>Chega de viver de chamada em chamada</h2></div>
+  <div class="compara ver">
+    <div class="antes"><h3>Do jeito de sempre</h3><ul><li>Toda dúvida vira uma chamada agendada</li><li>Ninguém sabe quem está disponível</li><li>Link perdido no meio das mensagens</li><li>Equipe espalhada em vários aplicativos</li><li>Remoto sem conversa de corredor</li></ul></div>
+    <div class="depois"><h3>No escritório virtual</h3><ul><li>Chegou perto, conversou</li><li>Status e lugar de cada um à vista</li><li>Sala de reunião sempre no mesmo lugar</li><li>Áudio, vídeo, chat e tarefas juntos</li><li>A sensação de trabalhar lado a lado</li></ul></div>
   </div>
 </div></section>
 
@@ -157,9 +224,9 @@ footer{padding:46px 0;color:var(--mut);font-size:14px}footer .wrap{display:flex;
 <section id="como" style="padding-top:20px"><div class="wrap">
   <div class="titulo ver"><span class="etq">Como funciona</span><h2>Em 3 minutos sua equipe está dentro</h2></div>
   <div class="passos">
-    <div class="passo ver"><h3>Crie o escritório</h3><p>Entre com seu e-mail, dê um nome ao espaço e escolha o modelo de salas.</p></div>
-    <div class="passo ver"><h3>Mande o link</h3><p>Cada pessoa abre o link, monta o personagem e já aparece no escritório.</p></div>
-    <div class="passo ver"><h3>Trabalhe junto</h3><p>Converse andando, marque reuniões, acompanhe as tarefas no telão. Teste 7 dias grátis.</p></div>
+    <div class="passo ver"><h3>Crie o escritório</h3><p>Entre com seu e-mail, dê um nome ao espaço e escolha o modelo de salas.</p><small>⏱ 1 minuto</small></div>
+    <div class="passo ver"><h3>Mande o link</h3><p>Cada pessoa abre o link, monta o personagem e já aparece no escritório.</p><small>⏱ 30 segundos por pessoa</small></div>
+    <div class="passo ver"><h3>Trabalhe junto</h3><p>Converse andando, marque reuniões, acompanhe as tarefas no telão. Teste 7 dias grátis.</p><small>⏱ Na hora</small></div>
   </div>
 </div></section>
 
@@ -183,6 +250,8 @@ footer{padding:46px 0;color:var(--mut);font-size:14px}footer .wrap{display:flex;
 <section id="faq"><div class="wrap">
   <div class="titulo ver"><span class="etq">Dúvidas</span><h2>Perguntas frequentes</h2></div>
   <div class="faq ver">
+    <details><summary>O que é um escritório virtual?</summary><p>É um mapa do seu escritório no navegador, onde cada pessoa é um personagem. Quem está perto se ouve, as salas têm portas e reuniões, e todo mundo vê quem está disponível — como trabalhar no mesmo lugar, mesmo cada um em casa.</p></details>
+    <details><summary>Quem usa?</summary><p>Equipes remotas e híbridas que querem menos chamadas agendadas e mais conversa rápida: agências, times de marketing e vendas, empresas de software, atendimento e escolas.</p></details>
     <details><summary>Precisa instalar alguma coisa?</summary><p>Não. Funciona direto no navegador (Chrome, Edge, Safari, Firefox), no computador e no celular.</p></details>
     <details><summary>O que acontece quando o teste de 7 dias acaba?</summary><p>O escritório fica fechado até o dono do espaço assinar. Nada é apagado: salas, tarefas e conversas continuam guardadas.</p></details>
     <details><summary>Como funciona a cobrança por pessoa?</summary><p>Você escolhe o plano e quantas pessoas vão usar. O valor é cobrado todo mês pelo Mercado Pago, por PIX, cartão ou boleto. Dá para mudar a quantidade depois.</p></details>
@@ -197,13 +266,28 @@ footer{padding:46px 0;color:var(--mut);font-size:14px}footer .wrap{display:flex;
   <a class="btn" href="index.html?criar=1">Começar teste grátis →</a>
 </div></section>
 
-<footer><div class="wrap"><span>© <span data-ano></span> <span data-marca>Escritório Virtual</span> · uma solução Next Co.</span><span><a href="index.html">Entrar</a></span></div></footer>
+<footer><div class="wrap"><div class="cols">
+  <div><a class="marca" href="#"><i></i><span data-marca>Escritório Virtual</span></a><p style="margin:12px 0 0">Sua equipe no mesmo escritório, de qualquer lugar.</p><p>© <span data-ano></span> · uma solução Next Co.</p></div>
+  <div><h4>Produto</h4><a href="#recursos">Recursos</a><a href="#planos">Planos</a><a href="#como">Como funciona</a></div>
+  <div><h4>Ajuda</h4><a href="#faq">Dúvidas</a><a href="index.html">Entrar</a></div>
+  <div><h4>Comece</h4><a href="index.html?criar=1">Teste grátis de 7 dias</a></div>
+</div></div></footer>
 
 <script>
 /* nome do produto num lugar só */
 const MARCA = "Escritório Virtual";
 document.querySelectorAll("[data-marca]").forEach(e => e.textContent = MARCA);
 document.querySelector("[data-ano]").textContent = new Date().getFullYear();
+/* abas do topo: trocam a imagem e a legenda */
+const ABAS = [["assets/lp/2d.jpg", "Todo mundo no mesmo mapa: veja quem está em cada sala e chegue perto para conversar."],
+  ["assets/lp/reuniao.jpg", "No horário da reunião, o convite aparece e você entra já sentado. O telão mostra o assunto."],
+  ["assets/lp/chat.jpg", "Chat da sala, geral e direto, com @nome para chamar alguém."],
+  ["assets/lp/3d.jpg", "O mesmo escritório em 3D, de cima ou em primeira pessoa."]];
+document.querySelectorAll("[data-aba]").forEach(b => b.onclick = () => {
+  document.querySelectorAll("[data-aba]").forEach(x => x.classList.toggle("on", x === b));
+  const [src, txt] = ABAS[+b.dataset.aba], img = document.querySelector("[data-tela]");
+  img.style.opacity = 0; setTimeout(() => { img.src = src; img.style.opacity = 1; }, 180); document.querySelector("[data-legenda]").textContent = txt; });
+ABAS.forEach(([src]) => { const i = new Image(); i.src = src; });
 /* calculadora de preço */
 const r = v => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const q = document.getElementById("qtd"), conta = () => { const n = +q.value; document.querySelector("[data-qtd]").textContent = n; document.querySelector("[data-eq]").textContent = r(19.9 * n); document.querySelector("[data-em]").textContent = r(29.9 * n); };
