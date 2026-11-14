@@ -194,7 +194,8 @@
     };
     if (art && art.pE && !sent && (F || B)) { const qx = art.quadril || 0; pernaArt(13.5 + qx, 32, (art.pE || [0, 0])[0], (art.pE || [0, 0])[1], -1, true); pernaArt(18.5 + qx, 32, (art.pD || [0, 0])[0], (art.pD || [0, 0])[1], 1, true); }
     else if (art && !sent && L) { // perfil: perna de trás primeiro (mais escura não precisa: o contorno separa)
-      pernaArt(15.5, 32, (art.pD || [0, 0])[0], (art.pD || [0, 0])[1], -1, false); pernaArt(15.5, 32, (art.pE || [0, 0])[0], (art.pE || [0, 0])[1], -1, true); }
+      const aE = (art.pE || [0, 0])[0], aD = (art.pD || [0, 0])[0], xq = a => 15.5 - Math.sign(a) * 1; // a perna que vai à frente sai um pouco mais à frente
+      pernaArt(xq(aD), 32, aD, (art.pD || [0, 0])[1], -1, false); pernaArt(xq(aE), 32, aE, (art.pE || [0, 0])[1], -1, true); }
     else if (sent && B) { /* sentado de costas: as pernas ficam escondidas pela cadeira */ }
     else if (F || B) {
       if (sent && F) { desenharPerna(12, 4, 0, true); desenharPerna(17, 4, 0, true); }
@@ -315,10 +316,10 @@
     // andar com juntas: quadril, joelho, ombro e cotovelo em cada passo (col. 0 parado, 1–4 o ciclo)
     const ANDAR_PERFIL = [ // [pE (perna da frente), pD (perna de trás), braço] — passada curta e natural
       { pE: [0, 0], pD: [0, 0], bE: [0, 4] },
-      { pE: [18, 0], pD: [-16, 18], bE: [-16, 10] },
-      { pE: [4, 6], pD: [-4, 10], bE: [-4, 6] },
-      { pE: [-16, 18], pD: [18, 0], bE: [16, 12] },
-      { pE: [-4, 10], pD: [4, 6], bE: [4, 6] },
+      { pE: [32, -4], pD: [-30, 12], bE: [-22, 12] },   // passada aberta: um pé na frente, o outro atrás ( /\ )
+      { pE: [10, 6], pD: [-10, 16], bE: [-6, 8] },
+      { pE: [-30, 12], pD: [32, -4], bE: [22, 14] },
+      { pE: [-10, 16], pD: [10, 6], bE: [6, 8] },
     ];
     const ANDAR_FRENTE = [ // de frente/costas só os braços balançam (as pernas usam o passo de sempre)
       { bE: [4, 0], bD: [4, 0] },
