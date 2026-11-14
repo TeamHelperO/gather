@@ -16,12 +16,19 @@ async function lerPC() {
   try {
     const r = await fetch("http://127.0.0.1:47321/status", { cache: "no-store" });
     const j = await r.json(); pcAtivo = true; appPC = j.app && j.app !== "navegador" ? j.app : null;
-    if (j.app === "navegador") focoNoNavegador = true; // o PC confirma que o navegador está na frente
+    focoNoNavegador = j.app === "navegador"; // com o app de PC, ele é quem sabe o que está na frente
   } catch (e) { pcAtivo = false; appPC = null; }
 }
+// voltar para a aba do Andar não apaga o app: ele continua aparecendo por até 10 min
+// (você deu uma olhada no escritório, mas segue trabalhando no Figma)
+const MANTER_MS = 10 * 60 * 1000;
+let ultimoApp = null, ultimoAppEm = 0;
 function atual() {
-  if (focoNoNavegador) return appNavegador === "andar" ? null : appNavegador;
-  return appPC;
+  let app = focoNoNavegador ? appNavegador : appPC;
+  if (app === "andar") app = Date.now() - ultimoAppEm < MANTER_MS ? ultimoApp : null;
+  else if (app) { ultimoApp = app; ultimoAppEm = Date.now(); }
+  else ultimoApp = null; // foi para algo fora da lista: some
+  return app;
 }
 function enviar(forcar) {
   const app = atual();
@@ -49,6 +56,9 @@ chrome.runtime.onConnect.addListener(p => {
   p.onMessage.addListener(m => { if (m && m.tipo === "ping") tique(); });
   lerPC().then(() => atualizar(true));
 });
+// enquanto houver aba do Andar aberta, consulta o app de PC a cada 2 s pelo próprio fundo
+// (a aba em segundo plano é desacelerada pelo Chrome e não dá conta disso sozinha)
+setInterval(() => { if (portas.size) { chrome.runtime.getPlatformInfo(() => {}); tique(); } }, 2000);
 let ocupado = false;
 async function tique() {
   if (ocupado) return; ocupado = true;

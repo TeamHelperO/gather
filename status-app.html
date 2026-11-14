@@ -32,6 +32,7 @@ code{background:var(--creme);padding:1px 6px;border-radius:6px;font-size:14px}
 <header><div class="wrap"><img src="assets/marca/andar-icone.svg" alt=""><b>Andar</b></div></header>
 <main class="wrap">
   <h1>Status do app em tempo real</h1>
+  <div id="teste" class="passo" style="border-color:#1a7f4b"><h2>Teste agora</h2><p id="tExt">Extensão: procurando…</p><p id="tPc">App para computador: —</p><p id="tApp">App detectado: —</p><p style="font-size:14px;color:#6f6a7d;margin:0">Deixe esta página aberta, troque para o Figma, Notion ou VS Code por alguns segundos e volte aqui.</p></div>
   <p class="sub">Um selinho ao lado do seu nome mostra o app de trabalho que você está usando (Figma, Notion, VS Code, Planilhas…). Assim a equipe sabe se é uma boa hora para chegar perto. Você escolhe quais apps aparecem.</p>
 
   <section class="passo">
@@ -64,5 +65,20 @@ code{background:var(--creme);padding:1px 6px;border-radius:6px;font-size:14px}
 
   <div class="priv"><b>Privacidade:</b> o Andar recebe só o nome do app que está na frente, e só se ele estiver na lista. Não vê o título das janelas, os arquivos, os sites fora da lista nem o que você faz dentro dos apps. O app para computador conversa só com a extensão, dentro do seu computador.</div>
 </main>
+<script>
+(() => {
+  let achou = false; const $ = id => document.getElementById(id);
+  addEventListener("message", e => {
+    if (e.source !== window || !e.data || e.data.fonte !== "andar-ext") return;
+    achou = true; $("tExt").textContent = "Extensão: ✅ conectada (versão " + (e.data.versao || "?") + ")";
+    if (e.data.tipo === "app") {
+      $("tPc").textContent = "App para computador: " + (e.data.pc ? "✅ conectado" : "❌ não encontrado (opcional, só para programas instalados)");
+      $("tApp").textContent = "App detectado: " + (e.data.app || "nenhum");
+    }
+  });
+  postMessage({ fonte: "andar-pagina", tipo: "quem" }, location.origin);
+  setTimeout(() => { if (!achou) $("tExt").textContent = "Extensão: ❌ não encontrada. Instale (passo 1) ou, se já instalou, baixe de novo a versão nova e recarregue esta página."; }, 2500);
+})();
+</script>
 </body>
 </html>

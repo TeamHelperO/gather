@@ -1,7 +1,7 @@
 // Ponte entre a extensão e a página do Andar (só roda nos endereços do Andar).
 (() => {
   let porta = null;
-  const paraPagina = m => window.postMessage({ fonte: "andar-ext", versao: "1.0.0", ...m }, location.origin);
+  const paraPagina = m => window.postMessage({ fonte: "andar-ext", versao: "1.1.0", ...m }, location.origin);
   function conectar() {
     try { porta = chrome.runtime.connect({ name: "andar" }); } catch (e) { return; }
     porta.onMessage.addListener(paraPagina);
