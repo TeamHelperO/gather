@@ -45,7 +45,7 @@
   "rewrites": [
     {
       "source": "/conheca",
-      "destination": "/landing.html"
+      "destination": "/landing"
     }
   ]
 }
