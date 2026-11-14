@@ -168,11 +168,15 @@ function moverAtor(a, dt, vx, vy, livre, vel){
     a.anim += dt*8; a.frame = 1 + (Math.floor(a.anim) % 4); a.parado = 0;
   } else { a.frame = 0; a.parado += dt; }
 }
-function seguirCaminho(a){
+// passo = quanto o boneco anda neste quadro (vel*dt). Com o computador lento (poucos quadros por segundo)
+// o passo passa de 6 px e o boneco pulava por cima do ponto, voltava e ficava tremendo no lugar:
+// agora o último trecho é encurtado para parar em cima do ponto.
+function seguirCaminho(a, passo){
   if (!a.path) return [0, 0];
   const [tx, ty] = a.path[0]; const dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy);
   if (d < 3){ a.path.shift(); if (!a.path.length) a.path = null; return [0, 0]; }
-  return [dx/d, dy/d];
+  const k = passo > 0 ? Math.min(1, d / passo) : 1;
+  return [dx/d*k, dy/d*k];
 }
 
 /* ---------- danças (emote 10+): cada uma devolve linha/coluna da folha do personagem e um deslocamento ----------

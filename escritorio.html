@@ -1129,7 +1129,7 @@ function loop(now){
     if (umaP && TOQUE){ Iso3D.virar(-vx*dt*2.6); vx = 0; if (Math.abs(vy) < 0.25) vy = 0; } }
   if ((vx || vy) && em3d()) [vx, vy] = Iso3D.direcaoTeclas(vx, vy); // no 3D, "cima" é para dentro da tela
   if ((vx || vy) && P.assento) P.levantar();
-  if (!vx && !vy && !P.assento && P.path){ [vx, vy] = seguirCaminho(P); if (umaP && Iso3D.seguirOlhar) Iso3D.seguirOlhar(vx, vy, dt); }
+  if (!vx && !vy && !P.assento && P.path){ [vx, vy] = seguirCaminho(P, Montaria.velocidade()*dt); if (umaP && Iso3D.seguirOlhar) Iso3D.seguirOlhar(vx, vy, dt); }
   // caminho travado (um móvel no meio no 3D): desiste em vez de ficar empurrando
   if (P.path && !P.assento){ const d = Math.hypot(P.x - (P.travaX ?? P.x), P.y - (P.travaY ?? P.y)); if (d > 6 || P.travaX == null){ P.travaX = P.x; P.travaY = P.y; P.travaT = 0; } else if ((P.travaT += dt) > 1.2){ P.path = null; P.travaX = null; } }
   Montaria.atualizar(P);
