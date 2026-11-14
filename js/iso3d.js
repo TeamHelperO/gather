@@ -8,8 +8,11 @@
 import * as THREE from "./vendor/three/three.min.js";
 
 const cv = document.getElementById("cv3d");
-const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+// telas de alta resolução (retina/4K): até 1,5× e sem antisserrilhado, que ali quase não aparece e
+// multiplicava a memória de vídeo (a 2× com antisserrilhado o 3D chegava a centenas de MB)
+const DPR3 = Math.min(devicePixelRatio || 1, 1.5);
+const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: (devicePixelRatio || 1) < 1.5, powerPreference: "low-power" });
+renderer.setPixelRatio(DPR3);
 const ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 1);
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
@@ -215,8 +218,26 @@ const GENTE = 1.27; // o desenho da pessoa tem ~1,35 tile; ×1,27 ≈ 1,72 m, na
 const ESCALA_NAT = { nat_arvore: 2.6, nat_arvore2: 2.5, nat_pinheiro: 2.8, nat_arbusto: 1.6, nat_arvore_neve: 2.6, nat_pinheiro_neve: 2.8, nat_arbusto_neve: 1.6, nat_arvore_seca: 2.6, nat_arvore_flor: 2.6, nat_abobora: 1.3 };
 const SEM_BATER = /^(deco_|nat_|bib_|cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$|teclado|mouse$|notebook$|gabinete$|projecao$|sino$)/;
 let objetos = null;
+// devolve à placa de vídeo tudo o que um grupo usa (geometria, material e texturas). Textura ou material
+// descartado volta sozinho se for usado de novo, então os caches (mats, img._tex3d) continuam valendo.
+function descartar(raiz) {
+  raiz.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    for (const m of [].concat(o.material || [])) { for (const v of Object.values(m)) if (v && v.isTexture) v.dispose(); m.dispose(); }
+  });
+}
+// sair do 3D: libera a memória do 3D (antes ficava tudo guardado, ~150 MB, mesmo de volta ao 2D)
+function liberar() {
+  if (objetos) { cena.remove(objetos); descartar(objetos); objetos = null; }
+  for (const [, s] of pessoas) { cena.remove(s.sp); if (s.sombra) cena.remove(s.sombra); if (s.tex) s.tex.dispose(); if (s.sp && s.sp.material) s.sp.material.dispose(); }
+  pessoas.clear();
+  for (const t of telas) if (t.tex) t.tex.dispose(); telas.length = 0;
+  for (const m of Object.values(mats)) m.dispose();
+  if (sol.shadow.map) { sol.shadow.map.dispose(); sol.shadow.map = null; }
+  renderer.renderLists.dispose(); renderer.setSize(1, 1, false); tamanho = "";
+}
 function montar(S) {
-  if (objetos) { cena.remove(objetos); objetos.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+  if (objetos) { cena.remove(objetos); descartar(objetos); }
   objetos = new THREE.Group(); cena.add(objetos); cartazes.length = 0; paredes.length = 0; telas.length = 0; escuros.clear(); solidos.length = 0; tetos.length = 0; portas3d.length = 0;
   const W = S.w, H = S.h;
   const tg = texturaPiso("f_grama"); tg.repeat.set((W + 40) / 2, (H + 40) / 2);
@@ -396,6 +417,7 @@ let giro = 0, giroAlvo = 0, meia = 9, VW = innerWidth, VH = innerHeight;
 const alvo = new THREE.Vector3(); let alvoPronto = false;
 let tamanho = "";
 function ajustar() {
+  if (!ativo) return; // escondido: não guarda uma tela do tamanho da janela
   VW = innerWidth; VH = innerHeight;
   const k = VW + "x" + VH + "@" + renderer.getPixelRatio(); if (k !== tamanho) { tamanho = k; renderer.setSize(VW, VH, false); }
   const asp = VW / VH; camFP.aspect = asp; camFP.updateProjectionMatrix(); camera.left = -meia * asp; camera.right = meia * asp; camera.top = meia; camera.bottom = -meia; camera.updateProjectionMatrix();
@@ -477,7 +499,7 @@ const escuros = new Map(); // sala → { brilho, sombra }
 let apagadaFn = null;
 const Iso3D = {
   get ativo() { return ativo; },
-  ligar(sim, S) { ativo = !!sim; cv.style.display = ativo ? "block" : "none"; if (ativo) { if (montadoPara !== S) { montar(S); montadoPara = S; } ajustar(); } },
+  ligar(sim, S) { const antes = ativo; ativo = !!sim; cv.style.display = ativo ? "block" : "none"; if (ativo) { if (montadoPara !== S) { montar(S); montadoPara = S; } ajustar(); } else if (antes) { liberar(); montadoPara = null; } },
   montar(S) { montar(S); montadoPara = S; },
   luzes(apagada) {
     apagadaFn = apagada;
