@@ -1116,8 +1116,20 @@ function sentarPerto(){
 let last = 0, marca = null, sujo = false, ultimoSave = 0, t = 0;
 const VEL = 120, conversasLog = {};
 let dtQuadro = 0.016;
+// economia de processador: com alguém andando ou mexendo na tela desenha em até 60 quadros/s;
+// parado, 20 quadros/s no 2D e 30 no 3D, e metade disso com outro programa em foco (as animações continuam, só mais espaçadas)
+let ultimaMexida = 0;
+for (const ev of ["pointermove", "pointerdown", "keydown", "wheel", "touchmove"]) addEventListener(ev, () => { ultimaMexida = performance.now(); }, { passive: true });
+function emMovimento(now){
+  if (now - ultimaMexida < 1500 || keys.size || joyV || marca) return true;
+  if (P && (P.moving || P.path || P.emote)) return true;
+  for (const o of outros) if (o.remotoAndando || o.moving || o.emote) return true;
+  return false;
+}
 function loop(now){
   if (SessaoUnica.derrubada) return; // conta aberta em outro lugar: para tudo
+  const fpsParado = (em3d() ? 30 : 20) / (document.hasFocus() ? 1 : 2); // usando outro programa: metade
+  if (now - last < 1000 / (emMovimento(now) ? 60 : fpsParado) - 3){ requestAnimationFrame(loop); return; }
   const dt = Math.min(0.05, (now - last)/1000); last = now; t += dt; dtQuadro = dt;
   // você
   let vx = 0, vy = 0;
