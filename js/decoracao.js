@@ -119,13 +119,13 @@
 
   /* faixa com texto: um desenho por texto (criado na hora) */
   function faixa(texto, cor, largura) {
-    const w = Math.max(96, Math.min(160, Math.floor(largura || 160))), h = 28;
+    const w = Math.max(64, Math.min(160, Math.floor(largura || 160))), h = 28;
     const k = "deco_faixa_" + (texto + cor).replace(/[^a-z0-9]/gi, "").slice(0, 40) + (w < 160 ? "_" + w : "");
     if (window.ASSETS[k]) return k;
     const c = A(k, w, h, (R, g) => {
       R(4, 5, w - 8, 18, cor); R(4, 5, w - 8, 2, "rgba(255,255,255,.3)"); R(0, 8, 6, 12, cor); R(w - 6, 8, 6, 12, cor); R(0, 0, 2, 8, "#6b6760"); R(w - 2, 0, 2, 8, "#6b6760");
       g.fillStyle = "#ffffff"; g.textAlign = "center"; g.textBaseline = "middle"; let fs = 13; g.font = `bold ${fs}px system-ui, sans-serif`;
-      while (g.measureText(texto).width > w - 18 && fs > 7) { fs--; g.font = `bold ${fs}px system-ui, sans-serif`; }
+      while (g.measureText(texto).width > w - 14 && fs > 5) { fs--; g.font = `bold ${fs}px system-ui, sans-serif`; }
       g.fillText(texto, w / 2, 14.5);
     }, "Faixa", { z: "wall" });
     if (typeof IMG !== "undefined") IMG[k] = c; // o próprio desenho (já pronto para o 2D e o 3D)
@@ -190,16 +190,17 @@
     const add = (k, x, y, z) => out.push({ k, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, z, room: r.id, deco: true, id: "deco_" + k + "_" + out.length });
     // faixa no maior trecho livre da parede de cima (sem cobrir telão, quadro ou logo)
     const naParede = allItemsBase().filter(o => ASSETS[o.k] && (o.room ? o.room === r.id : (o.x >= r.x - 0.5 && o.x <= r.x + r.w)) && o.y < r.y + 0.3 && o.y > r.y - 3.2
-        && /^(telao|tv|projecao|quadro|logo|relogio|claquete|placa|estante|armario|rack|geladeira)/.test(o.k))
+        && /^(telao|tv|projecao|quadro|logo|relogio|claquete|placa|estante|armario|rack|geladeira|bib_)/.test(o.k))
       .map(o => [o.x, o.x + ASSETS[o.k].w / T_]).sort((p, q) => p[0] - q[0]);
     let melhor = [r.x + 0.2, r.x + 0.2], ini = r.x + 0.2;
     for (const [a0, a1] of [...naParede, [r.x + r.w - 0.2, r.x + r.w]]) { if (a0 - ini > melhor[1] - melhor[0]) melhor = [ini, a0]; ini = Math.max(ini, a1); }
     // a faixa encolhe (até 3 blocos) para caber no maior trecho livre; se nem assim couber, fica pendurada à frente
-    const gap = melhor[1] - melhor[0], fk = faixa(t.faixa(titulo), t.cor, gap * T_ - 8), fw = ASSETS[fk].w / T_, fx = gap >= fw ? (melhor[0] + melhor[1]) / 2 - fw / 2 : r.x + r.w / 2 - fw / 2;
-    add(fk, fx, gap >= fw ? r.y - 1.6 : r.y + 1.15, "wall"); // sem espaço na parede: pendurada um pouco à frente (não some atrás do telão)
-    if (gap < fw) out[out.length - 1].pendurada = true; // sem espaço na parede: fica pendurada do teto, no meio da sala
+    // a faixa encolhe até 2 blocos para caber na parede; se nem assim couber, a sala fica sem faixa (nunca no chão)
+    const gap = melhor[1] - melhor[0], cabe = gap * T_ - 8 >= 64;
+    const fk = cabe ? faixa(t.faixa(titulo), t.cor, gap * T_ - 8) : null, fw = fk ? ASSETS[fk].w / T_ : 0, fx = fk ? (melhor[0] + melhor[1]) / 2 - fw / 2 : 0;
+    if (fk) add(fk, fx, r.y - 1.6, "wall");
     if (t.parede) { // enfeites de parede só onde não há telão, logo, quadro (nem a faixa)
-      const cheio = [...naParede, ...(gap >= fw ? [[fx, fx + fw]] : [])], livreEm = (x, pw) => !cheio.some(([a0, a1]) => x < a1 && x + pw > a0);
+      const cheio = [...naParede, ...(fk ? [[fx, fx + fw]] : [])], livreEm = (x, pw) => !cheio.some(([a0, a1]) => x < a1 && x + pw > a0);
       const lista = [].concat(t.parede), alturaDe = k => /cascata/.test(k) ? r.y - 1.45 : /guirlanda|estrela/.test(k) ? r.y - 1.4 : r.y - 1.2;
       let n = 0, i = 0;
       // varre a parede da esquerda para a direita, alternando os enfeites do tema; onde o longo não cabe, tenta os menores

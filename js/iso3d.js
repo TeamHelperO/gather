@@ -188,7 +188,8 @@ function materialTela(it, recorte) {
 function spriteDe(img, w, h) {
   let c = img;
   if (!img._pisca) { c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0); }
-  const tex = new THREE.CanvasTexture(c); if (img._pisca) (img._texs = img._texs || []).push(tex); // pisca-pisca: atualiza junto com o desenho tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.colorSpace = THREE.SRGBColorSpace;
+  const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.colorSpace = THREE.SRGBColorSpace;
+  if (img._pisca) (img._texs = img._texs || []).push(tex); // pisca-pisca: atualiza junto com o desenho
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, alphaTest: 0.5 })); sp.center.set(0.5, 0.02); sp.scale.set(w / T, h / T, 1); return sp;
 }
 let ultimaTela = 0;
