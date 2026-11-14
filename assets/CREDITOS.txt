@@ -2,3 +2,5 @@ Biblioteca grátis (js/biblioteca.js) — todos CC0 1.0 (domínio público, uso 
 - "Indoor office appliances" — semtex99 — https://opengameart.org/content/indoor-office-appliances
 - "Roguelike Indoor pack" — Kenney (kenney.nl)
 Obtidos pelo acervo series-ai/jam-ready-assets (cada pacote com o próprio License.txt CC0).
+
+Móveis extras (js/biblioteca-100.js): pacote de 100 itens originais enviado pelo dono do projeto (40 itens selecionados).

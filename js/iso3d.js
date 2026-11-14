@@ -122,10 +122,10 @@ function movel(it, sala) {
     const pl = new THREE.Mesh(new THREE.PlaneGeometry(a.w / T, a.h / T), new THREE.MeshStandardMaterial({ map: texDe(IMG[k]), transparent: true, alphaTest: 0.1, roughness: 0.7 }));
     pl.position.set(0, a.h / T / 2, 0.06); add(pl); g.userData.parede = true; g.userData.alturaParede = k === "bib_espelho" ? 0.6 : 1.45; prof = 0.1;
   }
-  else if (/^bib_/.test(k)) { // móveis e plantas da biblioteca: em pé, de frente para a câmera
+  else if (/^bib_/.test(k) && it.z !== "floor") { // móveis e plantas da biblioteca: em pé, de frente para a câmera
     const sp = spriteDe(IMG[k], a.w, a.h); sp.scale.multiplyScalar(/planta/.test(k) ? 1.4 : 1.15); add(sp); g.userData.billboard = true; prof = 0.4;
   }
-  else if (/^nat_/.test(k) && it.z === "floor") { // flores e pedras na grama
+  else if (/^(nat_|bib_)/.test(k) && it.z === "floor") { // flores e pedras na grama, tapetes da biblioteca
     const pl = new THREE.Mesh(new THREE.PlaneGeometry(a.w / T, a.h / T), new THREE.MeshStandardMaterial({ map: texDe(IMG[k]), transparent: true, alphaTest: 0.3, roughness: 0.95 }));
     pl.rotation.x = -Math.PI / 2; pl.position.set(0, 0.03, 0); add(pl); g.userData.chao = true; prof = 0.01;
   }

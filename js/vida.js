@@ -12,8 +12,13 @@ const ASSENTOS_DEF = {
   poltrona:        { pts: [[16, 22]], face: "frente", r: 30 },
   pufe:            { pts: [[16, 16]], face: "frente", r: 28 },
 };
+// poltronas e sofás dos móveis extras (biblioteca-100.js): também dá para sentar
+for (let n = 1; n <= 5; n++) { const s = String(n).padStart(2, "0");
+  ASSENTOS_DEF["bib_poltrona_" + s] = { pts: [[24, 26]], face: "frente", r: 30 };
+  ASSENTOS_DEF["bib_sofa_" + s] = { pts: [[20, 26], [40, 26], [60, 26]], face: "frente", r: 30 }; }
 // para onde a pessoa sentada olha (0 baixo, 1 esquerda, 2 direita, 3 cima), contando o "Girar 90°"/"Espelhar" do editor
 const DIR_ASSENTO = { cadeira_cima: 3, cadeira_baixo: 0, cadeira_esq: 1, cadeira_dir: 2, cadeira_plateia: 3, sofa: 0, poltrona: 0, pufe: 0 };
+for (const k of Object.keys(ASSENTOS_DEF)) if (/^bib_(poltrona|sofa)_/.test(k)) DIR_ASSENTO[k] = 0;
 function direcaoDoAssento(it){
   const giro = [3, 2, 0, 1]; let d = DIR_ASSENTO[it.k] ?? 0;
   if ((it.k === "sofa" || it.k === "poltrona") && typeof frenteDoEstofado === "function"){ const f = frenteDoEstofado(it); if (f != null) return f; }
