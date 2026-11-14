@@ -10,5 +10,5 @@
   conectar();
   paraPagina({ tipo: "ola" });
   setInterval(() => { if (porta) try { porta.postMessage({ tipo: "ping" }); } catch (e) {} }, 2000);
-  window.addEventListener("message", e => { if (e.source === window && e.data && e.data.fonte === "andar-pagina" && e.data.tipo === "quem") { paraPagina({ tipo: "ola" }); if (ultimo) paraPagina(ultimo); } // a página chegou depois: repete o último aviso });
+  window.addEventListener("message", e => { if (e.source === window && e.data && e.data.fonte === "andar-pagina" && e.data.tipo === "quem") { paraPagina({ tipo: "ola" }); if (ultimo) paraPagina(ultimo); } }); // a página chegou depois: repete o último aviso
 })();
