@@ -118,6 +118,13 @@ function movel(it, sala) {
   else if (/^agente_\d$/.test(k) || /^npc_/.test(k) || k === "pet") { // pixel art em pé, sempre de frente para a câmera
     const sp = spriteDe(IMG[k], a.w, a.h); sp.scale.multiplyScalar(GENTE); add(sp); g.userData.billboard = true; prof = 0.4;
   }
+  else if (/^bib_/.test(k) && it.z === "wall" && IMG[k] && IMG[k].width) { // quadros, espelho e mural da biblioteca: a imagem na parede
+    const pl = new THREE.Mesh(new THREE.PlaneGeometry(a.w / T, a.h / T), new THREE.MeshStandardMaterial({ map: texDe(IMG[k]), transparent: true, alphaTest: 0.1, roughness: 0.7 }));
+    pl.position.set(0, a.h / T / 2, 0.06); add(pl); g.userData.parede = true; g.userData.alturaParede = k === "bib_espelho" ? 0.6 : 1.45; prof = 0.1;
+  }
+  else if (/^bib_/.test(k)) { // móveis e plantas da biblioteca: em pé, de frente para a câmera
+    const sp = spriteDe(IMG[k], a.w, a.h); sp.scale.multiplyScalar(/planta/.test(k) ? 1.4 : 1.15); add(sp); g.userData.billboard = true; prof = 0.4;
+  }
   else if (/^nat_/.test(k) && it.z === "floor") { // flores e pedras na grama
     const pl = new THREE.Mesh(new THREE.PlaneGeometry(a.w / T, a.h / T), new THREE.MeshStandardMaterial({ map: texDe(IMG[k]), transparent: true, alphaTest: 0.3, roughness: 0.95 }));
     pl.rotation.x = -Math.PI / 2; pl.position.set(0, 0.03, 0); add(pl); g.userData.chao = true; prof = 0.01;
@@ -204,7 +211,7 @@ const solidos = [], tetos = [], portas3d = []; // caixas no chão (colisão no 3
 const PE_DIREITO = 3.6; // mesma altura de parede e teto em todas as salas; telões grandes diminuem para caber
 const GENTE = 1.27; // o desenho da pessoa tem ~1,35 tile; ×1,27 ≈ 1,72 m, na escala dos móveis (1 tile = 1 m)
 const ESCALA_NAT = { nat_arvore: 2.6, nat_arvore2: 2.5, nat_pinheiro: 2.8, nat_arbusto: 1.6 };
-const SEM_BATER = /^(deco_|nat_|cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$|teclado|mouse$|notebook$|gabinete$|projecao$|sino$)/;
+const SEM_BATER = /^(deco_|nat_|bib_|cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$|teclado|mouse$|notebook$|gabinete$|projecao$|sino$)/;
 let objetos = null;
 function montar(S) {
   if (objetos) { cena.remove(objetos); objetos.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }

@@ -64,6 +64,39 @@
       if (!livreEm(x, y, 0.5, 0.5) && rnd() < 0.6) continue;
       out.push({ k, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, z: "floor", id: "nat_" + out.length, natureza: true });
     }
+    return out.concat(ambiente());
+  }
+  /* dentro das salas: quadros nos trechos livres da parede de cima e plantas nos cantos vazios (itens da biblioteca grátis) */
+  function ambiente() {
+    if (!ASSETS.bib_quadro_paisagem) return [];
+    const base = [];
+    for (const r of S.rooms) if (r.auto) base.push(...layout(r).map(it => Object.assign({ room: r.id }, it)));
+    base.push(...S.items);
+    const out = [], quadros = ["bib_quadro_paisagem", "bib_quadro_mar", "bib_quadro_sol"], plantas = ["bib_planta_vaso", "bib_planta_1", "bib_planta_2"];
+    const cx0 = it => it.x, cx1 = it => it.x + (ASSETS[it.k] ? ASSETS[it.k].w / T : 1);
+    S.rooms.forEach((r, ri) => {
+      if (TYPES[r.type].noWalls || r.type === "corredor") return;
+      const dentro = it => cx1(it) > r.x && cx0(it) < r.x + r.w;
+      // parede de cima: o que já ocupa (itens de parede, telões, móveis altos encostados) e a porta
+      const cheio = base.filter(it => dentro(it) && ASSETS[it.k] && it.y < r.y + 0.8 && it.y + ASSETS[it.k].h / T > r.y - 2.2 && (it.z === "wall" || ASSETS[it.k].h >= 48 || it.y < r.y + 0.2)).map(it => [cx0(it) - 0.3, cx1(it) + 0.3]);
+      for (const pt of portasDe(r)) if (pt.side === "cima") cheio.push([pt.tile - 0.2, pt.tile + 1.2]);
+      const livre = (x, w) => x >= r.x + 0.3 && x + w <= r.x + r.w - 0.3 && !cheio.some(([a, b]) => x < b && x + w > a);
+      let n = 0;
+      for (let x = r.x + 0.4; x < r.x + r.w - 1 && n < 2; x += 0.25) {
+        const k = r.type === "trabalho" || r.type === "ti" || r.type === "edicao" ? (n === 0 ? "bib_mural" : quadros[(ri + n) % 3]) : quadros[(ri + n) % 3];
+        const w = ASSETS[k].w / T; if (!livre(x, w)) continue;
+        out.push({ k, x: Math.round(x * 100) / 100, y: Math.round((r.y - (k === "bib_mural" ? 1.9 : 1.45)) * 100) / 100, z: "wall", room: r.id, id: "amb_" + r.id + "_" + n, natureza: true });
+        cheio.push([x - 0.8, x + w + 0.8]); n++; x += w;
+      }
+      // plantas nos cantos de cima (encostadas na parede), só se o canto estiver vazio e longe da porta
+      const ocupado = (x, y) => base.some(it => { const a = ASSETS[it.k]; if (!a || it.z === "wall" || it.z === "floor") return false; return x < cx1(it) + 0.1 && x + 1 > cx0(it) - 0.1 && y < it.y + a.h / T + 0.1 && y + 1 > it.y - 0.1; })
+        || portasDe(r).some(pt => (pt.side === "cima" && y < r.y + 1.5 || pt.side === "baixo" && y > r.y + r.h - 2.5) && x < pt.tile + 1.6 && x + 1 > pt.tile - 0.6);
+      let p = 0;
+      for (const [x, y] of [[r.x + 0.15, r.y + 0.1], [r.x + r.w - 1.15, r.y + 0.1], [r.x + 0.15, r.y + r.h - 1.15], [r.x + r.w - 1.15, r.y + r.h - 1.15]]) {
+        if (p >= 2 || ocupado(x, y)) continue;
+        out.push({ k: plantas[(ri + p) % 3], x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, room: r.id, id: "amb_p_" + r.id + "_" + p, natureza: true }); p++;
+      }
+    });
     return out;
   }
   window.Natureza = { itens() { if (typeof S === "undefined" || !S || !S.rooms) return []; if (de !== S) { de = S; cache = montar(); } return cache; } };
