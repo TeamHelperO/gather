@@ -34,7 +34,7 @@ module.exports = async (req, res) => {
   const salas = new Set((d.salas || []).map(s => s.id));
   const tarefas = (d.tarefas || []).filter(t => !t.sala || salas.has(t.sala));
   const rel = Rel.calcular({ tarefas, usuarios: d.usuarios, presenca: d.presenca });
-  const link = `https://${req.headers.host || "gather-next.vercel.app"}/escritorio.html?sala=nextco`;
+  const link = `https://${req.headers.host || "andar-app.vercel.app"}/escritorio.html?sala=nextco`;
   const html = Rel.html(rel, "Relatório da semana — Escritório Next Co.", link), texto = Rel.texto(rel, "Relatório da semana — Escritório Next Co.");
 
   // cron: todos os administradores; botão: só quem pediu

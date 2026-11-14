@@ -47,5 +47,18 @@
       "source": "/conheca",
       "destination": "/landing"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/:caminho((?!api/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "gather-next.vercel.app"
+        }
+      ],
+      "destination": "https://andar-app.vercel.app/:caminho",
+      "permanent": true
+    }
   ]
 }

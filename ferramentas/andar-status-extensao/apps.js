@@ -13,7 +13,7 @@ const SITES = [
   [/^(outlook\.office\.com|outlook\.live\.com)$/, "outlook"], [/(^|\.)office\.com$/, "office"], [/^www\.capcut\.com$/, "capcut"],
   [/^(www\.)?(framer\.com|webflow\.com)$/, "webflow"], [/^vercel\.com$/, "vercel"], [/\.supabase\.com$|^supabase\.com$/, "supabase"],
 ];
-const ANDAR = [/^gather-next\.vercel\.app$/, /(^|\.)andar\.app\.br$/, /^localhost$/, /^127\.0\.0\.1$/];
+const ANDAR = [/^andar-app\.vercel\.app$/, /^gather-next\.vercel\.app$/, /(^|\.)andar\.app\.br$/, /^localhost$/, /^127\.0\.0\.1$/];
 function appDoSite(url) {
   let u; try { u = new URL(url); } catch (e) { return null; }
   if (!/^https?:$/.test(u.protocol)) return null;
