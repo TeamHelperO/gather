@@ -236,7 +236,7 @@
   }
 
   /* quais eventos estão "valendo" agora (30 min antes até 15 min depois) */
-  let opt = {}, assinatura = "", mapaDe = null;
+  let opt = {}, assinatura = "", mapaDe = null, climaTema = null;
   function atualizar() {
     if (!window.S && typeof S === "undefined") return; if (!opt.reunioes) return;
     if (S !== mapaDe) { mapaDe = S; assinatura = ""; } // mapa novo: monta de novo
@@ -253,6 +253,7 @@
     for (const r of ativos) { const sala = S.rooms.find(q => q.id === r.sala_id); if (sala) itens.push(...montarTema(sala, temaDe(r), r.titulo)); }
     for (const x of doAno) { const sala = S.rooms.find(q => q.id === x.sala); if (sala) itens.push(...montarTema(sala, x.tema, null)); }
     window.DECORACAO = itens.length ? itens : null;
+    climaTema = doAno.length ? doAno[0].tema : null; // a vegetação e o clima seguem a data comemorativa do ano
     try { _itensDe = null; } catch (e) {}
     opt.aoMudar && opt.aoMudar(ativos, doAno);
   }
@@ -338,5 +339,5 @@
     });
   }
 
-  window.Decoracao = { TEMAS, ANUAIS, anuaisAtivos, periodoTexto, recorteDoLogo, previa, temaDe, pautaSemTema, comTema, iniciar, atualizar, aplicarLogo, prepararLogo, get itens() { return window.DECORACAO || []; } };
+  window.Decoracao = { TEMAS, ANUAIS, anuaisAtivos, periodoTexto, recorteDoLogo, previa, temaDe, pautaSemTema, comTema, iniciar, atualizar, aplicarLogo, prepararLogo, get itens() { return window.DECORACAO || []; }, get clima() { return climaTema; } };
 })();

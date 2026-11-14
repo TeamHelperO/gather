@@ -25,7 +25,8 @@ const mats = {};
 const mat = (cor, o = {}) => { const k = cor + JSON.stringify(o); return mats[k] || (mats[k] = new THREE.MeshStandardMaterial({ color: cor, roughness: 0.78, metalness: 0.02, ...o })); };
 const brilho = (cor, forca = 1.4) => mat("#111111", { emissive: new THREE.Color(cor), emissiveIntensity: forca, roughness: 0.4 });
 function texturaPiso(tipo) {
-  const [a, b] = PISO[tipo] || PISO.f_madeira, c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d");
+  const cl = tipo === "f_grama" && window.Natureza && Natureza.clima;
+  const [a, b] = (cl && cl.grama3d) || PISO[tipo] || PISO.f_madeira, c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d");
   g.fillStyle = a; g.fillRect(0, 0, 64, 64);
   if (tipo === "f_madeira" || tipo === "f_palco") { g.fillStyle = b; for (let i = 0; i < 4; i++) g.fillRect(0, i * 16, 64, 1); g.fillRect(((0) % 64), 0, 1, 16); g.fillRect(32, 16, 1, 16); g.fillRect(12, 32, 1, 16); g.fillRect(44, 48, 1, 16); }
   else if (tipo === "f_ceramica" || tipo === "f_ti") { g.fillStyle = b; g.fillRect(0, 0, 64, 2); g.fillRect(0, 0, 2, 64); g.fillRect(0, 32, 64, 2); g.fillRect(32, 0, 2, 64); if (tipo === "f_ti") { g.fillStyle = "#2fd4e8"; g.fillRect(6, 6, 3, 3); g.fillRect(40, 40, 3, 3); } }
@@ -211,7 +212,7 @@ const paredes = [], cartazes = []; // cartazes: agentes, NPCs e pets em pixel ar
 const solidos = [], tetos = [], portas3d = []; // caixas no chão (colisão no 3D), tetos (só na 1ª pessoa) e portas que abrem
 const PE_DIREITO = 3.6; // mesma altura de parede e teto em todas as salas; telões grandes diminuem para caber
 const GENTE = 1.27; // o desenho da pessoa tem ~1,35 tile; ×1,27 ≈ 1,72 m, na escala dos móveis (1 tile = 1 m)
-const ESCALA_NAT = { nat_arvore: 2.6, nat_arvore2: 2.5, nat_pinheiro: 2.8, nat_arbusto: 1.6 };
+const ESCALA_NAT = { nat_arvore: 2.6, nat_arvore2: 2.5, nat_pinheiro: 2.8, nat_arbusto: 1.6, nat_arvore_neve: 2.6, nat_pinheiro_neve: 2.8, nat_arbusto_neve: 1.6, nat_arvore_seca: 2.6, nat_arvore_flor: 2.6, nat_abobora: 1.3 };
 const SEM_BATER = /^(deco_|nat_|bib_|cadeira_|pessoa|npc_|pet$|tapete$|f_palco$|palco_frente$|placa$|logo$|relogio$|quadro_avisos$|janela$|porta_retrato$|monitor$|teclado|mouse$|notebook$|gabinete$|projecao$|sino$)/;
 let objetos = null;
 function montar(S) {
@@ -220,13 +221,14 @@ function montar(S) {
   const W = S.w, H = S.h;
   const tg = texturaPiso("f_grama"); tg.repeat.set((W + 40) / 2, (H + 40) / 2);
   const grama = new THREE.Mesh(new THREE.PlaneGeometry(W + 40, H + 40), new THREE.MeshStandardMaterial({ map: tg, roughness: 1 }));
+  { const cl = window.Natureza && Natureza.clima; CEU.set((cl && cl.ceu) || "#a9cdf0"); } // céu da data comemorativa
   grama.rotation.x = -Math.PI / 2; grama.position.set(W / 2, 0, H / 2); grama.receiveShadow = true; objetos.add(grama);
   // mata em volta do escritório (só no 3D, onde a grama continua além do mapa)
   { const ks = ["nat_arvore", "nat_arvore2", "nat_pinheiro", "nat_arvore", "nat_pinheiro", "nat_arbusto"], mats = {};
     let sd = (W * 31 + H * 17) >>> 0; const rr = () => (sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
     for (let x = -10; x < W + 10; x += 2.3) for (let z = -10; z < H + 10; z += 2.3) {
       if (!(x < -1 || z < -1.2 || x > W + 0.4 || z > H + 0.4) || rr() < 0.22) continue;
-      const k = ks[Math.floor(rr() * ks.length)], im = IMG[k], a = ASSETS[k]; if (!im || !a) continue;
+      const k0 = ks[Math.floor(rr() * ks.length)], k = window.Natureza ? Natureza.chave(k0) : k0, im = IMG[k], a = ASSETS[k]; if (!im || !a) continue;
       const m = mats[k] || (mats[k] = new THREE.SpriteMaterial({ map: texDe(im), alphaTest: 0.5 }));
       const sp = new THREE.Sprite(m), e = ESCALA_NAT[k] || 2.4; sp.center.set(0.5, 0.02); sp.scale.set(a.w / T * e, a.h / T * e, 1);
       sp.position.set(x + rr() * 1.1, 0, z + rr() * 1.1); objetos.add(sp);
@@ -489,8 +491,10 @@ const Iso3D = {
       const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw), f = -vy, l = vx;
       return [f * fx + l * rx, f * fz + l * rz];
     }
-    const c = Math.cos(giro), s = Math.sin(giro), ix = (vx - vy) * Math.SQRT1_2, iy = (vx + vy) * Math.SQRT1_2;
-    return [ix * c - iy * s, ix * s + iy * c];
+    // isométrico: W anda para dentro da tela e D para a direita da tela, seja qual for o giro da câmera
+    const ang = angulo(), fx = -Math.sin(ang), fz = -Math.cos(ang), rx = -fz, rz = fx, f = -vy, l = vx;
+    const mx = f * fx + l * rx, mz = f * fz + l * rz, n = Math.hypot(mx, mz) || 1, m = Math.min(1, Math.hypot(vx, vy));
+    return [mx / n * m, mz / n * m];
   },
   render(atores, desenhaveis, t, zoom, P, dt) {
     if (!ativo) return;

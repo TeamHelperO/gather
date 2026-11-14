@@ -333,6 +333,8 @@ function drawWorld(c, extra){
   const v = window.SEM_RECORTE ? null : areaVisivel(c);
   // ground
   c.fillStyle = PAT.f_grama; if (v) c.fillRect(Math.max(0, v.x0), Math.max(0, v.y0), Math.min(S.w*T, v.x1) - Math.max(0, v.x0), Math.min(S.h*T, v.y1) - Math.max(0, v.y0)); else c.fillRect(0,0,S.w*T,S.h*T);
+  const tinta = window.Natureza && Natureza.tintaGrama; // neve, entardecer de Halloween…: a grama muda com a data
+  if (tinta){ c.fillStyle = tinta; if (v) c.fillRect(Math.max(0, v.x0), Math.max(0, v.y0), Math.min(S.w*T, v.x1) - Math.max(0, v.x0), Math.min(S.h*T, v.y1) - Math.max(0, v.y0)); else c.fillRect(0,0,S.w*T,S.h*T); }
   // floors
   for (const r of S.rooms){ if (!naArea(v, r.x*T, r.y*T, r.w*T, r.h*T)) continue; c.fillStyle = PAT[r.floor || TYPES[r.type].floor] || PAT.f_madeira; c.fillRect(r.x*T, r.y*T, r.w*T, r.h*T); }
   const items = allItems();

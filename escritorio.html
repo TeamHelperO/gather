@@ -534,6 +534,7 @@ async function boot(){
   spawn();
   Projecao.iniciar({ eu: () => P, outros: () => outros, toast, registrar: (d, sala) => Dados.registrarAtividade(EMAIL, "acao", d, {sala}) });
   Palco.iniciar({ eu: () => P, outros: () => outros, toast, aoMudarAudio: () => atualizarBotaoAudio() });
+  if (window.Natureza) Natureza.configurar({ dentro: () => { if (!P || !em3d() || !Iso3D.primeiraPessoa) return false; const r = roomAt(P.px, P.py - 4); return !!(r && !TYPES[r.type].noWalls); } });
   Reuniao.iniciar({ toast, salaAtual: () => { const id = salaAtualId(); return id ? roomById(id) : null; }, teleportar: teleportarSentado });
   TI.iniciar({ eu: () => P, toast, aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
   Edicao.iniciar({ eu: () => P, toast, aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
