@@ -12,10 +12,15 @@ window.Palco = (function () {
 
   function iniciar(o) { opt = o; }
   const eu = () => opt.eu();
-  const salaAud = a => { const r = roomAt(a.px, a.py - 4); return r && r.type === "auditorio" ? r : null; };
+  // sala de reunião com reunião valendo funciona como o auditório: quem apresenta é o "palco", o resto é plateia
+  const reuniaoDe = a => { const r = roomAt(a.px, a.py - 4); return r && r.type === "reuniao" && window.Reuniao && Reuniao.ativaEm(r) ? r : null; };
+  const salaAud = a => { const r = roomAt(a.px, a.py - 4); return r && r.type === "auditorio" ? r : reuniaoDe(a); };
   const noPalco = a => Projecao.salaNoPalco(a);
-  // palco que a pessoa pode usar (com palestrante fixo, só ele)
-  const palcoUsavel = a => { const p = noPalco(a); return p && Acesso.podePalestrar(a, p.id) ? p : null; };
+  // palco que a pessoa pode usar (com palestrante fixo, só ele); na reunião, só quem apresenta
+  const palcoUsavel = a => {
+    const reu = reuniaoDe(a); if (reu) return Reuniao.palestranteDaSala(reu) === a.id ? reu : null;
+    const p = noPalco(a); return p && Acesso.podePalestrar(a, p.id) ? p : null;
+  };
 
   /* palestrante que manda na sala (o que mexeu por último, entre quem está no palco agora) */
   function moderador(sala) {
@@ -32,8 +37,9 @@ window.Palco = (function () {
     if (!opt) return;
     const e = eu(), palco = palcoUsavel(e), aud = salaAud(e);
     // --- palestrante ---
-    if (palco && palco.type === "auditorio") {
-      if (!mod || mod.sala !== palco.id) mod = { sala: palco.id, mudo: false, libera: [], cala: [], atendidos: {}, t: 0 };
+    if (palco && (palco.type === "auditorio" || palco.type === "reuniao")) {
+      // na reunião todo mundo começa mutado (quem apresenta libera a fala de quem levantar a mão)
+      if (!mod || mod.sala !== palco.id) mod = { sala: palco.id, mudo: palco.type === "reuniao", libera: [], cala: [], atendidos: {}, t: palco.type === "reuniao" ? Date.now() : 0 };
       if (maoT) maoT = null;
     } else mod = null;
     // --- plateia ---
@@ -51,7 +57,8 @@ window.Palco = (function () {
     if (deveTravar !== travado) {
       travado = deveTravar;
       Voz.bloquear(travado, true);
-      opt.toast(travado ? "🔇 O palestrante mutou a plateia. Levante a mão para pedir a palavra" : "🎙️ Seu microfone foi liberado");
+      const naReuniao = aud && aud.type === "reuniao";
+      opt.toast(travado ? (naReuniao ? "🔇 Reunião em andamento: você entrou mutado. Levante a mão ✋ para pedir a palavra" : "🔇 O palestrante mutou a plateia. Levante a mão para pedir a palavra") : "🎙️ Seu microfone foi liberado");
       opt.aoMudarAudio && opt.aoMudarAudio();
     }
     if (estaLiberado && !liberado) opt.toast("🎙️ Você pode falar agora");
@@ -61,7 +68,7 @@ window.Palco = (function () {
 
   /* ---------------- ações ---------------- */
   function levantarMao() {
-    const e = eu(); if (!salaAud(e) || palcoUsavel(e)) { opt.toast("Levantar a mão funciona na plateia do auditório"); return; }
+    const e = eu(); if (!salaAud(e) || palcoUsavel(e)) { opt.toast("Levantar a mão funciona na plateia do auditório e nas reuniões"); return; }
     maoT = maoT ? null : Date.now();
     opt.toast(maoT ? "✋ Mão levantada: o palestrante vai ver seu pedido" : "Mão abaixada");
     atualizarBotoes(e, palcoUsavel(e), salaAud(e));
@@ -94,7 +101,7 @@ window.Palco = (function () {
       else { const txt = maoT ? "✋ Baixar a mão" : "✋ Levantar a mão"; if (bm.textContent !== txt) bm.textContent = txt; }
       bm.classList.toggle("on", !!maoT);
     }
-    const quero = palco && palco.type === "auditorio" ? palco.id : null;
+    const quero = palco && (palco.type === "auditorio" || palco.type === "reuniao") ? palco.id : null;
     if (quero !== painelSala) { painelSala = quero; renderPainel(); }
     else if (painelSala) renderPainelLeve();
   }
@@ -110,7 +117,8 @@ window.Palco = (function () {
     const f = fila(), pl = plateia();
     ultimaAssinatura = JSON.stringify([mod.mudo, mod.libera, mod.cala, f.map(o => o.id), pl.map(o => [o.id, !!o.mic])]);
     const falando = pl.filter(o => mod.libera.includes(o.id));
-    el.innerHTML = `<div class="pp-top"><b>🎤 Você está no palco</b><small>${pl.length} na plateia</small></div>
+    const reu = (roomById(mod.sala) || {}).type === "reuniao";
+    el.innerHTML = `<div class="pp-top"><b>${reu ? "🎤 Você está apresentando" : "🎤 Você está no palco"}</b><small>${pl.length} ${reu ? "na reunião" : "na plateia"}</small></div>
       <div class="pp-acoes">${mod.mudo
         ? `<button class="pp-btn" data-desmutar>🎙️ Desmutar todos</button>`
         : `<button class="pp-btn alerta" data-mutar>🔇 Mutar todos</button>`}</div>
@@ -120,7 +128,7 @@ window.Palco = (function () {
           ${mod.libera.includes(o.id) ? "" : `<button class="pp-mini ok" data-liberar="${esc(o.id)}">🎙️ Liberar fala</button>`}
           <button class="pp-mini" data-dispensar="${esc(o.id)}" title="Tirar da fila sem liberar">✕</button></div>`).join("")
         : `<div class="pp-vazio">Ninguém pediu a palavra.</div>`}
-      ${pl.length ? `<details class="pp-det"><summary>Plateia</summary>${pl.map(o => {
+      ${pl.length ? `<details class="pp-det"><summary>${reu ? "Participantes" : "Plateia"}</summary>${pl.map(o => {
           const cal = (mod.mudo && !mod.libera.includes(o.id)) || mod.cala.includes(o.id);
           return `<div class="pp-linha"><span>${cal ? "🔇" : "🎙️"} ${esc(o.nome)}</span>${cal ? `<button class="pp-mini ok" data-liberar="${esc(o.id)}">Liberar</button>` : `<button class="pp-mini" data-mutarp="${esc(o.id)}">Mutar</button>`}</div>`; }).join("")}</details>` : ""}`;
   }

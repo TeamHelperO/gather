@@ -281,6 +281,7 @@ function allItems(){
   for (const r of S.rooms) if (r.auto) for (const it of layout(r)){ const aj = r.ajustes && r.ajustes[chaveAuto(it, r)]; if (aj){ if (aj.rot) it.rot = aj.rot; if (aj.flip) it.flip = true; } out.push(it); }
   for (const it of S.items) if (!(window.OCULTAR_PESSOAS && /^pessoa/.test(it.k))) out.push(it);
   if (window.DECORACAO) for (const it of window.DECORACAO) if (ASSETS[it.k]) out.push(it); // decoração temática dos eventos (não fica salva no mapa)
+  if (window.Natureza) for (const it of Natureza.itens()) out.push(it); // árvores e flores da área externa (calculadas, não ficam salvas)
   if (window.CACHE_ITENS){ _itensCache = out; _itensDe = S; }
   return out;
 }

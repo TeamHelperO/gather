@@ -308,7 +308,10 @@ window.Social = (function () {
       const ini = new Date(r.inicio).getTime(), falta = ini - agora;
       const k5 = r.id + ":5", k0 = r.id + ":0";
       if (falta <= 5 * 60e3 && falta > 60e3 && !lembrados[k5]) { lembrados[k5] = 1; ls.set("nextco_lembretes", lembrados); lembrete(r, `Começa em ${Math.round(falta / 60e3)} min`); }
-      if (falta <= 60e3 && falta > -10 * 60e3 && !lembrados[k0]) { lembrados[k0] = 1; ls.set("nextco_lembretes", lembrados); lembrete(r, "Começando agora"); }
+      if (falta <= 60e3 && falta > -10 * 60e3 && !lembrados[k0]) { lembrados[k0] = 1; ls.set("nextco_lembretes", lembrados);
+        // reunião numa sala: convite para entrar já sentado (no lugar do lembrete)
+        if (r.sala_id && window.Reuniao) { som("reuniao"); notificar(`📅 ${r.titulo}`, `Começando agora${r.sala_nome ? " · " + r.sala_nome : ""}`, null, true); if (Reuniao.convite(r)) continue; }
+        lembrete(r, "Começando agora"); }
     }
   }
   function lembrete(r, quando) {
@@ -382,6 +385,7 @@ window.Social = (function () {
         <label>Sala<select name="sala"><option value="">Sem sala</option>${salas.map(s => `<option value="${esc(s.id)}" ${s.id === padrao ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>
         <label>Convidados <small>(sem ninguém marcado = todos)</small></label>
         <div class="ag-conv">${usuarios.filter(u => u.id !== Dados.meuId()).map(u => `<label class="chip"><input type="checkbox" name="conv" value="${u.id}" ${conv.has(u.id) ? "checked" : ""}><span class="av" style="background:${corNome(u.nome)}">${esc(iniciais(u.nome))}</span>${esc(u.nome)}</label>`).join("")}</div>
+        <label>Quem apresenta <small>(fala sem pedir; os outros entram mutados e levantam a mão)</small><select name="pal">${[{ id: Dados.meuId(), nome: (opt.eu().nome || "Eu") + " (eu)" }, ...usuarios.filter(u => u.id !== Dados.meuId())].map(u => `<option value="${u.id}" ${(r ? (window.Reuniao ? Reuniao.palestranteDe(r) : r.criado_por) : Dados.meuId()) === u.id ? "selected" : ""}>${esc(u.nome)}</option>`).join("")}</select></label>
         <label>Pauta<textarea name="pauta" rows="3" maxlength="1000" placeholder="Opcional">${esc(r ? D.pautaSemTema(r.pauta) || "" : "")}</textarea></label>
         ${opt.souAdmin && opt.souAdmin() ? `<label>Decoração temática <small>(a sala do evento se enfeita sozinha de 30 min antes até 15 min depois)</small><select name="tema"><option value="">Nenhuma</option>${Object.entries(D.TEMAS).map(([k, t]) => `<option value="${k}" ${r && D.temaDe(r) === k ? "selected" : ""}>${esc(t.nome)}</option>`).join("")}</select></label>` : ""}
         <div class="ag-ac"><button class="btn pri">${r ? "Salvar" : "Marcar e avisar"}</button><button type="button" class="btn" data-voltar>Voltar</button></div>
@@ -393,7 +397,7 @@ window.Social = (function () {
       const fd = new FormData(f), inicio = new Date(fd.get("data") + "T" + fd.get("hora")), fim = new Date(inicio.getTime() + (+fd.get("dur")) * 60e3);
       const sala = salas.find(s => s.id === fd.get("sala"));
       const temaEsc = fd.has("tema") ? String(fd.get("tema") || "") : (r ? D.temaDe(r) : ""); // quem não é admin não vê a opção e mantém o tema que já existia
-      const dados = { mapa_id: opt.mapaId, titulo: String(fd.get("titulo")).trim(), pauta: D.comTema(String(fd.get("pauta") || "").trim(), temaEsc) || null, inicio: inicio.toISOString(), fim: fim.toISOString(),
+      const dados = { mapa_id: opt.mapaId, titulo: String(fd.get("titulo")).trim(), pauta: D.comTema((String(fd.get("pauta") || "").trim() + (fd.get("pal") && fd.get("pal") !== (r ? r.criado_por : Dados.meuId()) ? ` ⟦pal:${fd.get("pal")}⟧` : "")).trim(), temaEsc) || null, inicio: inicio.toISOString(), fim: fim.toISOString(),
         sala_id: sala ? sala.id : null, sala_nome: sala ? sala.name : null, convidados: fd.getAll("conv") };
       if (r) dados.id = r.id;
       try {

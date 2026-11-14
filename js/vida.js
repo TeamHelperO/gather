@@ -142,9 +142,18 @@ function moverAtor(a, dt, vx, vy, livre, vel){
   a.moving = mag > 0.01;
   if (a.moving){
     if (mag > 1){ vx /= mag; vy /= mag; }
-    const sx = vx*vel*dt, sy = vy*vel*dt;
+    const sx = vx*vel*dt, sy = vy*vel*dt, x0 = a.x, y0 = a.y;
     if (!livre || livre(a.x + sx, a.y)) a.x += sx;
     if (!livre || livre(a.x, a.y + sy)) a.y += sy;
+    // quina de porta: bateu andando reto? escorrega para o lado livre mais perto (até 18 px) e entra na porta
+    if (livre && a.deslizar){
+      const passo = Math.max(1, vel*dt);
+      if (Math.abs(sy) > 0.01 && a.y === y0 && Math.abs(vx) < Math.abs(vy) * 0.6) {
+        for (const d of [3, 6, 9, 12, 15, 18]) { const s = [-1, 1].find(s => livre(a.x + s*d, a.y + sy) && livre(a.x + s*Math.min(d, passo), a.y)); if (s) { a.x += s*Math.min(d, passo); break; } }
+      } else if (Math.abs(sx) > 0.01 && a.x === x0 && Math.abs(vy) < Math.abs(vx) * 0.6) {
+        for (const d of [3, 6, 9, 12, 15, 18]) { const s = [-1, 1].find(s => livre(a.x + sx, a.y + s*d) && livre(a.x, a.y + s*Math.min(d, passo))); if (s) { a.y += s*Math.min(d, passo); break; } }
+      }
+    }
     a.dir = Math.abs(vx) > Math.abs(vy) ? (vx < 0 ? 1 : 2) : (vy < 0 ? 3 : 0);
     a.anim += dt*8; a.frame = 1 + (Math.floor(a.anim) % 4); a.parado = 0;
   } else { a.frame = 0; a.parado += dt; }

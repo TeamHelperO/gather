@@ -172,10 +172,10 @@
   const periodoTexto = (id, ano = new Date().getFullYear()) => { const [i, f] = ANUAIS[id].periodo(ano), fm = d => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", ""); return `${fm(i)} a ${fm(f)}`; };
 
   /* tema guardado no fim da pauta: "⟦tema:natal⟧" (não precisa de coluna nova no banco) */
-  const MARCA = /\s*⟦tema:([a-z]+)⟧\s*$/;
+  const MARCA = /⟦tema:([a-z_]+)⟧/; // marcas na pauta: ⟦tema:natal⟧, ⟦pal:id de quem apresenta⟧ (não aparecem para ninguém)
   const temaDe = r => { const m = r && r.pauta && String(r.pauta).match(MARCA); return m && TEMAS[m[1]] ? m[1] : null; };
-  const pautaSemTema = p => p ? String(p).replace(MARCA, "") : p;
-  const comTema = (pauta, tema) => { const p = pautaSemTema(pauta || "").trim(); return tema && TEMAS[tema] ? (p ? p + " " : "") + `⟦tema:${tema}⟧` : (p || null); };
+  const pautaSemTema = p => p ? String(p).replace(/\s*⟦[a-z_]+:[^⟧]*⟧/g, "").trim() : p; // texto da pauta, sem nenhuma marca
+  const comTema = (pauta, tema) => { const p = String(pauta || "").replace(/\s*⟦tema:[a-z_]+⟧/g, "").trim(); return tema && TEMAS[tema] ? (p ? p + " " : "") + `⟦tema:${tema}⟧` : (p || null); };
 
   /* onde pôr: cantos livres no chão e a parede de cima */
   function ocupado(x, y, w, h, extra) {

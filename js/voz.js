@@ -18,6 +18,7 @@ window.Voz = (function () {
   const SAIDA_NO_ELEMENTO = typeof HTMLMediaElement !== "undefined" && typeof HTMLMediaElement.prototype.setSinkId === "function";
 
   let ligado = false, stream = null, micAberto = true, ctxAudio = null, meuId = null;
+  let cam = null; // câmera ligada (vídeo chamada): MediaStream com a trilha de vídeo
   let iceServers = (window.CONFIG && CONFIG.ICE) || [];
   /* Busca servidores TURN (necessários em 4G/redes de empresa). /api/turn devolve [] se não estiver configurado. */
   async function carregarIce() {
@@ -222,8 +223,12 @@ window.Voz = (function () {
     peers.set(id, p);
     if (stream) for (const t of stream.getAudioTracks()) pc.addTrack(t, stream);
     else pc.addTransceiver("audio", { direction: "recvonly" });
+    if (iniciar) { // quem liga já abre o canal de vídeo; quem atende usa o que veio na oferta (aoSinal)
+      try { p.vt = pc.addTransceiver("video", { direction: "sendrecv" }); if (cam) p.vt.sender.replaceTrack(cam.getVideoTracks()[0]).catch(() => {}); } catch (e) {}
+    }
     pc.onicecandidate = (e) => { if (e.candidate) Sala.sinal(id, { tipo: "ice", candidato: e.candidate.toJSON() }); };
     pc.ontrack = (e) => {
+      if (e.track.kind === "video") { p.video = new MediaStream([e.track]); return; } // vídeo: mostrado na faixa de vídeo
       const ms = e.streams[0] || new MediaStream([e.track]);
       if (!p.audio) { p.audio = new Audio(); p.audio.autoplay = true; p.audio.playsInline = true; p.audio.style.display = "none"; document.body.appendChild(p.audio); }
       p.audio.srcObject = ms;
@@ -260,6 +265,7 @@ window.Voz = (function () {
     try { p.pc.close(); } catch (e) {}
     try { if (p.fonte) p.fonte.disconnect(); if (p.ganho) p.ganho.disconnect(); } catch (e) {}
     if (p.audio) { p.audio.srcObject = null; p.audio.remove(); }
+    p.video = null;
     if (avisar) Sala.sinal(id, { tipo: "tchau" });
   }
   async function aoSinal(msg) {
@@ -271,6 +277,8 @@ window.Voz = (function () {
         p = criar(id, false);
         await p.pc.setRemoteDescription(msg.sdp);
         for (const c of p.pendentes) await p.pc.addIceCandidate(c).catch(() => {}); p.pendentes = [];
+        const vt = p.pc.getTransceivers().find(t => t.receiver && t.receiver.track && t.receiver.track.kind === "video");
+        if (vt) { try { vt.direction = "sendrecv"; p.vt = vt; if (cam) await vt.sender.replaceTrack(cam.getVideoTracks()[0]); } catch (e) {} }
         const resp = await p.pc.createAnswer(); await p.pc.setLocalDescription(resp);
         Sala.sinal(id, { tipo: "resposta", sdp: p.pc.localDescription.toJSON() });
       } else if (msg.tipo === "resposta") {
@@ -321,7 +329,25 @@ window.Voz = (function () {
     }
     for (const id of [...peers.keys()]) if (!outros.some(o => o.id === id)) fechar(id, false);
   }
-  function desligar() { for (const id of [...peers.keys()]) fechar(id, true); if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; ligado = false; }
+  /* ---------- câmera (vídeo chamada) ---------- */
+  async function ligarCamera() {
+    if (cam) return true;
+    try { cam = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15, max: 20 }, facingMode: "user" }, audio: false }); }
+    catch (e) { cam = null; return false; }
+    const tr = cam.getVideoTracks()[0];
+    tr.onended = () => desligarCamera(); // câmera tirada / permissão revogada
+    for (const p of peers.values()) if (p.vt) p.vt.sender.replaceTrack(tr).catch(() => {});
+    return true;
+  }
+  function desligarCamera() {
+    if (!cam) return;
+    for (const p of peers.values()) if (p.vt) p.vt.sender.replaceTrack(null).catch(() => {});
+    cam.getTracks().forEach(t => t.stop()); cam = null;
+  }
+  /* vídeo de uma pessoa (só de quem está ligado comigo e com a câmera aberta) */
+  function videoDe(id) { const p = peers.get(id); return p && p.video && p.pc.connectionState === "connected" ? p.video : null; }
+
+  function desligar() { desligarCamera(); for (const id of [...peers.keys()]) fechar(id, true); if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; ligado = false; }
 
   // fone desconectado / novo dispositivo: se o escolhido sumiu, segue no padrão
   if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
@@ -335,6 +361,7 @@ window.Voz = (function () {
   }
 
   return {
+    ligarCamera, desligarCamera, videoDe, get camAberta() { return !!cam; }, get minhaCam() { return cam; },
     configurar, ativar, alternarMic, desbloquear, bloquear, get bloqueado() { return bloqueado; }, aoSinal, atualizar, desligar, zona,
     dispositivos, pedirPermissao, trocarMic, processamento, aplicarSaida, testarSaida, testeMic,
     volumePessoa, definirVolumePessoa,

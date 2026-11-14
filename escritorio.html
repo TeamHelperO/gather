@@ -153,6 +153,17 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 .sc-adm small{color:var(--mut);font-size:11px;font-weight:800;text-transform:uppercase}
 .sc-adm button{padding:8px;border-radius:10px;background:var(--chip);border:1px solid var(--line);font-weight:700;font-size:13px;text-align:left}
 .soc-card .dan,.sc-adm .dan{color:#e5484d}
+#faixaVideo{position:fixed;z-index:40;top:62px;left:50%;transform:translateX(-50%);display:none;gap:8px;max-width:calc(100vw - 140px);overflow-x:auto;padding:4px}
+#faixaVideo.on{display:flex}
+#faixaVideo .fv-b{position:relative;flex:none;width:168px;height:126px;border-radius:14px;overflow:hidden;background:#111;box-shadow:0 6px 18px rgba(0,0,0,.35);border:2px solid transparent;cursor:zoom-in;transition:width .2s,height .2s}
+#faixaVideo .fv-b.grande{width:360px;height:270px;cursor:zoom-out}#faixaVideo .fv-b.fala{border-color:#3fbf5f}
+#faixaVideo video{width:100%;height:100%;object-fit:cover;display:block}#faixaVideo .eu video{transform:scaleX(-1)}
+#faixaVideo .fv-n{position:absolute;left:6px;bottom:6px;max-width:calc(100% - 12px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(0,0,0,.55);color:#fff;font:600 11.5px system-ui,sans-serif;padding:2px 7px;border-radius:7px}
+.emotes.hud #btnCam.on{background:#3fbf5f;color:#fff}
+@media (max-width:700px){#faixaVideo .fv-b{width:120px;height:90px}#faixaVideo .fv-b.grande{width:240px;height:180px}}
+.reu-convite{position:fixed;z-index:72;left:50%;top:76px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:min(560px,94vw);background:var(--panel,#fff);color:var(--ink,#1d1b26);border:2px solid #3d5afe;border-radius:16px;padding:12px 14px;box-shadow:0 12px 40px rgba(0,0,0,.35);animation:reuIn .35s ease}
+.reu-convite .rc-ic{font-size:28px}.reu-convite .rc-tx{display:flex;flex-direction:column;gap:2px;flex:1;min-width:180px}.reu-convite .rc-tx b{font-size:15px}.reu-convite .rc-tx small{color:var(--mut,#8a857c);font-size:12px}
+.reu-convite .rc-ac{display:flex;gap:8px}@keyframes reuIn{from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)}}
 .soc-toque{position:fixed;z-index:70;left:50%;top:76px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:min(560px,94vw);
   background:var(--panel);color:var(--ink);border:2px solid var(--brand);border-radius:16px;padding:12px 14px;box-shadow:0 18px 50px rgba(0,0,0,.45);animation:tqIn .35s cubic-bezier(.2,1.4,.4,1)}
 @keyframes tqIn{from{transform:translate(-50%,-14px) scale(.95);opacity:0}}
@@ -417,7 +428,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 </div>
 <div class="zoom pill hud"><button id="zin" aria-label="Aproximar"></button><button id="zout" aria-label="Afastar"></button><button id="b3d" title="Alternar 2D / 3D isométrico" aria-label="Alternar 2D e 3D"></button><button id="bVista" title="Primeira pessoa ou visão de cima (V)" style="display:none"></button><button id="gEsq" title="Girar câmera (Q)" style="display:none"></button><button id="gDir" title="Girar câmera (E)" style="display:none"></button><button id="bMapa" title="Minimapa (M)" aria-label="Mostrar ou esconder o minimapa"></button></div>
 <div class="emotes pill hud">
-  <button id="btnAudio">Ligar áudio</button><button id="btnCfgAudio" title="Microfone, saída de áudio e volume de cada pessoa" aria-label="Configurar áudio"></button><i class="div"></i><button id="btnMont">Patinete</button><button id="btnMao" style="display:none">Levantar a mão</button><button data-emote="5" title="Acenar"></button><button data-emote="6" title="Dançar"></button><button data-emote="4" title="Sentar ou levantar"></button><button id="btnLuz" style="display:none" title="Acender ou apagar a luz desta sala (L)"></button>
+  <button id="btnAudio">Ligar áudio</button><button id="btnCfgAudio" title="Microfone, saída de áudio e volume de cada pessoa" aria-label="Configurar áudio"></button><button id="btnCam" title="Ligar ou desligar a câmera (vídeo chamada com quem está na mesma sala)"></button><i class="div"></i><button id="btnMont">Patinete</button><button id="btnMao" style="display:none">Levantar a mão</button><button data-emote="5" title="Acenar"></button><button data-emote="6" title="Dançar"></button><button data-emote="4" title="Sentar ou levantar"></button><button id="btnLuz" style="display:none" title="Acender ou apagar a luz desta sala (L)"></button>
 </div>
 <div id="acoesCentro"><button class="pill hud" id="btnProj"></button>
 <button class="pill hud" id="btnTelao" style="display:none;padding:11px 16px;font-weight:800;font-size:14px;background:#3d5afe;color:#fff;border-color:#3d5afe">Abrir telão</button></div>
@@ -435,6 +446,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 <script src="js/projecao.js"></script>
 <script src="js/ti.js"></script>
 <script src="js/decoracao.js"></script>
+<script src="js/natureza.js"></script>
 <script src="js/edicao.js"></script>
 <script src="js/video.js"></script>
 <script src="js/palco.js"></script>
@@ -449,6 +461,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 <script src="js/sala.js"></script>
 <script src="js/sessao-unica.js"></script>
 <script src="js/social.js"></script>
+<script src="js/reuniao.js"></script>
 <script src="js/relatorio-core.js"></script>
 <script src="js/gestor.js"></script>
 <script src="js/configuracoes.js"></script>
@@ -460,6 +473,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 <script>
 /* ícones da barra (Lucide) */
 ROTULO(document.getElementById("btnAudio"), "headphones", "Ligar áudio");
+ROTULO(document.getElementById("btnCam"), "video-off", "Câmera");
 ROTULO(document.getElementById("bMapa"), "map", "");
 ROTULO(document.getElementById("btnCfgAudio"), "settings", "");
 ROTULO(document.querySelector('[data-emote="5"]'), "hand", "Acenar");
@@ -518,6 +532,7 @@ async function boot(){
   spawn();
   Projecao.iniciar({ eu: () => P, outros: () => outros, toast, registrar: (d, sala) => Dados.registrarAtividade(EMAIL, "acao", d, {sala}) });
   Palco.iniciar({ eu: () => P, outros: () => outros, toast, aoMudarAudio: () => atualizarBotaoAudio() });
+  Reuniao.iniciar({ toast, salaAtual: () => { const id = salaAtualId(); return id ? roomById(id) : null; }, teleportar: teleportarSentado });
   TI.iniciar({ eu: () => P, toast, aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
   Edicao.iniciar({ eu: () => P, toast, aoAbrir: () => { keys.clear(); joyV = null; if (P) P.path = null; } });
   conectarSala();
@@ -646,7 +661,7 @@ function conectarSala(){
       else ult.t2 = agoraR; // mesma posição: só confirma que segue parado
       if (a.buf.length > 30) a.buf.splice(0, a.buf.length - 30);
       a.ivEnvio = st.iv || 100;
-      a.alvo = { x: st.x, y: st.y }; a.dir = st.dir; a.remotoAndando = !!st.mov; a.mic = !!st.mic; a.audio = st.audio === undefined ? undefined : !!st.audio; a.proj = st.proj || null; a.tela = !!st.tela; a.mao = st.mao || null; a.mod = st.mod || null; a.montaria = st.mont || null;
+      a.alvo = { x: st.x, y: st.y }; a.dir = st.dir; a.remotoAndando = !!st.mov; a.mic = !!st.mic; a.audio = st.audio === undefined ? undefined : !!st.audio; a.proj = st.proj || null; a.tela = !!st.tela; a.mao = st.mao || null; a.mod = st.mod || null; a.montaria = st.mont || null; a.cam = !!st.cam;
       if (st.emote !== a.emote){ a.emote = st.emote; a.emoteT = 0; }
       const atual = a.assento ? a.assento.id : null;
       if (st.assento !== atual){
@@ -836,6 +851,7 @@ function livreP(x, y){
   if (em3d() && Iso3D.livre && !Iso3D.livre(x, y) && Iso3D.livre(P.x, P.y)) return false; // 3D: não atravessa o móvel (só deixa sair se já estiver dentro)
   const r = roomAt(x, y - 4);
   if (r && !Acesso.podeEntrar(r)){ const atual = roomAt(P.px, P.py - 4); if (!atual || atual.id !== r.id){ P.path = null; Acesso.tentou(r); return false; } }
+  if (r && Reuniao.bloqueia(r)){ const atual = roomAt(P.px, P.py - 4); if (!atual || atual.id !== r.id){ P.path = null; Reuniao.avisarBloqueio(r); return false; } } // reunião: só convidados
   return true;
 }
 function spawn(){
@@ -956,6 +972,40 @@ function joyMove(e){
   joyV = d > 8 ? [dx/max, dy/max] : null; if (joyV && P){ P.path = null; P.emote = null; }
 }
 document.getElementById("btnAudio").onclick = e => { e.stopPropagation(); ligarAudio(); };
+/* ---------- vídeo chamada: cada um liga a própria câmera; aparece para quem está se ouvindo (mesma sala ou perto) ---------- */
+document.getElementById("btnCam").onclick = async e => {
+  e.stopPropagation(); const b = document.getElementById("btnCam");
+  if (Voz.camAberta) { Voz.desligarCamera(); toast("📷 Câmera desligada"); }
+  else {
+    if (!Voz.ligado) await ligarAudioAuto();
+    ROTULO(b, "loader-circle", "Abrindo…");
+    const ok = await Voz.ligarCamera();
+    toast(ok ? "📹 Câmera ligada — quem está na mesma sala vê você" : "Não consegui abrir a câmera: permita a câmera no navegador (cadeado na barra de endereço)");
+    if (ok) Dados.registrarAtividade(EMAIL, "audio", "Ligou a câmera");
+  }
+  atualizarBotaoCam(); atualizarVideos();
+};
+function atualizarBotaoCam(){ const b = document.getElementById("btnCam"); ROTULO(b, Voz.camAberta ? "video" : "video-off", Voz.camAberta ? "Câmera ligada" : "Câmera"); b.classList.toggle("on", Voz.camAberta); }
+const faixaVideo = document.createElement("div"); faixaVideo.id = "faixaVideo"; document.body.appendChild(faixaVideo);
+const blocosVideo = new Map(); // id -> { el, video, stream }
+faixaVideo.addEventListener("click", e => { const b = e.target.closest(".fv-b"); if (b) b.classList.toggle("grande"); });
+function atualizarVideos(){
+  if (!P) return;
+  const quer = [];
+  if (Voz.camAberta) quer.push({ id: "eu", nome: user.nome + " (você)", stream: Voz.minhaCam, eu: true, mic: Voz.micAberto, fala: P.vozAtiva && performance.now() - P.vozAtiva < 400 });
+  for (const o of outros) { if (!o.visto || !o.cam || !o.ouvindo) continue; const st = Voz.videoDe(o.id); if (st) quer.push({ id: o.id, nome: o.nome, stream: st, mic: o.mic, fala: o.vozAtiva && performance.now() - o.vozAtiva < 400 }); }
+  const ids = new Set(quer.map(q => q.id));
+  for (const [id, b] of blocosVideo) if (!ids.has(id)) { b.video.srcObject = null; b.el.remove(); blocosVideo.delete(id); }
+  for (const q of quer) {
+    let b = blocosVideo.get(q.id);
+    if (!b) { const el = document.createElement("div"); el.className = "fv-b" + (q.eu ? " eu" : ""); el.innerHTML = `<video autoplay playsinline muted></video><span class="fv-n"></span>`; faixaVideo.appendChild(el); b = { el, video: el.querySelector("video"), stream: null }; blocosVideo.set(q.id, b); }
+    if (b.stream !== q.stream) { b.stream = q.stream; b.video.srcObject = q.stream; b.video.play().catch(() => {}); }
+    const n = (q.mic === false ? "🔇 " : "") + q.nome; const sp = b.el.querySelector(".fv-n"); if (sp.textContent !== n) sp.textContent = n;
+    b.el.classList.toggle("fala", !!q.fala);
+  }
+  faixaVideo.classList.toggle("on", quer.length > 0);
+}
+setInterval(atualizarVideos, 300);
 document.getElementById("btnMont").onclick = e => { e.stopPropagation(); toast(Montaria.trocar()); };
 document.getElementById("btnMao").onclick = e => { e.stopPropagation(); Palco.levantarMao(); };
 document.getElementById("btnCfgAudio").onclick = e => { e.stopPropagation(); const el = document.getElementById("audioCfg"); el.classList.contains("hidden") ? abrirConfigAudio() : fecharConfigAudio(); };
@@ -964,6 +1014,25 @@ function emote(row){
   if (!P) return; if (P.assento) P.levantar();
   P.emote = row; P.emoteT = 0; P.path = null;
   Dados.registrarAtividade(EMAIL, "acao", `${row === 5 ? "Acenou" : "Dançou"}${P.sala ? " em " + P.sala : ""}`, {sala: P.sala});
+}
+/* convite de reunião aceito: vai direto para uma cadeira livre da sala (a mais perto do telão) */
+function teleportarSentado(salaId){
+  const r = roomById(salaId); if (!r || !P) return false;
+  if (P.assento) P.levantar(); P.path = null; P.emote = null; keys.clear(); joyV = null;
+  const naSala = s => { const q = roomAt(s.sx, s.sy); return q && q.id === r.id; };
+  const tel = teloes.find(t => { const q = salaDoTelao(t); return q && q.id === r.id; }), fx = tel ? tel.x*T + 96 : (r.x + r.w/2)*T, fy = tel ? tel.y*T + 96 : r.y*T;
+  // prefere quem fica de frente para o telão (cadeiras viradas para cima), e dessas a mais perto dele
+  const nota = s => (tel && s.dir !== 3 ? 1e5 : 0) + Math.hypot(s.sx - fx, s.sy - fy);
+  const s = assentos.filter(s => !s.ocupante && naSala(s)).sort((a, b) => nota(a) - nota(b))[0];
+  if (s){ P.x = s.sx; P.y = s.sy + 8; P.sentar(s); }
+  else { // sem cadeira livre: fica em pé num lugar livre da sala
+    const cx = (r.x + r.w/2)*T, cy = (r.y + r.h/2)*T;
+    for (let rad = 0; rad < 12; rad++) { let ok = false; for (let a = 0; a < 16 && !ok; a++){ const x = cx + Math.cos(a/16*Math.PI*2)*rad*16, y = cy + Math.sin(a/16*Math.PI*2)*rad*16; if (livre(x, y) && roomAt(x, y - 4) === r){ P.x = x; P.y = y; ok = true; } } if (ok) break; }
+  }
+  sujo = true; marca = null;
+  toast(`📍 Você entrou na ${r.name}${s ? " e já está sentado" : ""}`);
+  Dados.registrarAtividade(EMAIL, "acao", `Entrou na reunião pelo convite`, { sala: r.name });
+  return true;
 }
 function sentarPerto(){
   if (!P) return; if (P.assento){ P.levantar(); return; }
@@ -995,7 +1064,7 @@ function loop(now){
   // caminho travado (um móvel no meio no 3D): desiste em vez de ficar empurrando
   if (P.path && !P.assento){ const d = Math.hypot(P.x - (P.travaX ?? P.x), P.y - (P.travaY ?? P.y)); if (d > 6 || P.travaX == null){ P.travaX = P.x; P.travaY = P.y; P.travaT = 0; } else if ((P.travaT += dt) > 1.2){ P.path = null; P.travaX = null; } }
   Montaria.atualizar(P);
-  if (!P.assento) moverAtor(P, dt, vx, vy, livreP, Montaria.velocidade()); else { P.moving = false; P.parado += dt; }
+  if (!P.assento) { P.deslizar = !P.path; moverAtor(P, dt, vx, vy, livreP, Montaria.velocidade()); } else { P.moving = false; P.parado += dt; }
   if (umaP && !P.assento && !P.moving) P.dir = Iso3D.direcaoDoOlhar(); // os outros veem para onde você olha
   if (P.moving){ P.emote = null; sujo = true; }
   if (P.emote != null){ P.emoteT += dt; if (P.emoteT > 3) P.emote = null; }
@@ -1012,7 +1081,7 @@ function loop(now){
   Voz.atualizar(P, visiveis, now);
   Projecao.atualizar(now);
   Palco.atualizar();
-  Sala.enviarPosicao({ x: Math.round(P.x), y: Math.round(P.y), dir: P.dir, mov: P.moving, assento: P.assento ? P.assento.id : null, emote: P.emote, mic: Voz.micAberto, audio: Voz.ligado, proj: Projecao.minhaSala, tela: Projecao.minhaTela, mao: Palco.mao, mod: Palco.estado, mont: Montaria.ativa }, now);
+  Sala.enviarPosicao({ x: Math.round(P.x), y: Math.round(P.y), dir: P.dir, mov: P.moving, assento: P.assento ? P.assento.id : null, emote: P.emote, mic: Voz.micAberto, audio: Voz.ligado, proj: Projecao.minhaSala, tela: Projecao.minhaTela, mao: Palco.mao, mod: Palco.estado, mont: Montaria.ativa, cam: Voz.camAberta }, now);
   atualizarConversas([P, ...visiveis], dt, (a, o) => {
     if (a !== P) return;
     const agora = Date.now(); if (conversasLog[o.nome] && agora - conversasLog[o.nome] < 60000) return;
@@ -1123,7 +1192,7 @@ function draw(){
   const c = cam(), atores = [P, ...outros.filter(o => o.visto && o.sheet), ...AgentesVivos.atores()];
   const ligados = new Set(monitoresTI); for (const a of atores) if (a.assento && a.assento.trabalho) for (const m of a.assento.monitores) ligados.add(m.x + "," + m.y);
   // telas vivas (telões, monitores, projeção, tendências, roteiros): as mesmas no 2D e no 3D
-  const telasVivas = teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => { const r = salaDoTelao(it); if (!dentroDoTelao(it)){ telaoTrancado(g, it.x*T, it.y*T, r); return; } Telao.desenharTela(g, it.x*T, it.y*T, r ? Telao.filtrarSala(tarefas, r.id, salaPadrao()) : tarefas, r ? "TELÃO · " + r.name.toUpperCase() : "TELÃO DA EQUIPE"); } }))
+  const telasVivas = teloes.map(it => ({ sort: sortKey(it) + 0.01, draw: g => { const r = salaDoTelao(it); if (!dentroDoTelao(it)){ telaoTrancado(g, it.x*T, it.y*T, r); Reuniao.desenharNoTelao(g, it.x*T, it.y*T, r); return; } Telao.desenharTela(g, it.x*T, it.y*T, r ? Telao.filtrarSala(tarefas, r.id, salaPadrao()) : tarefas, r ? "TELÃO · " + r.name.toUpperCase() : "TELÃO DA EQUIPE"); Reuniao.desenharNoTelao(g, it.x*T, it.y*T, r); } }))
     .concat(monitores.map(it => ({ sort: sortKey(it) + 0.01, draw: g => desenharMonitor(g, it, ligados.has(it.x + "," + it.y), t) })))
     .concat(Projecao.desenhaveis()).concat(TI.desenhaveis(t)).concat(Edicao.desenhaveis());
   ctx.imageSmoothingEnabled = false;
