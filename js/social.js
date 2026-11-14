@@ -22,10 +22,16 @@ window.Social = (function () {
   const AUSENTE_MIN = 10;
   function mudarStatus(s, auto) {
     if (!STATUS[s]) return;
-    status = s; autoAusente = !!auto;
+    status = s; autoAusente = !!auto; if (!auto) autoOcupado = false;
     if (!auto) ls.set("nextco_status", s);
     opt && opt.presencaMudou && opt.presencaMudou();
     desenharTopo();
+  }
+  /* sentado em silêncio por muito tempo: fica "Ocupado" sozinho (e volta a "Disponível" ao levantar ou falar) */
+  let autoOcupado = false;
+  function ocupadoAuto(liga) {
+    if (liga && status === "disponivel" && !autoOcupado) { autoOcupado = true; status = "ocupado"; opt && opt.presencaMudou && opt.presencaMudou(); desenharTopo(); opt.toast("🔴 Você está sentado em silêncio há 5 min: status mudou para Ocupado"); }
+    else if (!liga && autoOcupado) { autoOcupado = false; if (status === "ocupado") { status = ls.get("nextco_status", "disponivel") === "ausente" ? "disponivel" : ls.get("nextco_status", "disponivel"); opt && opt.presencaMudou && opt.presencaMudou(); desenharTopo(); } }
   }
   function atividade() {
     ultimaAcao = Date.now();
@@ -473,7 +479,7 @@ window.Social = (function () {
   }
   let ultimaSalaChat = null;
   return {
-    iniciar, cartao, recebeuToque, abrirChat, fecharChat, abrirAgenda, avisarPrazos, acharMencoes, notificar, mudarStatus,
+    iniciar, cartao, recebeuToque, abrirChat, fecharChat, abrirAgenda, avisarPrazos, acharMencoes, notificar, mudarStatus, ocupadoAuto,
     STATUS, get status() { return status; }, get reunioes() { return reunioes; }, get chatAberto() { return chat.aberto; }, get usuarios() { return usuarios; },
   };
 })();

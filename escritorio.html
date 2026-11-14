@@ -1018,6 +1018,38 @@ function emote(row){
   P.emote = row; P.emoteT = 0; P.path = null;
   Dados.registrarAtividade(EMAIL, "acao", `${row === 5 ? "Acenou" : "Dançou"}${P.sala ? " em " + P.sala : ""}`, {sala: P.sala});
 }
+/* ---------- rotina automática ----------
+   – 5 min em pé sem fazer nada (sem andar, teclar, clicar nem falar): vai para a Área silenciosa (lá não tem áudio, só chat escrito).
+   – 5 min sentado sem o microfone captar voz: status vira "Ocupado" (volta a "Disponível" ao levantar ou falar). */
+const inativoMs = () => window.TESTE_INATIVO_MS || 5 * 60e3; // 5 min
+let ultimaAtividade = performance.now(), sentouEm = 0, ultimoAssento = null;
+for (const ev of ["keydown", "pointerdown", "touchstart", "wheel"]) addEventListener(ev, () => { ultimaAtividade = performance.now(); }, { passive: true });
+function irParaSilencio(){
+  const r = S.rooms.find(q => q.type === "silenciosa"); if (!r || !P) return false;
+  if (P.assento) P.levantar(); P.path = null; keys.clear(); joyV = null;
+  const cx = (r.x + r.w/2)*T, cy = (r.y + r.h/2)*T;
+  for (let rad = 0; rad < 14; rad++) for (let a = 0; a < 16; a++){ const x = cx + Math.cos(a/16*Math.PI*2)*rad*16, y = cy + Math.sin(a/16*Math.PI*2)*rad*16;
+    if (livre(x, y) && roomAt(x, y - 4) === r){ P.x = x; P.y = y; sujo = true;
+      toast(`💤 Você ficou 5 min parado sem fazer nada: foi para a ${r.name} (lá não tem áudio, só o chat escrito)`);
+      Dados.registrarAtividade(EMAIL, "acao", "Foi para a área silenciosa por inatividade", { sala: r.name }); return true; } }
+  return false;
+}
+setInterval(() => {
+  if (!P || !S) return;
+  const agora = performance.now();
+  if (P.moving || (P.vozAtiva && agora - P.vozAtiva < 2000)) ultimaAtividade = agora;
+  // sentado: conta desde quando sentou
+  if (P.assento !== ultimoAssento){ ultimoAssento = P.assento; sentouEm = agora; if (!P.assento) Social.ocupadoAuto(false); }
+  const sala = roomAt(P.px, P.py - 4), ocupadoTela = Telao.aberto || TI.aberto || Edicao.aberto || Acesso.aberto;
+  if (!P.assento){
+    const naReuniao = sala && Reuniao.ativaEm(sala), noSilencio = sala && sala.type === "silenciosa";
+    if (!noSilencio && !naReuniao && !ocupadoTela && !Projecao.minhaSala && agora - ultimaAtividade > inativoMs()) { irParaSilencio(); ultimaAtividade = agora; }
+  } else {
+    const falouRecente = P.vozAtiva && agora - P.vozAtiva < inativoMs();
+    if (falouRecente) Social.ocupadoAuto(false);
+    else if (agora - sentouEm > inativoMs()) Social.ocupadoAuto(true);
+  }
+}, 5000);
 /* convite de reunião aceito: vai direto para uma cadeira livre da sala (a mais perto do telão) */
 function teleportarSentado(salaId){
   const r = roomById(salaId); if (!r || !P) return false;
