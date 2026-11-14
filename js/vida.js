@@ -71,7 +71,7 @@ class Ator {
   sort(){ return this.assento ? this.assento.sort : this.y + 0.5; }
   draw(g, t){
     const sh = this.sheet; if (!sh) return;
-    let row = this.dir, col = this.frame, x = this.x - 16, y = this.y - 45;
+    let row = this.dir, col = this.frame, x = this.x - 16, y = this.y - 45, giro = 0;
     if (this.assento){
       const s = this.assento; row = 4;
       const fala = this.conversa && this.falando;
@@ -91,9 +91,13 @@ class Ator {
       return;
     } else {
       g.fillStyle = "rgba(20,15,30,.25)"; g.beginPath(); g.ellipse(this.x, this.y + 1, 8, 3, 0, 0, Math.PI*2); g.fill();
-      if (this.emote != null && !this.moving){ row = this.emote; const n = row === 6 ? 6 : 4; col = Math.floor(this.emoteT*7) % n; }
+      if (this.emote != null && !this.moving && this.emote >= 10){ // danças novas, feitas com os quadros do próprio personagem
+        const d = DANCAS[this.emote]; if (d){ const p = d(this.emoteT); row = p.row; col = p.col; x += p.dx || 0; y += p.dy || 0; giro = p.rot || 0; }
+      }
+      else if (this.emote != null && !this.moving){ row = this.emote; const n = row === 6 ? 6 : 4; col = Math.floor(this.emoteT*7) % n; }
       else if (this.conversa && this.falando && !this.moving){ row = this.dir; col = 0; y += (Math.floor(t*4) % 2) ? -1 : 0; }
     }
+    if (giro){ g.save(); g.translate(Math.round(x) + 16, Math.round(y) + 47); g.rotate(giro); g.drawImage(sh, col*32, row*48, 32, 48, -16, -47, 32, 48); g.restore(); return; }
     g.drawImage(sh, col*32, row*48, 32, 48, Math.round(x), Math.round(y), 32, 48);
   }
   /* balões acima da cabeça (coordenadas do mundo) */
@@ -169,6 +173,24 @@ function seguirCaminho(a){
   if (d < 3){ a.path.shift(); if (!a.path.length) a.path = null; return [0, 0]; }
   return [dx/d, dy/d];
 }
+
+/* ---------- danças (emote 10+): cada uma devolve linha/coluna da folha do personagem e um deslocamento ----------
+   linhas da folha: 0 frente, 1 esquerda, 2 direita, 3 costas, 5 acenar, 6 dança original; colunas 1–4 = passos */
+const DANCAS = {
+  // passinho: pezinho rápido de um lado para o outro, com quique
+  10: t => { const b = Math.floor(t * 9); return { row: 0, col: 1 + (b % 4), dx: (b % 2 ? 3 : -3), dy: -Math.abs(Math.sin(t * 14)) * 2.5, rot: (b % 2 ? 0.06 : -0.06) }; },
+  // giro: roda nos quatro lados com pulinho
+  11: t => { const b = Math.floor(t * 6), lados = [0, 2, 3, 1]; return { row: lados[b % 4], col: 1 + (b % 4), dy: -Math.abs(Math.sin(t * 6 * Math.PI / 2)) * 4 }; },
+  // pulinho: pula com os braços para cima (quadros do aceno)
+  12: t => { const b = Math.floor(t * 4); return { row: 5, col: b % 4, dy: -Math.abs(Math.sin(t * 4 * Math.PI)) * 7 }; },
+  // robô: travadinho, vira de lado em tempos marcados
+  13: t => { const b = Math.floor(t * 3); return { row: [0, 2, 0, 1][b % 4], col: 0, dy: b % 2 ? -1 : 0, dx: [0, 2, 0, -2][b % 4] }; },
+  // requebra: balança o corpo de um lado para o outro
+  14: t => ({ row: 0, col: 1 + (Math.floor(t * 6) % 4), rot: Math.sin(t * 7) * 0.22, dx: Math.sin(t * 7) * 2 }),
+  // moonwalk: desliza para trás de costas, passos ao contrário
+  15: t => { const ciclo = (t * 18) % 36; return { row: 1, col: 4 - (Math.floor(t * 8) % 4), dx: 18 - ciclo }; },
+};
+const NOMES_DANCA = { 6: "Dança clássica", 10: "Passinho", 11: "Giro", 12: "Pulinho", 13: "Robô", 14: "Requebra", 15: "Moonwalk" };
 
 /* ---------- telas dos monitores ----------
    Monitor (sprite 32x32): tela em x 5..26, y 6..20. Desligado = descanso escuro; com alguém trabalhando = código sendo digitado. */

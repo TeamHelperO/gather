@@ -173,6 +173,9 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 .ass-pessoas{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:600}.ass-pessoas input{width:90px;padding:8px;border-radius:10px;border:1px solid rgba(127,127,127,.4);font-size:16px;text-align:center}
 .ass-total b{color:var(--ink,#1d1b26);font-size:17px}.ass-erro{color:#e5484d!important;min-height:1em}
 @media (max-width:520px){.ass-planos{grid-template-columns:1fr}}
+#menuDanca{position:fixed;z-index:60;display:none;flex-direction:column;gap:4px;background:var(--panel,#fff);color:var(--ink,#1d1b26);border-radius:14px;padding:8px;box-shadow:0 12px 34px rgba(0,0,0,.3);width:180px}
+#menuDanca.on{display:flex}#menuDanca button{border:0;background:none;text-align:left;padding:9px 10px;border-radius:10px;font:600 14px system-ui,sans-serif;color:inherit;cursor:pointer}
+#menuDanca button:hover{background:rgba(61,90,254,.1)}#menuDanca button.on{background:#3d5afe;color:#fff}
 .reu-convite{position:fixed;z-index:72;left:50%;top:76px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:min(560px,94vw);background:var(--panel,#fff);color:var(--ink,#1d1b26);border:2px solid #3d5afe;border-radius:16px;padding:12px 14px;box-shadow:0 12px 40px rgba(0,0,0,.35);animation:reuIn .35s ease}
 .reu-convite .rc-ic{font-size:28px}.reu-convite .rc-tx{display:flex;flex-direction:column;gap:2px;flex:1;min-width:180px}.reu-convite .rc-tx b{font-size:15px}.reu-convite .rc-tx small{color:var(--mut,#8a857c);font-size:12px}
 .reu-convite .rc-ac{display:flex;gap:8px}@keyframes reuIn{from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)}}
@@ -886,7 +889,7 @@ function spawn(){
 /* ---------- entrada ---------- */
 const DIRKEYS = {ArrowUp:[0,-1],w:[0,-1],W:[0,-1],ArrowDown:[0,1],s:[0,1],S:[0,1],ArrowLeft:[-1,0],a:[-1,0],A:[-1,0],ArrowRight:[1,0],d:[1,0],D:[1,0]};
 addEventListener("keydown", e => { if (e.target.matches("input,select,textarea") || Telao.aberto || TI.aberto || Edicao.aberto || Acesso.aberto) return; if (DIRKEYS[e.key]) { keys.add(e.key); if (P) { P.path = null; P.emote = null; } e.preventDefault(); }
-  if (e.key === "1") emote(5); if (e.key === "2") emote(6); if (e.key === "3") sentarPerto(); if ((e.key === "l" || e.key === "L") && !e.ctrlKey && !e.metaKey) alternarLuz(); });
+  if (e.key === "1") emote(5); if (e.key === "2") emote(ultimaDanca); if (e.key === "3") sentarPerto(); if ((e.key === "l" || e.key === "L") && !e.ctrlKey && !e.metaKey) alternarLuz(); });
 document.getElementById("btnLuz").addEventListener("click", alternarLuz);
 addEventListener("keyup", e => keys.delete(e.key));
 addEventListener("blur", () => keys.clear());
@@ -1026,7 +1029,20 @@ setInterval(atualizarVideos, 300);
 document.getElementById("btnMont").onclick = e => { e.stopPropagation(); toast(Montaria.trocar()); };
 document.getElementById("btnMao").onclick = e => { e.stopPropagation(); Palco.levantarMao(); };
 document.getElementById("btnCfgAudio").onclick = e => { e.stopPropagation(); const el = document.getElementById("audioCfg"); el.classList.contains("hidden") ? abrirConfigAudio() : fecharConfigAudio(); };
-document.querySelector(".emotes").onclick = e => { const b = e.target.closest("[data-emote]"); if (!b) return; const r = +b.dataset.emote; r === 4 ? sentarPerto() : emote(r); };
+document.querySelector(".emotes").onclick = e => { const b = e.target.closest("[data-emote]"); if (!b) return; const r = +b.dataset.emote; if (r === 6) return abrirDancas(b); r === 4 ? sentarPerto() : emote(r); };
+/* Dançar: escolhe a dança (a última escolhida fica marcada; tecla 2 repete a última) */
+let ultimaDanca = 10;
+function abrirDancas(botao){
+  let m = document.getElementById("menuDanca");
+  if (m && m.classList.contains("on")) { m.classList.remove("on"); return; }
+  if (!m) { m = document.createElement("div"); m.id = "menuDanca"; document.body.appendChild(m);
+    m.onclick = e => { const b = e.target.closest("[data-danca]"); if (!b) return; ultimaDanca = +b.dataset.danca; m.classList.remove("on"); emote(ultimaDanca); };
+    addEventListener("pointerdown", e => { if (!e.target.closest("#menuDanca,[data-emote='6']")) m.classList.remove("on"); }); }
+  const ic = { 6: "🕺", 10: "👟", 11: "🌀", 12: "🙌", 13: "🤖", 14: "💃", 15: "🌙" };
+  m.innerHTML = Object.entries(NOMES_DANCA).map(([k, n]) => `<button data-danca="${k}" class="${+k === ultimaDanca ? "on" : ""}">${ic[k] || "🎵"} ${n}</button>`).join("");
+  const r = botao.getBoundingClientRect(); m.style.left = Math.max(8, Math.min(innerWidth - 190, r.left + r.width/2 - 90)) + "px"; m.style.bottom = (innerHeight - r.top + 8) + "px";
+  m.classList.add("on");
+}
 function emote(row){
   if (!P) return; if (P.assento) P.levantar();
   P.emote = row; P.emoteT = 0; P.path = null;
@@ -1116,7 +1132,7 @@ function loop(now){
   if (!P.assento) { P.deslizar = !P.path; moverAtor(P, dt, vx, vy, livreP, Montaria.velocidade()); } else { P.moving = false; P.parado += dt; }
   if (umaP && !P.assento && !P.moving) P.dir = Iso3D.direcaoDoOlhar(); // os outros veem para onde você olha
   if (P.moving){ P.emote = null; sujo = true; }
-  if (P.emote != null){ P.emoteT += dt; if (P.emoteT > 3) P.emote = null; }
+  if (P.emote != null){ P.emoteT += dt; if (P.emoteT > (P.emote === 6 || P.emote >= 10 ? 8 : 3)) P.emote = null; } // dança dura 8 s
   if (P.saiuDe && Math.hypot(P.saiuDe.sx - P.x, P.saiuDe.sy - P.y) > 40) P.saiuDe = null;
   if (!P.assento && !P.moving && !P.path && P.parado > 0.35 && P.emote == null){
     const s = assentoPerto(assentos, P.x, P.y);
