@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Entrar – Escritório Virtual Next Co.</title>
-<meta name="description" content="Escritório virtual da Next Co.">
+<title>Entrar – Andar</title><link rel="icon" type="image/png" sizes="32x32" href="assets/marca/favicon-32.png"><link rel="apple-touch-icon" href="assets/marca/apple-touch-icon.png">
+<meta name="description" content="Andar — o escritório virtual da sua equipe.">
 <link rel="stylesheet" href="css/base.css">
 <style>
 body{display:grid;place-items:center;min-height:100vh;padding:20px;background:#16141f url("assets/splash.png") center/cover no-repeat;image-rendering:pixelated}
@@ -13,7 +13,9 @@ body::before{content:"";position:fixed;inset:0;background:rgba(18,14,30,.55)}
 h1{margin:0 0 4px;font-size:24px}
 p.sub{margin:0 0 8px;color:var(--mut)}
 .logo{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-.logo span{width:40px;height:40px;border-radius:10px;background:var(--brand);display:grid;place-items:center;color:#fff;font-weight:900;font-size:20px}
+@font-face{font-family:Silkscreen;src:url(assets/fonts/silkscreen-latin-400-normal.woff2) format("woff2")}
+.logo span{width:40px;height:40px;border-radius:8px;background:url(assets/marca/andar-icone.svg) center/cover;image-rendering:pixelated}
+.logo b{font-family:Silkscreen,monospace;font-weight:400;font-size:24px;text-transform:lowercase;letter-spacing:.02em}
 .row{display:flex;gap:8px;margin-top:10px}.row .btn{flex:1}
 .small{font-size:12px;color:var(--mut);margin-top:14px}
 #enviado{display:none;text-align:center}
@@ -29,7 +31,7 @@ p.sub{margin:0 0 8px;color:var(--mut)}
 </head>
 <body>
 <form class="card" id="f" novalidate>
-  <div class="logo"><span>N</span><div><b>Next Co.</b><div style="font-size:12px;color:var(--mut)">Escritório virtual</div></div></div>
+  <div class="logo"><span></span><div><b>Andar</b><div style="font-size:12px;color:var(--mut)">Escritório virtual da sua equipe</div></div></div>
   <div id="pedir">
     <h1 id="titulo">Entrar</h1>
     <div class="abas" role="tablist">

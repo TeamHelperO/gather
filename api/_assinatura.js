@@ -2,7 +2,7 @@
 const SUPA = process.env.SUPABASE_URL || "https://geqljiqocpzlkxjjoylk.supabase.co";
 const ANON = process.env.SUPABASE_ANON_KEY || "sb_publishable_eNVC3vsJuDQritXDoVyiOw_FbMokMGj";
 const PRECOS = { equipe: 19.9, empresa: 29.9 };
-const NOME_PRODUTO = process.env.PRODUTO_NOME || "Escritório Virtual";
+const NOME_PRODUTO = process.env.PRODUTO_NOME || "Andar";
 const rpc = async (fn, corpo, token) => {
   const r = await fetch(`${SUPA}/rest/v1/rpc/${fn}`, { method: "POST", headers: { apikey: ANON, Authorization: `Bearer ${token || ANON}`, "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
   const t = await r.text(); if (!r.ok) throw new Error(t.slice(0, 200)); try { return JSON.parse(t); } catch (e) { return t; }
