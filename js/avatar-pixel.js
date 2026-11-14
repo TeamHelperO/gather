@@ -1,7 +1,8 @@
 /* Gerador de personagens em pixel art (estilo "chibi" com contorno, cabelo volumoso com brilho e rosto expressivo).
-   Desenha a folha completa do avatar no MESMO formato das camadas antigas (192×336, quadros de 32×48):
+   Desenha a folha completa do avatar no MESMO formato das camadas antigas (192×624, quadros de 32×48):
      linha 0 frente · 1 perfil esquerdo · 2 perfil direito · 3 costas (col. 0 parado, 1–4 andando)
      linha 4 sentado (col. 0–1 de frente, 2–3 de costas digitando) · 5 acenando (sorriso) · 6 dançando (gargalhada)
+     linhas 7–12 danças com juntas: passinho, pulinho, robô, requebra, moonwalk (perfil), giro
    Assim o 2D, o 3D e o editor de avatar usam tudo sem mudança. AvatarPixel.folha(av, cores) → canvas;
    AvatarPixel.retrato(av, expressao) → canvas 32×32 do rosto (neutra | sorriso | gargalhada). */
 (function () {
@@ -142,6 +143,18 @@
   }
 
   /* ---------- corpo e roupas ---------- */
+  /* membro articulado: segmento que sai da junta (x0,y0) no ângulo ang (graus; 0 = para baixo, positivo = para fora/à frente)
+     dir = -1 (para a esquerda da tela) ou 1; cor(t, lado) escolhe a cor ao longo do comprimento t e do lado (-1..1). Devolve a ponta. */
+  function seg(q, x0, y0, ang, comp, larg, dir, cor, parte) {
+    const a = ang * Math.PI / 180, vx = Math.sin(a) * dir, vy = Math.cos(a), px = -vy, py = vx, m = comp + larg;
+    for (let y = Math.floor(y0 - m); y <= Math.ceil(y0 + m); y++) for (let x = Math.floor(x0 - m); x <= Math.ceil(x0 + m); x++) {
+      const dx = x + 0.5 - x0, dy = y + 0.5 - y0, t = dx * vx + dy * vy, l = dx * px + dy * py;
+      if (t < -0.4 || t > comp + 0.2 || Math.abs(l) > larg / 2) continue;
+      const c = cor(t, l / (larg / 2)); if (!c) continue; const [cc, pp] = Array.isArray(c) ? c : [c, parte]; q.px(x, y, cc, pp);
+    }
+    return [x0 + vx * comp, y0 + vy * comp];
+  }
+
   function figura(av, cores, pose) {
     const q = new Quadro();
     const P = tons(cores.pele), H = tons(cores.cabelo || "#4a3022"), R = tons(cores.roupa), Bx = tons(cores.baixo || "#3d5a8a"), S = tons(cores.calcado || "#f2f0ea");
@@ -166,7 +179,21 @@
       if (pe === "sapato") { q.ret(x - (L ? 1 : 0), sy, w + 1, 2, cor.b, "pe"); q.px(x + (L ? 0 : 1), sy, cor.h, "pe"); q.ret(x - (L ? 1 : 0), sy + 2, w + 1, 1, cor.s, "pe"); }
       else { q.ret(x - (L ? 1 : 0), sy, w + 1, 2, cor.b, "pe"); q.px(x + 1, sy, cor.h, "pe"); q.ret(x - (L ? 1 : 0), sy + 2, w + 1, 1, "#f4f1ea", "pe"); }
     };
-    if (sent && B) { /* sentado de costas: as pernas ficam escondidas pela cadeira */ }
+    const art = pose.art; // pose com juntas: { bE:[ombro, cotovelo], bD:[…], pE:[quadril, joelho], pD:[…], quadril:dx }
+    const pernaArt = (x0, y0, ang, joelho, dir, frente) => {
+      const curtoAte = baixo === "short" ? 4 : baixo === "saia" || baixo === "nenhuma" || est === "vestido" ? 5 : 99;
+      const corPerna = (t, l) => { const pele = t > curtoAte; const lado = l > 0.45 ? 1 : l < -0.45 && frente ? -1 : 0;
+        return pele ? [lado > 0 ? P.s : P.b, "pele"] : [lado > 0 ? Bx.s : lado < 0 ? Bx.h : Bx.b, "baixo"]; };
+      const [jx, jy] = seg(q, x0, y0 + dy, ang, 5.5, 4, dir, corPerna, "baixo");
+      const [px2, py2] = seg(q, jx, jy, ang + joelho, 5, 4, dir, (t, l) => corPerna(t + 5.5, l), "baixo");
+      // pé (aponta para a frente no perfil; no de frente/costas fica embaixo)
+      const fx = Math.round(px2 - 2 - (L ? 1 : 0)), fy = Math.round(py2);
+      q.ret(fx, fy, 5, 2, S.b, "pe"); q.px(fx + 1, fy, S.h, "pe"); q.ret(fx, fy + 2, 5, 1, pe === "sapato" ? S.s : "#f4f1ea", "pe");
+    };
+    if (art && !sent && (F || B)) { const qx = art.quadril || 0; pernaArt(13.5 + qx, 32, (art.pE || [0, 0])[0], (art.pE || [0, 0])[1], -1, true); pernaArt(18.5 + qx, 32, (art.pD || [0, 0])[0], (art.pD || [0, 0])[1], 1, true); }
+    else if (art && !sent && L) { // perfil: perna de trás primeiro (mais escura não precisa: o contorno separa)
+      pernaArt(15.5, 32, (art.pD || [0, 0])[0], (art.pD || [0, 0])[1], -1, false); pernaArt(15.5, 32, (art.pE || [0, 0])[0], (art.pE || [0, 0])[1], -1, true); }
+    else if (sent && B) { /* sentado de costas: as pernas ficam escondidas pela cadeira */ }
     else if (F || B) {
       if (sent && F) { desenharPerna(12, 4, 0, true); desenharPerna(17, 4, 0, true); }
       else { desenharPerna(12, 4, Math.max(0, passo), true); desenharPerna(17, 4, Math.max(0, -passo), true); }
@@ -201,7 +228,15 @@
       void onda;
     };
     const manga = longa || vest && false ? 9 : 4;
-    if (F || B) {
+    const bracoArt = (x0, y0, ang, cot, dir) => {
+      const cor = (t, l) => { const pele = t >= manga; return pele ? [l > 0.3 ? P.s : P.b, "pele"] : [l > 0.3 ? R.s : l < -0.3 ? R.h : R.b, "roupa"]; };
+      const [ex, ey] = seg(q, x0, y0 + dy, ang, 5.5, 3, dir, cor, "roupa");
+      const [hx, hy] = seg(q, ex, ey, ang + cot, 5, 3, dir, (t, l) => cor(t + 5.5, l), "roupa");
+      q.ret(Math.round(hx - 1), Math.round(hy - 1), 3, 3, P.b, "pele"); // mão
+    };
+    if (art && (F || B)) { const b1 = art.bE || [0, 0], b2 = art.bD || [0, 0]; bracoArt(9.5, 21, b1[0], b1[1], -1); bracoArt(22.5, 21, b2[0], b2[1], 1); }
+    else if (art && L) { const b1 = art.bE || [0, 0]; bracoArt(16, 21, b1[0], b1[1], -1); }
+    else if (F || B) {
       const bE = pose.bracoE || 0, bD = pose.bracoD || 0;
       if (pose.acenar) { // braço direito (da tela) levantado
         for (let y = 9; y < 21; y++) { const yy = y + dy, xx = 23 + (pose.acenar % 2); const pele = y < 15; q.px(xx, yy, pele ? P.b : R.b, pele ? "pele" : "roupa"); q.px(xx + 1, yy, pele ? P.s : R.s, pele ? "pele" : "roupa"); }
@@ -272,16 +307,52 @@
   /* ---------- folha completa ---------- */
   function folha(av, coresFixas) {
     av = Object.assign({}, window.Avatar ? Avatar.PADRAO : {}, av || {});
-    const cores = coresFixas || coresDe(av), c = document.createElement("canvas"); c.width = 6 * FW; c.height = 7 * FH;
+    const cores = coresFixas || coresDe(av), c = document.createElement("canvas"); c.width = 6 * FW; c.height = 13 * FH;
     const g = c.getContext("2d");
     const q = (pose, col, row, esp) => figura(av, cores, pose).para(g, col * FW, row * FH, esp);
+    // andar com juntas: quadril, joelho, ombro e cotovelo em cada passo (col. 0 parado, 1–4 o ciclo)
+    const ANDAR_PERFIL = [ // [pE (frente), pD (trás), braço da frente]
+      { pE: [0, 0], pD: [0, 0], bE: [0, 6] },
+      { pE: [28, -6], pD: [-22, 30], bE: [-26, 22] },
+      { pE: [6, 2], pD: [-4, 18], bE: [-4, 12] },
+      { pE: [-22, 30], pD: [28, -6], bE: [26, 18] },
+      { pE: [-4, 18], pD: [6, 2], bE: [4, 12] },
+    ];
+    const ANDAR_FRENTE = [
+      { pE: [0, 0], pD: [0, 0], bE: [6, 0], bD: [6, 0] },
+      { pE: [-4, 22], pD: [3, 0], bE: [16, 14], bD: [2, 4] },
+      { pE: [0, 6], pD: [0, 0], bE: [8, 4], bD: [8, 4] },
+      { pE: [3, 0], pD: [-4, 22], bE: [2, 4], bD: [16, 14] },
+      { pE: [0, 0], pD: [0, 6], bE: [8, 4], bD: [8, 4] },
+    ];
     for (let f = 0; f < 5; f++) {
       const bob = f === 2 || f === 4 ? -1 : 0;
-      q({ vista: "f", andar: f, bob, expr: "neutra", bracoE: f === 1 ? 1 : f === 3 ? -1 : 0, bracoD: f === 3 ? 1 : f === 1 ? -1 : 0, piscar: false }, f, 0);
-      q({ vista: "l", andar: f, bob, expr: "neutra" }, f, 1);
-      q({ vista: "l", andar: f, bob, expr: "neutra" }, f, 2, true);
-      q({ vista: "b", andar: f, bob, bracoE: f === 1 ? 1 : f === 3 ? -1 : 0, bracoD: f === 3 ? 1 : f === 1 ? -1 : 0 }, f, 3);
+      q({ vista: "f", andar: f, bob, expr: "neutra", art: ANDAR_FRENTE[f], piscar: false }, f, 0);
+      q({ vista: "l", andar: f, bob, expr: "neutra", art: ANDAR_PERFIL[f] }, f, 1);
+      q({ vista: "l", andar: f, bob, expr: "neutra", art: ANDAR_PERFIL[f] }, f, 2, true);
+      q({ vista: "b", andar: f, bob, art: ANDAR_FRENTE[f] }, f, 3);
     }
+    // danças com juntas (linhas 7–12, 6 quadros cada): passinho, pulinho, robô, requebra, moonwalk, giro
+    const DANCAS = [
+      // 7 passinho: chute de um pé e do outro, braços dobrados acompanhando
+      [{ pE: [-30, 40], pD: [4, 0], bE: [30, 90], bD: [20, 70], bob: -1 }, { pE: [6, 0], pD: [6, 0], bE: [20, 60], bD: [20, 60] }, { pE: [4, 0], pD: [-30, 40], bE: [20, 70], bD: [30, 90], bob: -1 },
+       { pE: [6, 0], pD: [6, 0], bE: [20, 60], bD: [20, 60] }, { pE: [-36, 70], pD: [8, 0], bE: [50, 80], bD: [10, 40], bob: -2 }, { pE: [8, 0], pD: [-36, 70], bE: [10, 40], bD: [50, 80], bob: -2 }],
+      // 8 pulinho: agacha, estica com os braços para cima
+      [{ pE: [10, 30], pD: [10, 30], bE: [30, 20], bD: [30, 20], bob: 2 }, { pE: [4, 0], pD: [4, 0], bE: [150, 10], bD: [150, 10], bob: -3 }, { pE: [12, 10], pD: [12, 10], bE: [170, 0], bD: [170, 0], bob: -4 },
+       { pE: [4, 0], pD: [4, 0], bE: [150, 10], bD: [150, 10], bob: -3 }, { pE: [10, 30], pD: [10, 30], bE: [30, 20], bD: [30, 20], bob: 2 }, { pE: [6, 10], pD: [6, 10], bE: [60, 40], bD: [60, 40], bob: 0 }],
+      // 9 robô: braços em 90°, travados, um sobe e o outro desce
+      [{ pE: [4, 0], pD: [4, 0], bE: [90, -90], bD: [90, 0] }, { pE: [4, 0], pD: [4, 0], bE: [90, 0], bD: [90, -90] }, { pE: [10, 0], pD: [0, 0], bE: [90, -90], bD: [90, -90] },
+       { pE: [0, 0], pD: [10, 0], bE: [0, 90], bD: [0, 90] }, { pE: [4, 0], pD: [4, 0], bE: [90, 90], bD: [90, -90] }, { pE: [4, 0], pD: [4, 0], bE: [90, -90], bD: [90, 90] }],
+      // 10 requebra: quadril para um lado, braços para o outro
+      [{ pE: [12, -6], pD: [-6, 12], quadril: -2, bE: [40, 60], bD: [120, 30] }, { pE: [6, 0], pD: [6, 0], quadril: 0, bE: [70, 40], bD: [70, 40] }, { pE: [-6, 12], pD: [12, -6], quadril: 2, bE: [120, 30], bD: [40, 60] },
+       { pE: [6, 0], pD: [6, 0], quadril: 0, bE: [70, 40], bD: [70, 40] }, { pE: [14, -8], pD: [-8, 14], quadril: -2, bE: [30, 90], bD: [140, 20] }, { pE: [-8, 14], pD: [14, -8], quadril: 2, bE: [140, 20], bD: [30, 90] }],
+    ];
+    DANCAS.forEach((quadros, i) => quadros.forEach((art, f) => q({ vista: "f", bob: art.bob || 0, expr: f % 3 === 2 ? "gargalhada" : "sorriso", art }, f, 7 + i)));
+    // 11 moonwalk (perfil): o pé da frente desliza para trás, um de cada vez
+    [[{ pE: [-4, 30], pD: [-18, 0] }, { pE: [-10, 20], pD: [-6, 10] }, { pE: [-18, 0], pD: [-4, 30] }, { pE: [-6, 10], pD: [-10, 20] }, { pE: [-4, 30], pD: [-18, 0] }, { pE: [-10, 20], pD: [-6, 10] }]]
+      .forEach(qs => qs.forEach((p, f) => q({ vista: "l", expr: "sorriso", art: { ...p, bE: [-10, 20] } }, f, 11)));
+    // 12 giro com braços abertos (frente, lado, costas, lado)
+    [["f", 0], ["l", 0], ["b", 0], ["l", 1], ["f", 0], ["l", 0]].forEach(([v, esp], f) => q({ vista: v, expr: "gargalhada", bob: f % 2 ? -2 : 0, art: v === "l" ? { pE: [8, 0], pD: [-8, 0], bE: [80, 10] } : { pE: [8, 0], pD: [8, 0], bE: [90, 10], bD: [90, 10] } }, f, 12, !!esp));
     q({ vista: "f", sentado: true, expr: "neutra" }, 0, 4); q({ vista: "f", sentado: true, expr: "sorriso" }, 1, 4);
     q({ vista: "b", sentado: true, digitar: 1 }, 2, 4); q({ vista: "b", sentado: true, digitar: 2 }, 3, 4);
     q({ vista: "l", sentado: true }, 4, 4); q({ vista: "l", sentado: true }, 5, 4, true); // sentado de lado (esquerda, direita)

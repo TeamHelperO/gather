@@ -92,7 +92,8 @@ class Ator {
     } else {
       g.fillStyle = "rgba(20,15,30,.25)"; g.beginPath(); g.ellipse(this.x, this.y + 1, 8, 3, 0, 0, Math.PI*2); g.fill();
       if (this.emote != null && !this.moving && this.emote >= 10){ // danças novas, feitas com os quadros do próprio personagem
-        const d = DANCAS[this.emote]; if (d){ const p = d(this.emoteT); row = p.row; col = p.col; x += p.dx || 0; y += p.dy || 0; giro = p.rot || 0; }
+        const art = sh.height >= 13*48 && DANCAS_ART[this.emote], d = art || DANCAS[this.emote];
+        if (d){ const p = d(this.emoteT); row = p.row; col = p.col; x += p.dx || 0; y += p.dy || 0; giro = p.rot || 0; }
       }
       else if (this.emote != null && !this.moving){ row = this.emote; const n = row === 6 ? 6 : 4; col = Math.floor(this.emoteT*7) % n; }
       else if (this.conversa && this.falando && !this.moving){ row = this.dir; col = 0; y += (Math.floor(t*4) % 2) ? -1 : 0; }
@@ -189,6 +190,15 @@ const DANCAS = {
   14: t => ({ row: 0, col: 1 + (Math.floor(t * 6) % 4), rot: Math.sin(t * 7) * 0.22, dx: Math.sin(t * 7) * 2 }),
   // moonwalk: desliza para trás de costas, passos ao contrário
   15: t => { const ciclo = (t * 18) % 36; return { row: 1, col: 4 - (Math.floor(t * 8) % 4), dx: 18 - ciclo }; },
+};
+// com juntas (folhas novas, linhas 7–12): a pose vem desenhada; aqui só o ritmo e o deslocamento
+const DANCAS_ART = {
+  10: t => { const f = Math.floor(t * 8) % 6; return { row: 7, col: f, dx: [-2, 0, 2, 0, -3, 3][f] }; },        // passinho
+  11: t => { const f = Math.floor(t * 7) % 6; return { row: 12, col: f, dy: -Math.abs(Math.sin(t * 7 * Math.PI / 2)) * 3 }; }, // giro
+  12: t => { const f = Math.floor(t * 6) % 6; return { row: 8, col: f, dy: [2, -4, -8, -4, 1, 0][f] }; },        // pulinho
+  13: t => ({ row: 9, col: Math.floor(t * 3.5) % 6 }),                                                          // robô
+  14: t => { const f = Math.floor(t * 5) % 6; return { row: 10, col: f, rot: Math.sin(t * 5 * Math.PI / 3) * 0.08 }; }, // requebra
+  15: t => { const f = Math.floor(t * 7) % 6; return { row: 11, col: f, dx: 16 - ((t * 14) % 32) }; },            // moonwalk
 };
 const NOMES_DANCA = { 6: "Dança clássica", 10: "Passinho", 11: "Giro", 12: "Pulinho", 13: "Robô", 14: "Requebra", 15: "Moonwalk" };
 
