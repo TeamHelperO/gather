@@ -8,6 +8,15 @@
   function tela(w, h, f) { const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); f((x, y, ww, hh, cor) => { g.fillStyle = cor; g.fillRect(x, y, ww, hh); }, g); return c; }
   const A = (k, w, h, f, label, extra) => { const c = tela(w, h, f); window.ASSETS[k] = { src: c.toDataURL(), w, h, label, cat: "Festa", ...(extra || {}) }; return c; };
 
+  /* pisca-pisca: o desenho é refeito a cada meio segundo no mesmo canvas (o 2D e o 3D usam esse canvas direto) */
+  const PISCA = {};
+  const Pk = (k, w, h, f, label, extra) => { const c = tela(w, h, (R, g) => f(R, g, 0)); c._pisca = true; window.ASSETS[k] = { src: c.toDataURL(), w, h, label, cat: "Festa", ...(extra || {}) }; PISCA[k] = { c, f }; return c; };
+  const escuro = cor => { const n = parseInt(cor.slice(1), 16), r = n >> 16, gg = (n >> 8) & 255, b = n & 255, m = v => Math.round(v * 0.35); return `rgb(${m(r)},${m(gg)},${m(b)})`; };
+  // uma lâmpada: acesa (com brilho em volta) ou apagada; o padrão alterna metade/metade e às vezes "corre"
+  const acesa = (i, fase) => (fase % 8 < 4) ? (i + fase) % 2 === 0 : (i + fase) % 3 !== 0;
+  const lampada = (R, x, y, cor, ligada) => { if (ligada) { R(x - 1, y - 1, 5, 6, cor.length === 7 ? cor + "55" : cor); R(x, y, 3, 4, cor); R(x, y, 1, 1, "#ffffff"); } else R(x, y, 3, 4, escuro(cor)); };
+  const PALETAS = { natal: ["#ff3b3b", "#3fdf6f", "#ffd23e", "#4d7bff"], ouro: ["#ffd23e", "#fff1b0", "#ffb020", "#ffe58a"], halloween: ["#ff8a1f", "#a259ff", "#7dff5a", "#ff8a1f"], festa: ["#ff4fa0", "#ffd23e", "#3fdf6f", "#4dc3ff"] };
+
   // balões (3 cores por tema)
   const balao = cores => (R, g) => {
     const b = (x, y, c) => { R(x + 1, y, 8, 11, c); R(x, y + 1, 10, 9, c); R(x + 2, y + 2, 2, 3, "rgba(255,255,255,.55)"); R(x + 4, y + 11, 2, 2, c); };
@@ -24,17 +33,52 @@
     R(1, 8, 14, 14, "#e5484d"); R(7, 8, 2, 14, "#f2c14e"); R(1, 13, 14, 2, "#f2c14e"); R(5, 4, 3, 4, "#f2c14e"); R(9, 4, 3, 4, "#f2c14e");
     R(16, 12, 14, 10, "#3fbf5f"); R(22, 12, 2, 10, "#fff4f7"); R(16, 16, 14, 2, "#fff4f7"); R(20, 9, 3, 3, "#fff4f7"); R(24, 9, 3, 3, "#fff4f7");
   }, "Presentes");
-  A("deco_arvore", 48, 72, R => {
+  Pk("deco_arvore", 48, 72, (R, g, fase) => {
     R(20, 62, 8, 8, "#6b3f22"); R(14, 68, 20, 3, "#8a5a32");
     for (let i = 0; i < 4; i++) { const y = 10 + i * 13, w = 14 + i * 8; R(24 - w / 2, y, w, 15, i % 2 ? "#1f7a46" : "#25904f"); R(24 - w / 2 + 2, y + 12, w - 4, 3, "#17633a"); }
     R(21, 2, 6, 6, "#f2c14e"); R(23, 0, 2, 10, "#f2c14e"); R(19, 4, 10, 2, "#f2c14e");
-    for (const [x, y, c] of [[16, 20, "#e5484d"], [30, 24, "#3d5afe"], [12, 36, "#f2c14e"], [26, 34, "#e5484d"], [36, 46, "#3d5afe"], [18, 48, "#f2c14e"], [8, 58, "#e5484d"], [30, 56, "#f2c14e"]]) R(x, y, 3, 3, c);
+    // bolas fixas + pisca-pisca em zigue-zague
+    for (const [x, y, c] of [[16, 20, "#e5484d"], [30, 26, "#3d5afe"], [26, 36, "#e5484d"], [14, 50, "#3d5afe"]]) R(x, y, 3, 3, c);
+    const pis = [[20, 16], [26, 18], [12, 28], [20, 30], [34, 32], [10, 42], [18, 44], [28, 42], [36, 44], [6, 56], [16, 58], [26, 56], [38, 58]];
+    pis.forEach(([x, y], i) => lampada(R, x, y, PALETAS.natal[i % 4], acesa(i, fase)));
+    if (fase % 2) R(23, 3, 2, 2, "#ffffff"); // estrela cintila
   }, "Árvore de Natal");
-  const luzes = W => (R, g) => {
+  const luzes = (W, cores) => (R, g, fase) => {
     g.strokeStyle = "#2b2f39"; g.lineWidth = 1; g.beginPath(); for (let x = 0; x < W; x += 24) { g.moveTo(x, 2); g.quadraticCurveTo(x + 12, 12, x + 24, 2); } g.stroke();
-    const cores = ["#e5484d", "#3fbf5f", "#f2c14e", "#3d5afe"]; for (let i = 0; i < W / 8; i++) { const x = 4 + i * 8, y = 4 + Math.round(4 * Math.sin((i % 3) * 1.4)); R(x, y, 3, 4, cores[i % 4]); R(x, y, 1, 1, "#ffffff"); }
+    for (let i = 0; i < W / 8; i++) { const x = 4 + i * 8, y = 4 + Math.round(4 * Math.sin((i % 3) * 1.4)); lampada(R, x, y, cores[i % cores.length], acesa(i, fase)); }
   };
-  A("deco_luzes", 96, 16, luzes(96), "Luzinhas", { z: "wall" }); A("deco_luzes_p", 64, 16, luzes(64), "Luzinhas (curta)", { z: "wall" });
+  for (const [suf, pal, nome] of [["", "natal", "Pisca-pisca"], ["_ouro", "ouro", "Pisca-pisca dourado"], ["_hw", "halloween", "Pisca-pisca de Halloween"], ["_festa", "festa", "Pisca-pisca colorido"]]) {
+    Pk("deco_luzes" + suf, 96, 16, luzes(96, PALETAS[pal]), nome, { z: "wall" }); Pk("deco_luzes" + suf + "_p", 64, 16, luzes(64, PALETAS[pal]), nome + " (curto)", { z: "wall" });
+  }
+  // cascata de luzes: fios caindo do alto, cada um piscando
+  const cascata = cores => (R, g, fase) => {
+    R(0, 0, 64, 2, "#2b2f39");
+    for (let f = 0; f < 8; f++) { const x = 3 + f * 8, n = 3 + (f * 5) % 3; R(x + 1, 2, 1, n * 9, "#2b2f39"); for (let j = 0; j < n; j++) lampada(R, x, 6 + j * 9, cores[(f + j) % cores.length], acesa(f * 3 + j, fase)); }
+  };
+  Pk("deco_cascata", 64, 44, cascata(PALETAS.natal), "Cascata de luzes", { z: "wall" });
+  Pk("deco_cascata_ouro", 64, 44, cascata(PALETAS.ouro), "Cascata dourada", { z: "wall" });
+  // guirlanda com luzinhas
+  Pk("deco_guirlanda", 32, 32, (R, g, fase) => {
+    g.fillStyle = "#1f7a46"; g.beginPath(); g.arc(16, 16, 13, 0, Math.PI * 2); g.arc(16, 16, 7, 0, Math.PI * 2, true); g.fill();
+    g.fillStyle = "#25904f"; for (let a = 0; a < 12; a++) { const ang = a * Math.PI / 6; g.fillRect(16 + Math.cos(ang) * 10 - 2, 16 + Math.sin(ang) * 10 - 2, 4, 4); }
+    R(12, 25, 8, 4, "#e5484d"); R(10, 27, 3, 4, "#e5484d"); R(19, 27, 3, 4, "#e5484d"); R(15, 26, 2, 2, "#b02a2e");
+    for (let a = 0; a < 8; a++) { const ang = a * Math.PI / 4 - Math.PI / 2; lampada(R, Math.round(16 + Math.cos(ang) * 10) - 1, Math.round(16 + Math.sin(ang) * 10) - 2, PALETAS.natal[a % 4], acesa(a, fase)); }
+  }, "Guirlanda", { z: "wall" });
+  // boneco de neve com cachecol e luzinha no chapéu
+  Pk("deco_boneco_neve", 32, 44, (R, g, fase) => {
+    g.fillStyle = "#f4f7fb"; g.beginPath(); g.arc(16, 33, 10, 0, Math.PI * 2); g.fill(); g.beginPath(); g.arc(16, 17, 7, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#d7dde8"; g.fillRect(8, 38, 16, 3);
+    R(9, 6, 14, 3, "#1b1b1f"); R(11, 0, 10, 7, "#1b1b1f"); R(11, 4, 10, 1, "#e5484d");
+    R(13, 15, 2, 2, "#1b1b1f"); R(18, 15, 2, 2, "#1b1b1f"); R(16, 18, 4, 1, "#ff8a1f");
+    R(9, 22, 14, 3, "#e5484d"); R(18, 24, 3, 7, "#e5484d"); for (const y of [29, 34]) R(15, y, 2, 2, "#1b1b1f");
+    lampada(R, 15, 0, fase % 2 ? "#ffd23e" : "#ff3b3b", true);
+  }, "Boneco de neve");
+  // poste de luz pisca (vela grande) para festas
+  Pk("deco_estrela", 32, 32, (R, g, fase) => {
+    const raio = fase % 2 ? 14 : 12; g.fillStyle = fase % 2 ? "#ffe58a" : "#ffd23e"; g.beginPath();
+    for (let i = 0; i < 10; i++) { const r = i % 2 ? raio * 0.45 : raio, a = -Math.PI / 2 + i * Math.PI / 5; g.lineTo(16 + Math.cos(a) * r, 16 + Math.sin(a) * r); } g.closePath(); g.fill();
+    R(15, 9, 2, 2, "#ffffff"); if (fase % 3 === 0) { R(2, 4, 1, 1, "#ffffff"); R(29, 26, 1, 1, "#ffffff"); }
+  }, "Estrela brilhante", { z: "wall" });
   A("deco_abobora", 32, 32, R => {
     R(15, 3, 3, 6, "#4a7a2a"); R(4, 9, 24, 20, "#e07a1f"); R(2, 12, 28, 14, "#e07a1f"); R(10, 9, 2, 20, "#c4601a"); R(20, 9, 2, 20, "#c4601a");
     R(8, 14, 5, 4, "#2a1a08"); R(19, 14, 5, 4, "#2a1a08"); R(9, 21, 14, 3, "#2a1a08"); R(12, 21, 2, 2, "#e07a1f"); R(18, 21, 2, 2, "#e07a1f"); R(9, 15, 2, 1, "#ffb020"); R(20, 15, 2, 1, "#ffb020");
@@ -74,10 +118,10 @@
   }, "Fogos de artifício", { z: "wall" });
 
   /* faixa com texto: um desenho por texto (criado na hora) */
-  function faixa(texto, cor) {
-    const k = "deco_faixa_" + (texto + cor).replace(/[^a-z0-9]/gi, "").slice(0, 40);
+  function faixa(texto, cor, largura) {
+    const w = Math.max(96, Math.min(160, Math.floor(largura || 160))), h = 28;
+    const k = "deco_faixa_" + (texto + cor).replace(/[^a-z0-9]/gi, "").slice(0, 40) + (w < 160 ? "_" + w : "");
     if (window.ASSETS[k]) return k;
-    const w = 160, h = 28;
     const c = A(k, w, h, (R, g) => {
       R(4, 5, w - 8, 18, cor); R(4, 5, w - 8, 2, "rgba(255,255,255,.3)"); R(0, 8, 6, 12, cor); R(w - 6, 8, 6, 12, cor); R(0, 0, 2, 8, "#6b6760"); R(w - 2, 0, 2, 8, "#6b6760");
       g.fillStyle = "#ffffff"; g.textAlign = "center"; g.textBaseline = "middle"; let fs = 13; g.font = `bold ${fs}px system-ui, sans-serif`;
@@ -89,14 +133,15 @@
   }
 
   const TEMAS = {
-    aniversario: { nome: "🎂 Aniversário", faixa: t => "FELIZ ANIVERSÁRIO!", cor: "#e5484d", cantos: ["deco_baloes", "deco_baloes", "deco_baloes", "deco_baloes"], centro: ["deco_bolo"], parede: "deco_bandeirinhas", chao: "deco_confete" },
-    natal: { nome: "🎄 Natal", faixa: t => "FELIZ NATAL!", cor: "#1f7a46", cantos: ["deco_arvore", "deco_presentes", "deco_presentes"], centro: [], parede: "deco_luzes" },
-    halloween: { nome: "🎃 Halloween", faixa: t => "HALLOWEEN", cor: "#e07a1f", cantos: ["deco_abobora", "deco_abobora", "deco_abobora", "deco_abobora"], centro: [], parede: "deco_teia" },
-    junina: { nome: "🌽 Festa junina", faixa: t => "ARRAIÁ!", cor: "#c4601a", cantos: ["deco_fogueira"], centro: [], parede: "deco_bandeirinhas", parede2: "deco_bandeirinhas" },
-    ano_novo: { nome: "🥂 Ano novo", faixa: t => "FELIZ ANO NOVO!", cor: "#1d2040", cantos: ["deco_baloes_ouro", "deco_baloes_ouro", "deco_baloes_ouro", "deco_baloes_ouro"], centro: [], parede: "deco_fogos", chao: "deco_confete" },
-    carnaval: { nome: "🎭 Carnaval", faixa: t => "CARNAVAL!", cor: "#7b4fd8", cantos: ["deco_mascara", "deco_baloes", "deco_mascara", "deco_baloes"], centro: [], parede: "deco_bandeirinhas", chao: "deco_confete" },
-    pascoa: { nome: "🐣 Páscoa", faixa: t => "FELIZ PÁSCOA!", cor: "#e07aa8", cantos: ["deco_ovos", "deco_ovos", "deco_ovos"], centro: [], parede: "deco_bandeirinhas" },
-    comemoracao: { nome: "🎊 Comemoração", faixa: t => (t || "PARABÉNS, EQUIPE!").toUpperCase().slice(0, 26), cor: "#3d5afe", cantos: ["deco_baloes_ouro", "deco_baloes_ouro", "deco_baloes_ouro", "deco_baloes_ouro"], centro: [], parede: "deco_bandeirinhas", chao: "deco_confete" },
+    // parede: enfeites da parede de cima, na ordem, repetindo nos trechos livres (o 1º leva também a versão curta)
+    aniversario: { nome: "🎂 Aniversário", beiral: "deco_luzes_festa", faixa: t => "FELIZ ANIVERSÁRIO!", cor: "#e5484d", cantos: ["deco_baloes", "deco_baloes", "deco_baloes", "deco_baloes"], centro: ["deco_bolo"], parede: ["deco_luzes_festa", "deco_bandeirinhas"], chao: "deco_confete" },
+    natal: { nome: "🎄 Natal", beiral: "deco_luzes", faixa: t => "FELIZ NATAL!", cor: "#1f7a46", cantos: ["deco_arvore", "deco_boneco_neve", "deco_presentes", "deco_presentes"], centro: [], parede: ["deco_cascata", "deco_guirlanda", "deco_luzes", "deco_estrela", "deco_guirlanda"] },
+    halloween: { nome: "🎃 Halloween", beiral: "deco_luzes_hw", faixa: t => "HALLOWEEN", cor: "#e07a1f", cantos: ["deco_abobora", "deco_abobora", "deco_abobora", "deco_abobora"], centro: [], parede: ["deco_luzes_hw", "deco_teia"] },
+    junina: { nome: "🌽 Festa junina", beiral: "deco_luzes_festa", faixa: t => "ARRAIÁ!", cor: "#c4601a", cantos: ["deco_fogueira"], centro: [], parede: ["deco_bandeirinhas", "deco_luzes_festa"] },
+    ano_novo: { nome: "🥂 Ano novo", beiral: "deco_luzes_ouro", faixa: t => "FELIZ ANO NOVO!", cor: "#1d2040", cantos: ["deco_baloes_ouro", "deco_baloes_ouro", "deco_baloes_ouro", "deco_baloes_ouro"], centro: [], parede: ["deco_luzes_ouro", "deco_fogos", "deco_cascata_ouro", "deco_estrela"], chao: "deco_confete" },
+    carnaval: { nome: "🎭 Carnaval", beiral: "deco_luzes_festa", faixa: t => "CARNAVAL!", cor: "#7b4fd8", cantos: ["deco_mascara", "deco_baloes", "deco_mascara", "deco_baloes"], centro: [], parede: ["deco_luzes_festa", "deco_bandeirinhas"], chao: "deco_confete" },
+    pascoa: { nome: "🐣 Páscoa", faixa: t => "FELIZ PÁSCOA!", cor: "#e07aa8", cantos: ["deco_ovos", "deco_ovos", "deco_ovos"], centro: [], parede: ["deco_bandeirinhas"] },
+    comemoracao: { nome: "🎊 Comemoração", beiral: "deco_luzes_ouro", faixa: t => (t || "PARABÉNS, EQUIPE!").toUpperCase().slice(0, 26), cor: "#3d5afe", cantos: ["deco_baloes_ouro", "deco_baloes_ouro", "deco_baloes_ouro", "deco_baloes_ouro"], centro: [], parede: ["deco_luzes_ouro", "deco_bandeirinhas"], chao: "deco_confete" },
   };
 
   /* datas comemorativas do ano (o admin liga e escolhe as salas em Configurações → Administração) */
@@ -118,7 +163,8 @@
   function anuaisAtivos(datas, agora = new Date()) {
     const out = [];
     for (const [id, d] of Object.entries(ANUAIS)) {
-      const cfg = datas && datas[id]; if (!cfg || !cfg.ativo) continue;
+      const cfg = datas && datas[id]; if (!cfg || !(cfg.ativo || cfg.agora)) continue;
+      if (cfg.agora) { out.push({ id, tema: d.tema, salas: cfg.salas || [] }); continue; } // o admin mandou mostrar já
       for (const ano of [agora.getFullYear() - 1, agora.getFullYear()]) { const [i, f] = d.periodo(ano); if (agora >= i && agora < somaDias(f, 1)) { out.push({ id, tema: d.tema, salas: cfg.salas || [] }); break; } }
     }
     return out;
@@ -143,21 +189,33 @@
     const t = TEMAS[tema], out = [], T_ = T;
     const add = (k, x, y, z) => out.push({ k, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, z, room: r.id, deco: true, id: "deco_" + k + "_" + out.length });
     // faixa no maior trecho livre da parede de cima (sem cobrir telão, quadro ou logo)
-    const fk = faixa(t.faixa(titulo), t.cor), fa = ASSETS[fk], fw = fa.w / T_;
     const naParede = allItemsBase().filter(o => ASSETS[o.k] && (o.room ? o.room === r.id : (o.x >= r.x - 0.5 && o.x <= r.x + r.w)) && o.y < r.y + 0.3 && o.y > r.y - 3.2
-        && /^(telao|tv|projecao|quadro|logo|relogio|claquete|placa)/.test(o.k))
+        && /^(telao|tv|projecao|quadro|logo|relogio|claquete|placa|estante|armario|rack|geladeira)/.test(o.k))
       .map(o => [o.x, o.x + ASSETS[o.k].w / T_]).sort((p, q) => p[0] - q[0]);
     let melhor = [r.x + 0.2, r.x + 0.2], ini = r.x + 0.2;
     for (const [a0, a1] of [...naParede, [r.x + r.w - 0.2, r.x + r.w]]) { if (a0 - ini > melhor[1] - melhor[0]) melhor = [ini, a0]; ini = Math.max(ini, a1); }
-    const gap = melhor[1] - melhor[0], fx = gap >= fw ? (melhor[0] + melhor[1]) / 2 - fw / 2 : r.x + r.w / 2 - fw / 2;
-    add(fk, fx, gap >= fw ? r.y - 1.6 : r.y - 0.35, "wall");
+    // a faixa encolhe (até 3 blocos) para caber no maior trecho livre; se nem assim couber, fica pendurada à frente
+    const gap = melhor[1] - melhor[0], fk = faixa(t.faixa(titulo), t.cor, gap * T_ - 8), fw = ASSETS[fk].w / T_, fx = gap >= fw ? (melhor[0] + melhor[1]) / 2 - fw / 2 : r.x + r.w / 2 - fw / 2;
+    add(fk, fx, gap >= fw ? r.y - 1.6 : r.y + 1.15, "wall"); // sem espaço na parede: pendurada um pouco à frente (não some atrás do telão)
     if (gap < fw) out[out.length - 1].pendurada = true; // sem espaço na parede: fica pendurada do teto, no meio da sala
     if (t.parede) { // enfeites de parede só onde não há telão, logo, quadro (nem a faixa)
       const cheio = [...naParede, ...(gap >= fw ? [[fx, fx + fw]] : [])], livreEm = (x, pw) => !cheio.some(([a0, a1]) => x < a1 && x + pw > a0);
-      let n = 0;
-      for (const k of [t.parede, ASSETS[t.parede + "_p"] ? t.parede + "_p" : null].filter(Boolean)) { // primeiro as longas, depois as curtas nos espaços que sobraram
-        const pw = ASSETS[k].w / T_;
-        for (let x = r.x + 0.3; x + pw <= r.x + r.w - 0.3 && n < 6; x += 0.25) if (livreEm(x, pw)) { add(k, x, r.y - 1.2, "wall"); cheio.push([x, x + pw]); n++; x += pw - 0.25; }
+      const lista = [].concat(t.parede), alturaDe = k => /cascata/.test(k) ? r.y - 1.45 : /guirlanda|estrela/.test(k) ? r.y - 1.4 : r.y - 1.2;
+      let n = 0, i = 0;
+      // varre a parede da esquerda para a direita, alternando os enfeites do tema; onde o longo não cabe, tenta os menores
+      for (let x = r.x + 0.3; x < r.x + r.w - 0.3 && n < 10; x += 0.25) {
+        // o que pisca (fios e cascatas) vem primeiro, do maior para o menor; o resto revezando nos espaços que sobram
+        const fio = k => /^deco_(luzes|cascata)/.test(k), vez = lista.filter(k => !fio(k)), tam = k => ASSETS[k] ? ASSETS[k].w : 0;
+        const ops = [...new Set([...[...lista, ...lista.map(k => k + "_p")].filter(fio).sort((a, b) => tam(b) - tam(a)), ...(vez.length ? [vez[i % vez.length]] : []), ...vez, ...lista.map(k => k + "_p")])].filter(k => ASSETS[k]);
+        const k = ops.find(k => { const pw = ASSETS[k].w / T_; return x + pw <= r.x + r.w - 0.3 && livreEm(x, pw); });
+        if (!k) continue;
+        const pw = ASSETS[k].w / T_; add(k, x, alturaDe(k), "wall"); cheio.push([x, x + pw]); n++; i++; x += pw + 0.1 - 0.25;
+      } }
+    if (t.beiral) { // pisca-pisca correndo no alto de toda a parede, pulando o que é alto (telão, TV, quadro)
+      const altos = naParede.filter(([a0]) => true), pw = ASSETS[t.beiral].w / T_, pp = ASSETS[t.beiral + "_p"].w / T_;
+      for (let x = r.x + 0.05; x < r.x + r.w - 0.1;) {
+        const k = [t.beiral, t.beiral + "_p"].find(k => { const w = ASSETS[k].w / T_; return x + w <= r.x + r.w - 0.05 && !altos.some(([a0, a1]) => x < a1 && x + w > a0); });
+        if (k) { add(k, x, r.y - 1.88, "wall"); out[out.length - 1].beiral = true; x += ASSETS[k].w / T_; } else x += 0.25;
       } }
     // cantos e centro, só onde está livre
     const cantos = [[r.x + 0.4, r.y + 0.3], [r.x + r.w - 0.4, r.y + 0.3], [r.x + 0.4, r.y + r.h - 0.3], [r.x + r.w - 0.4, r.y + r.h - 0.3]];
@@ -208,7 +266,18 @@
     pilula.style.display = emPrevia ? "" : "none";
     if (emPrevia) { const t = TEMAS[emPrevia.tema]; pilula.textContent = `👁️ Prévia: ${t ? t.nome : id} · clique para sair`; }
   }
-  function iniciar(o) { opt = o || {}; atualizar(); setInterval(atualizar, 30000); }
+  let fase = 0;
+  function piscar() {
+    const d = window.DECORACAO; if (!d || !d.some(it => PISCA[it.k])) return; // nada piscando na tela: não gasta nada
+    fase++;
+    for (const k in PISCA) { const p = PISCA[k], g = p.c.getContext("2d"); g.clearRect(0, 0, p.c.width, p.c.height);
+      p.f((x, y, w, h, cor) => { g.fillStyle = cor; g.fillRect(x, y, w, h); }, g, fase);
+      if (p.c._tex3d) p.c._tex3d.needsUpdate = true; for (const t of p.c._texs || []) t.needsUpdate = true; }
+  }
+  function iniciar(o) {
+    opt = o || {}; if (typeof IMG !== "undefined") for (const k in PISCA) IMG[k] = PISCA[k].c;
+    atualizar(); setInterval(atualizar, 30000); setInterval(piscar, 450);
+  }
 
   /* logo do espaço: o PNG enviado vira o desenho de todos os itens "Logo" (encaixado em 96x64, fundo transparente) */
   let logoOriginal = null;

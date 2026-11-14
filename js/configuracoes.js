@@ -91,10 +91,11 @@ window.Configuracoes = (function () {
     const datas = i.datas || {}, salas = (opt.salas ? opt.salas() : []).filter(r => r.type !== "corredor");
     const linhas = Object.entries(Decoracao.ANUAIS).map(([id, d]) => {
       const c = datas[id] || {}, sel = new Set(c.salas || []), tema = Decoracao.TEMAS[d.tema];
-      return `<div class="cfg-data ${c.ativo ? "on" : ""}">
+      return `<div class="cfg-data ${c.ativo || c.agora ? "on" : ""}">
         <div class="cfg-data-h"><label class="cfg-data-h"><input type="checkbox" name="ativo_${id}" ${c.ativo ? "checked" : ""}><b>${esc(tema ? tema.nome : d.nome)}</b></label><small>${esc(Decoracao.periodoTexto(id))}</small><button type="button" class="chip-b" data-cprevia="${id}" title="Mostra a decoração agora, só para você">👁️ Ver agora</button></div>
         <div class="cfg-data-salas"><label class="chip"><input type="checkbox" name="sala_${id}" value="*" ${sel.has("*") ? "checked" : ""}>Todas as salas</label>
-          ${salas.map(r => `<label class="chip"><input type="checkbox" name="sala_${id}" value="${esc(r.id)}" ${sel.has(r.id) ? "checked" : ""}>${esc(r.name)}</label>`).join("")}</div></div>`;
+          ${salas.map(r => `<label class="chip"><input type="checkbox" name="sala_${id}" value="${esc(r.id)}" ${sel.has(r.id) ? "checked" : ""}>${esc(r.name)}</label>`).join("")}</div>
+        <label class="cfg-agora"><input type="checkbox" name="agora_${id}" ${c.agora ? "checked" : ""}> ⚡ Mostrar agora para todos, mesmo fora do período <small>(desmarque para voltar ao automático)</small></label></div>`;
     }).join("");
     return bloco("Datas comemorativas", `<form class="cfg-form" data-cform="datas">${linhas}<div class="cfg-acoes"><button class="btn pri">Salvar datas</button></div></form>`,
       "Ligue as datas e escolha as salas: todo ano, nesses dias, elas se enfeitam sozinhas no 2D e no 3D (sem mexer no mapa). Fora do período nada aparece; use \"Ver agora\" para conferir antes. Uma sala com evento decorado na agenda usa a decoração do evento (de 30 min antes até 15 min depois).");
@@ -149,7 +150,7 @@ window.Configuracoes = (function () {
     }
     if (f.dataset.cform === "datas") {
       const fd = new FormData(f), datas = {};
-      for (const id of Object.keys(Decoracao.ANUAIS)) { const salas = fd.getAll("sala_" + id); datas[id] = { ativo: fd.has("ativo_" + id), salas: salas.includes("*") ? ["*"] : salas }; }
+      for (const id of Object.keys(Decoracao.ANUAIS)) { const salas = fd.getAll("sala_" + id); const agora = fd.has("agora_" + id); datas[id] = { ativo: fd.has("ativo_" + id) || agora, agora, salas: salas.includes("*") ? ["*"] : salas }; }
       const sem = Object.entries(datas).filter(([, d]) => d.ativo && !d.salas.length).map(([id]) => Decoracao.ANUAIS[id].nome);
       if (sem.length) return opt.toast(`Escolha pelo menos uma sala para: ${sem.join(", ")}`);
       try { await opt.salvarDatas(datas); opt.toast("🎉 Datas comemorativas salvas"); desenhar(); } catch (er) { opt.toast("Não consegui salvar: " + (er.message || "")); }

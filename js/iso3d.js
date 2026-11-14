@@ -123,10 +123,11 @@ function movel(it, sala) {
     pl.rotation.x = -Math.PI / 2; pl.position.set(0, 0.095, 0); add(pl); g.userData.chao = true; prof = 0.01;
   }
   else if (/^deco_/.test(k) && it.z === "wall") { // faixa, bandeirinhas, luzinhas, teia: desenho na parede
+    const brilha = /^deco_(luzes|cascata|guirlanda|estrela)/.test(k);
     const pl = new THREE.Mesh(new THREE.PlaneGeometry(a.w / T, a.h / T), new THREE.MeshStandardMaterial({ map: texDe(IMG[k]), transparent: true, alphaTest: 0.2, roughness: 0.8, side: THREE.DoubleSide,
-      emissive: k === "deco_luzes" ? new THREE.Color("#ffffff") : new THREE.Color("#000000"), emissiveMap: k === "deco_luzes" ? texDe(IMG[k]) : null, emissiveIntensity: k === "deco_luzes" ? 0.8 : 0 }));
+      emissive: brilha ? new THREE.Color("#ffffff") : new THREE.Color("#000000"), emissiveMap: brilha ? texDe(IMG[k]) : null, emissiveIntensity: brilha ? 0.9 : 0 }));
     pl.position.set(0, a.h / T / 2, 0.06); add(pl);
-    g.userData.parede = true; g.userData.alturaParede = /^deco_faixa/.test(k) ? 2.55 : k === "deco_teia" ? 2.5 : 2.3; prof = 0.1;
+    g.userData.parede = true; g.userData.alturaParede = it.beiral ? 3.05 : /^deco_faixa/.test(k) ? 2.55 : k === "deco_teia" ? 2.5 : /^deco_cascata/.test(k) ? 2.15 : /^deco_(guirlanda|estrela)/.test(k) ? 2.35 : 2.3; prof = 0.1;
   }
   else if (/^deco_/.test(k)) { // balões, bolo, árvore, abóbora…: em pé, sempre de frente
     const sp = spriteDe(IMG[k], a.w, a.h); sp.scale.multiplyScalar(k === "deco_arvore" ? 1.5 : 1.15); add(sp); g.userData.billboard = true; prof = 0.3;
@@ -171,8 +172,9 @@ function materialTela(it, recorte) {
   return new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.75, roughness: 0.6 });
 }
 function spriteDe(img, w, h) {
-  const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0);
-  const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.colorSpace = THREE.SRGBColorSpace;
+  let c = img;
+  if (!img._pisca) { c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0); }
+  const tex = new THREE.CanvasTexture(c); if (img._pisca) (img._texs = img._texs || []).push(tex); // pisca-pisca: atualiza junto com o desenho tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.colorSpace = THREE.SRGBColorSpace;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, alphaTest: 0.5 })); sp.center.set(0.5, 0.02); sp.scale.set(w / T, h / T, 1); return sp;
 }
 let ultimaTela = 0;
