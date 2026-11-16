@@ -1371,6 +1371,7 @@ document.getElementById("eu").onclick = async () => {
     <div class="sala-info"><div><b>${esc(infoEspaco.nome)}</b><small>ID da sala: <code>${esc(idPublico())}</code> · ${({ "2d": "só 2D", "3d": "só 3D", ambos: "2D e 3D" })[modoSala]}</small></div><button class="btn" data-convite>Copiar convite</button></div>
     <button class="mi" data-config>⚙️ Configurações</button>
     <button class="mi" data-meutempo>📊 Meu tempo</button>
+    ${Dados.ehAdmin() ? `<a class="mi" href="admin.html" target="_blank">🛠️ Administração (assinaturas e integrações)</a>` : ""}
     <a class="mi" href="salas.html">🔁 Trocar de sala</a>
     <button class="mi" data-sair>🚪 Sair</button>
     <div class="sep"></div>

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Administração – Andar</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/marca/favicon-32.png">
+<style>
+@font-face{font-family:Inter;src:url(assets/fonts/inter-latin-600-normal.woff2) format("woff2");font-weight:600}
+@font-face{font-family:Inter;src:url(assets/fonts/inter-latin-800-normal.woff2) format("woff2");font-weight:800}
+@font-face{font-family:Silkscreen;src:url(assets/fonts/silkscreen-latin-400-normal.woff2) format("woff2")}
+:root{--verde:#1a7f4b;--verde2:#146a3e;--tinta:#16141f;--mut:#6f6a7d;--papel:#fbf8f2;--creme:#f2ece0;--borda:rgba(22,20,31,.1);--verm:#c0392b;--amar:#a86a00}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;font-weight:600;color:var(--tinta);background:var(--papel)}
+header{background:#fff;border-bottom:1px solid var(--borda)}header .w{display:flex;align-items:center;gap:12px;height:62px}
+header img{width:30px;height:30px;image-rendering:pixelated;border-radius:6px}header b{font-family:Silkscreen,monospace;font-weight:400;font-size:20px}
+header span{color:var(--mut)}header a{margin-left:auto;color:var(--tinta);font-size:14px}
+.w{max-width:1200px;margin:0 auto;padding:0 20px}
+h2{font-size:19px;margin:30px 0 12px;font-weight:800}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-top:22px}
+.kpi{background:#fff;border:1px solid var(--borda);border-radius:16px;padding:16px}
+.kpi small{color:var(--mut);font-size:13px}.kpi b{display:block;font-size:28px;font-weight:800;letter-spacing:-.02em;margin-top:4px}
+.kpi.dest{background:var(--verde);color:#fff;border-color:transparent}.kpi.dest small{color:#d6efe1}
+.barra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.barra button{font:inherit;font-size:13.5px;padding:7px 12px;border-radius:99px;border:1px solid var(--borda);background:#fff;cursor:pointer}
+.barra button.on{background:var(--tinta);color:#fff;border-color:transparent}
+.barra input[type=search]{font:inherit;padding:8px 12px;border-radius:10px;border:1px solid var(--borda);margin-left:auto;min-width:220px}
+.tab{background:#fff;border:1px solid var(--borda);border-radius:16px;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}th{text-align:left;color:var(--mut);font-size:12.5px;font-weight:600;padding:11px 12px;border-bottom:1px solid var(--borda);white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid var(--borda);vertical-align:top}tr:last-child td{border-bottom:0}
+td small{display:block;color:var(--mut);font-size:12.5px;font-weight:600;margin-top:2px}
+code{font-size:12.5px;background:var(--creme);padding:1px 6px;border-radius:5px}
+.st{display:inline-block;padding:3px 9px;border-radius:99px;font-size:12.5px;white-space:nowrap}
+.st.teste{background:#e8f0ff;color:#1d4ed8}.st.ativa,.st.isento{background:#dcf5e6;color:var(--verde2)}.st.pendente{background:#fff3d6;color:var(--amar)}
+.st.vencido,.st.cancelada,.st.pausada{background:#fde4e1;color:var(--verm)}.st.sem{background:var(--creme);color:var(--mut)}
+.acoes{display:flex;gap:6px;flex-wrap:wrap}.acoes button,.acoes a{font:inherit;font-size:12.5px;padding:5px 9px;border-radius:8px;border:1px solid var(--borda);background:#fff;cursor:pointer;text-decoration:none;color:inherit;white-space:nowrap}
+.acoes button:hover,.acoes a:hover{background:var(--creme)}
+.integ{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+.it{background:#fff;border:1px solid var(--borda);border-radius:14px;padding:14px 16px;display:flex;gap:12px}
+.it i{font-style:normal;font-size:18px;line-height:1.3}.it b{display:block}.it p{margin:3px 0 0;color:var(--mut);font-size:13.5px;line-height:1.45;word-break:break-word}
+.it small{display:block;color:var(--mut);font-size:12px;margin-top:4px;font-weight:600}
+.aviso{background:#fff3d6;border:1px solid #f0d38a;border-radius:14px;padding:14px 16px;margin-top:20px;line-height:1.5}
+.vazio{padding:26px;text-align:center;color:var(--mut)}
+#msg{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--tinta);color:#fff;padding:10px 16px;border-radius:12px;opacity:0;transition:.2s;pointer-events:none}
+#msg.on{opacity:1}
+footer{color:var(--mut);font-size:13px;padding:30px 0 50px}
+</style>
+</head>
+<body>
+<header><div class="w"><img src="assets/marca/andar-icone.svg" alt=""><b>Andar</b><span>· Administração</span><a href="salas.html">Voltar aos escritórios</a></div></header>
+<main class="w" id="app"><p class="vazio">Carregando…</p></main>
+<div id="msg" role="status"></div>
+<script src="js/vendor/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/dados.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const real = v => (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const data = v => v ? new Date(v).toLocaleDateString("pt-BR") : "—";
+const msg = t => { const m = $("#msg"); m.textContent = t; m.classList.add("on"); clearTimeout(msg.t); msg.t = setTimeout(() => m.classList.remove("on"), 2200); };
+let painel = null, integ = null, filtro = "todos", busca = "", verCopias = false;
+
+// situação de cada espaço, já com o "vencido" (teste acabou e não assinou)
+function situacao(e) {
+  if (e.isento) return ["isento", "Isento (Next)"];
+  if (!e.status) return ["sem", "Ainda não aberto"];
+  if (e.status === "ativa") return ["ativa", "Assinante"];
+  if ((e.status === "teste" || e.status === "pendente") && e.dias > 0) return [e.status, e.status === "pendente" ? `Pagamento pendente · ${e.dias} d` : `Teste · ${e.dias} dia${e.dias === 1 ? "" : "s"}`];
+  if (e.status === "teste" || e.status === "pendente") return ["vencido", "Teste vencido"];
+  return [e.status, e.status === "cancelada" ? "Cancelada" : "Pausada"];
+}
+const ehCopia = e => /_antes_/.test(e.id);
+
+function desenhar() {
+  const todos = painel.espacos.filter(e => verCopias || !ehCopia(e));
+  const sit = e => situacao(e)[0];
+  const ativos = todos.filter(e => sit(e) === "ativa"), teste = todos.filter(e => sit(e) === "teste" || sit(e) === "pendente");
+  const acabando = teste.filter(e => e.dias <= 2), vencidos = todos.filter(e => sit(e) === "vencido");
+  const mrr = ativos.reduce((s, e) => s + (Number(e.valor) || 0), 0), assentos = ativos.reduce((s, e) => s + (e.pessoas || 0), 0);
+  const filtros = { todos: todos, teste, ativos, acabando, vencidos };
+  let lista = filtros[filtro] || todos;
+  if (busca) { const q = busca.toLowerCase(); lista = lista.filter(e => [e.nome, e.id, e.dono_nome, e.dono_email, e.email_cobranca].some(v => String(v || "").toLowerCase().includes(q))); }
+  $("#app").innerHTML = `
+  ${painel.falta ? `<div class="aviso"><b>Falta um passo no banco de dados.</b> Rode o arquivo <code>rodar_no_supabase_11.sql</code> no Supabase → SQL Editor para ver os espaços e assinaturas aqui. As integrações abaixo já funcionam.</div>` : ""}
+  <div class="kpis">
+    <div class="kpi dest"><small>Receita por mês</small><b>${real(mrr)}</b></div>
+    <div class="kpi"><small>Assinantes</small><b>${ativos.length}</b><small>${assentos} pessoa${assentos === 1 ? "" : "s"} paga${assentos === 1 ? "" : "s"}</small></div>
+    <div class="kpi"><small>Em teste grátis</small><b>${teste.length}</b></div>
+    <div class="kpi"><small>Teste acaba em até 2 dias</small><b>${acabando.length}</b></div>
+    <div class="kpi"><small>Teste vencido sem assinar</small><b>${vencidos.length}</b></div>
+    <div class="kpi"><small>Usuários</small><b>${painel.usuarios ?? "—"}</b><small>${painel.usuarios_7d ?? "—"} ativos nos últimos 7 dias</small></div>
+  </div>
+  <h2>Espaços</h2>
+  <div class="barra">${[["todos", "Todos"], ["teste", "Em teste"], ["acabando", "Acabando"], ["vencidos", "Vencidos"], ["ativos", "Assinantes"]].map(([k, l]) => `<button data-f="${k}" class="${filtro === k ? "on" : ""}">${l} (${filtros[k].length})</button>`).join("")}
+    <label style="font-size:13px;color:var(--mut);display:flex;gap:6px;align-items:center"><input type="checkbox" data-copias ${verCopias ? "checked" : ""}> cópias de segurança</label>
+    <input type="search" placeholder="Buscar espaço, dono ou e-mail" value="${esc(busca)}" data-busca></div>
+  <div class="tab"><table><thead><tr><th>Espaço</th><th>Dono</th><th>Pessoas</th><th>Situação</th><th>Plano</th><th>Valor/mês</th><th>Ações</th></tr></thead><tbody>
+  ${lista.map(e => { const [k, t] = situacao(e); return `<tr>
+    <td><b>${esc(e.nome)}</b><small><code>${esc(e.id)}</code> · mexido em ${data(e.atualizado_em)}</small></td>
+    <td>${esc(e.dono_nome || "—")}<small>${esc(e.dono_email || "")}</small></td>
+    <td>${e.pessoas_7d} <small>${e.pessoas_hoje} hoje · nos últimos 7 dias</small></td>
+    <td><span class="st ${k}">${t}</span>${e.teste_ate && (k === "teste" || k === "pendente" || k === "vencido") ? `<small>até ${data(e.teste_ate)}</small>` : ""}</td>
+    <td>${e.plano ? (e.plano === "empresa" ? "Empresa" : "Equipe") + `<small>${e.pessoas} pessoas</small>` : "—"}</td>
+    <td>${e.valor ? real(e.valor) : "—"}${e.mp_id ? `<small>MP ${esc(String(e.mp_id).slice(0, 12))}…</small>` : ""}</td>
+    <td><div class="acoes"><a href="escritorio.html?sala=${encodeURIComponent(e.id === "principal" ? "nextco" : e.id)}" target="_blank">Abrir</a>
+      ${e.isento || painel.falta ? "" : `<button data-acao="estender" data-id="${esc(e.id)}">+7 dias</button>${k !== "ativa" ? `<button data-acao="liberar" data-id="${esc(e.id)}">Liberar</button>` : ""}${k !== "cancelada" && k !== "sem" ? `<button data-acao="cancelar" data-id="${esc(e.id)}">Bloquear</button>` : ""}`}</div></td></tr>`; }).join("") || `<tr><td colspan="7" class="vazio">${painel.falta ? "Rode o SQL para ver os espaços." : "Nada aqui."}</td></tr>`}
+  </tbody></table></div>
+  <h2>Integrações e chaves</h2>
+  <div class="integ">${integ ? integ.map(i => `<div class="it"><i>${i.ok === true ? "✅" : i.ok === false ? "❌" : "ℹ️"}</i><div><b>${esc(i.nome)}</b><p>${esc(i.detalhe)}</p>${i.ajuda && i.ok !== true ? `<small>${esc(i.ajuda)}</small>` : ""}</div></div>`).join("") : `<p class="vazio">Verificando…</p>`}</div>
+  <footer>“Liberar” vale como cortesia ou pagamento feito por fora; um novo pagamento pelo Mercado Pago passa por cima. As chaves ficam só na Vercel: aqui aparece apenas se estão configuradas.</footer>`;
+}
+
+async function carregar() {
+  const { data: d, error } = await Dados.cliente.rpc("admin_painel");
+  if (error) painel = { espacos: [], falta: /admin_painel|function|schema cache/i.test(error.message || "") };
+  else painel = d;
+  desenhar();
+}
+async function carregarInteg() {
+  try {
+    const r = await fetch("/api/admin-status", { headers: { Authorization: "Bearer " + await Dados.token() } });
+    const j = await r.json(); integ = j.itens || [{ nome: "Integrações", ok: false, detalhe: j.erro || "Não consegui verificar" }];
+  } catch (e) { integ = [{ nome: "Integrações", ok: false, detalhe: "Não consegui verificar agora" }]; }
+  desenhar();
+}
+
+document.addEventListener("click", async e => {
+  const f = e.target.closest("[data-f]"); if (f) { filtro = f.dataset.f; desenhar(); return; }
+  const c = e.target.closest("[data-copias]"); if (c) { verCopias = c.checked; desenhar(); return; }
+  const b = e.target.closest("[data-acao]"); if (!b) return;
+  const esp = painel.espacos.find(x => x.id === b.dataset.id), nome = esp ? esp.nome : b.dataset.id;
+  const pergunta = { estender: `Dar mais 7 dias de teste para “${nome}”?`, liberar: `Liberar “${nome}” como assinante (cortesia ou pagamento por fora)?`, cancelar: `Bloquear “${nome}”? A equipe deixa de entrar até assinar.` }[b.dataset.acao];
+  if (!confirm(pergunta)) return;
+  const { error } = await Dados.cliente.rpc("admin_assinatura_ajustar", { p_mapa: b.dataset.id, p_acao: b.dataset.acao, p_dias: 7 });
+  if (error) return msg("Não deu certo: " + error.message);
+  msg("Feito ✓"); carregar();
+});
+document.addEventListener("input", e => { if (e.target.matches("[data-busca]")) { busca = e.target.value; const pos = e.target.selectionStart; desenhar(); const i = $("[data-busca]"); i.focus(); i.setSelectionRange(pos, pos); } });
+
+(async () => {
+  const email = await Dados.exigirSessao("index.html"); if (!email) return;
+  if (!Dados.ehAdmin()) { $("#app").innerHTML = `<p class="vazio">Esta página é só para administradores do Andar.</p>`; return; }
+  carregar(); carregarInteg();
+})();
+</script>
+</body>
+</html>
