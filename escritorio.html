@@ -478,6 +478,7 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 <script src="js/sala.js"></script>
 <script src="js/sessao-unica.js"></script>
 <script src="js/app-status.js"></script>
+<script src="js/musica.js"></script>
 <script src="js/social.js"></script>
 <script src="js/reuniao.js"></script>
 <script src="js/assinatura.js"></script>
@@ -572,6 +573,10 @@ async function boot(){
   // o púlpito ganha o logo assim que o mapa está pronto (mesmo sem logo enviado: usa o logo padrão)
   Decoracao.aplicarLogo(infoEspaco.logo);
   Assinatura.verificar({ mapaId, toast }); // teste grátis / assinatura do espaço (a sala da Next não é cobrada)
+  // música ambiente: YouTube por sala e música de elevador no corredor
+  Musica.iniciar({ sala: () => P ? roomAt(P.px, P.py - 4) : null, mapa: () => S, salvar: () => Dados.salvarMapaLocal(mapaId, S),
+    souAdmin: () => souDonoDaSala(), meuNome: () => user.nome, toast,
+    alguemFalando: () => !!P && outros.some(a => a.visto && a.falando && Math.hypot(a.px - P.px, a.py - P.py) < 320) });
   Minimapa.iniciar({ irPara: (x, y) => andarAte(x, y, 48), bloqueado: () => Telao.aberto || TI.aberto || Edicao.aberto || Acesso.aberto });
   document.getElementById("bMapa").onclick = () => Minimapa.alternar();
   setTimeout(() => Tour.iniciar({ eu: () => P, modoSala: () => modoSala, vista: v => { if ((v === "3d") !== !!quer3d) document.getElementById("b3d").click(); } }), 1800);
