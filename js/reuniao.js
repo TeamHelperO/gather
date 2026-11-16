@@ -84,7 +84,7 @@ window.Reuniao = (function () {
     if (r) {
       const pal = palestranteDe(r), agora = Date.now(), aoVivo = ms(r.inicio) <= agora;
       g.save(); g.fillStyle = "#14121c"; g.fillRect(x + 6, y + 6, 180, 77);
-      g.fillStyle = aoVivo ? "#e5484d" : "#3d5afe"; g.fillRect(x + 6, y + 6, 180, 10);
+      g.fillStyle = aoVivo ? "#e5484d" : "#1a7f4b"; g.fillRect(x + 6, y + 6, 180, 10);
       g.fillStyle = "#fff"; g.font = "bold 7px system-ui,sans-serif"; g.textBaseline = "middle";
       g.fillText(aoVivo ? (Math.floor(agora / 600) % 2 ? "● AO VIVO" : "○ AO VIVO") : "COMEÇA ÀS " + hora(r.inicio), x + 10, y + 11.5);
       g.textAlign = "right"; g.fillText(hora(r.inicio) + "–" + hora(r.fim), x + 182, y + 11.5); g.textAlign = "left";
@@ -95,11 +95,11 @@ window.Reuniao = (function () {
       const conv = (r.convidados || []).length; g.fillText(conv ? `👥 ${conv + 1} convidados` : "👥 Aberta a todos", x + 110, y + 58);
       g.restore();
       const pauta = limpa(r.pauta);
-      letreiro(g, x + 6, y + 70, 180, (pauta ? pauta + "   •   " : "") + r.titulo + "   •   Levante a mão ✋ para pedir a palavra", aoVivo ? "#e5484d" : "#3d5afe");
+      letreiro(g, x + 6, y + 70, 180, (pauta ? pauta + "   •   " : "") + r.titulo + "   •   Levante a mão ✋ para pedir a palavra", aoVivo ? "#e5484d" : "#1a7f4b");
       return;
     }
     const prox = proximaHoje(sala);
-    if (prox) letreiro(g, x + 6, y + 70, 180, `PRÓXIMA REUNIÃO · ${hora(prox.inicio)} · ${prox.titulo}` + (palestranteDe(prox) ? ` · Apresenta: ${nomeDe(palestranteDe(prox))}` : ""), "#3d5afe");
+    if (prox) letreiro(g, x + 6, y + 70, 180, `PRÓXIMA REUNIÃO · ${hora(prox.inicio)} · ${prox.titulo}` + (palestranteDe(prox) ? ` · Apresenta: ${nomeDe(palestranteDe(prox))}` : ""), "#1a7f4b");
   }
 
   return { iniciar, ativaEm, proximaHoje, bloqueia, avisarBloqueio, palestranteDe, palestranteDaSala, souConvidado, convite, desenharNoTelao, animaTelao, limpa };

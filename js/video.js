@@ -14,7 +14,7 @@ window.Video = (function () {
   const SAIDA = { w: 1080, h: 1920, fps: 30, bitrate: 8000000 };
   const W = 720, H = 1280, K = SAIDA.w / W;               // desenho em 720×1280, gravado em 1080×1920
   const SEGURA = { topo: 115, base: 1025 };                // área segura (Reels/TikTok) no espaço de 720×1280
-  const COR = { fundo: "#16141f", fundo2: "#221e33", acento: "#3d5afe", acentoClaro: "#8a9bff", ok: "#3fbf5f", alerta: "#f2a33a",
+  const COR = { fundo: "#16141f", fundo2: "#221e33", acento: "#1a7f4b", acentoClaro: "#8a9bff", ok: "#3fbf5f", alerta: "#f2a33a",
     card: "#201c2e", card2: "#2a2540", linha: "rgba(255,255,255,.10)", texto: "#ffffff", suave: "rgba(255,255,255,.62)" };
   const FONTE = "Inter, system-ui, sans-serif";
   const TEMPO = { entrada: 0.45, clique: 1.05, resposta: 0.7, mascara: 0.42 }; // segundos
@@ -118,7 +118,7 @@ window.Video = (function () {
   function fundo(g, sec, fx = W / 2, fy = 440) {
     g.fillStyle = COR.fundo; g.fillRect(0, 0, W, H);
     const lx = fx + Math.sin(sec * 0.5) * 30, ly = fy + Math.cos(sec * 0.4) * 24;
-    let rg = g.createRadialGradient(lx, ly, 0, lx, ly, 520); rg.addColorStop(0, "rgba(61,90,254,.38)"); rg.addColorStop(.55, "rgba(61,90,254,.08)"); rg.addColorStop(1, "rgba(61,90,254,0)");
+    let rg = g.createRadialGradient(lx, ly, 0, lx, ly, 520); rg.addColorStop(0, "rgba(26,127,75,.38)"); rg.addColorStop(.55, "rgba(26,127,75,.08)"); rg.addColorStop(1, "rgba(26,127,75,0)");
     g.fillStyle = rg; g.fillRect(0, 0, W, H);
     rg = g.createRadialGradient(W * .85, H * .92, 0, W * .85, H * .92, 420); rg.addColorStop(0, "rgba(138,155,255,.14)"); rg.addColorStop(1, "rgba(138,155,255,0)");
     g.fillStyle = rg; g.fillRect(0, 0, W, H);
@@ -304,7 +304,7 @@ window.Video = (function () {
       const k = back(seg(loc, 0.35 + i * 0.12, 0.7 + i * 0.12)); if (k <= 0) return;
       const d = meia + 58, pos = [[-d, -250], [d, -30], [-d, 230]][i];
       g.save(); g.translate(pos[0], pos[1] + Math.sin(sec * 2 + i * 1.7) * 9); g.scale(k, k);
-      g.fillStyle = "rgba(61,90,254,.22)"; g.beginPath(); g.arc(0, 0, 34, 0, 7); g.fill();
+      g.fillStyle = "rgba(26,127,75,.22)"; g.beginPath(); g.arc(0, 0, 34, 0, 7); g.fill();
       g.strokeStyle = "rgba(138,155,255,.5)"; g.lineWidth = 2; g.beginPath(); g.arc(0, 0, 34, 0, 7); g.stroke();
       icone(g, ic, 0, 0, 30, "#fff", 2.2); g.restore();
     });
@@ -378,7 +378,7 @@ window.Video = (function () {
     if (x.capa) {
       fundo(g, sec, W / 2, 560);
       const sel = back(seg(loc, 0, 0.4)); g.save(); g.translate(W / 2, 330); g.scale(sel, sel);
-      g.fillStyle = "rgba(61,90,254,.25)"; rr(g, -150, -26, 300, 52, 26); g.fill(); g.strokeStyle = "rgba(138,155,255,.6)"; g.lineWidth = 2; rr(g, -150, -26, 300, 52, 26); g.stroke();
+      g.fillStyle = "rgba(26,127,75,.25)"; rr(g, -150, -26, 300, 52, 26); g.fill(); g.strokeStyle = "rgba(138,155,255,.6)"; g.lineWidth = 2; rr(g, -150, -26, 300, 52, 26); g.stroke();
       icone(g, "sparkles", -112, 0, 24, COR.acentoClaro); g.fillStyle = "#fff"; g.font = fonte(800, 20); g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("Tendência agora", 14, 1); g.restore();
       const h = titulo(g, r.titulo, W / 2, 470, W - 120, loc, 70, "#fff", 0.15);
       g.font = fonte(600, 30); g.fillStyle = COR.suave; g.textAlign = "center"; g.textBaseline = "alphabetic";

@@ -3,7 +3,7 @@
 window.Telao = (function () {
   const STATUS = [
     { id: "a_fazer", nome: "A fazer", cor: "#9a948a" },
-    { id: "andamento", nome: "Em andamento", cor: "#3d5afe" },
+    { id: "andamento", nome: "Em andamento", cor: "#1a7f4b" },
     { id: "bloqueado", nome: "Bloqueado", cor: "#e5484d" },
     { id: "feito", nome: "Feito", cor: "#3fbf5f" },
   ];
@@ -42,13 +42,13 @@ window.Telao = (function () {
 .tl.cheia{position:static;background:none;padding:0;min-height:100vh}
 .tl-box{background:#121a2b;color:#e8ecf6;border-radius:18px;border:4px solid #24242c;box-shadow:0 20px 60px rgba(0,0,0,.5);width:100%;max-width:1280px;display:flex;flex-direction:column;overflow:hidden}
 .tl.cheia .tl-box{border-radius:0;border:0;max-width:none;min-height:100vh}
-.tl-head{background:#3d5afe;color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tl-head{background:#1a7f4b;color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .tl-head h2{margin:0;font-size:17px;letter-spacing:.02em}
 .tl-sum{font-size:13px;opacity:.9}
 .tl-sum b{font-size:15px}
 .tl-sp{flex:1}
 .tl-btn{border:0;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer;font:inherit;font-weight:700}
-.tl-btn.w{background:#fff;color:#2438b8}.tl-btn.g{background:rgba(255,255,255,.18);color:#fff}
+.tl-btn.w{background:#fff;color:#146a3e}.tl-btn.g{background:rgba(255,255,255,.18);color:#fff}
 .tl-btn.x{background:rgba(255,255,255,.18);color:#fff;width:38px;height:38px;padding:0;font-size:20px}
 .tl-fil{display:flex;gap:6px;padding:10px 14px 0;flex-wrap:wrap}
 .tl-fil button{border:1px solid #2a3550;background:#182238;color:#cfd6e6;border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
@@ -92,7 +92,7 @@ window.Telao = (function () {
 .tl-com{display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--line,#e4dfd5)}.tl-com p{margin:2px 0 0;white-space:pre-wrap;word-break:break-word;font-size:13.5px}
 .tl-com small{color:var(--mut,#6b6760);font-size:11px}.tl-com .av{width:26px;height:26px;border-radius:50%;color:#fff;display:grid;place-items:center;font-size:10px;font-weight:800;flex:none}
 .tl-coms textarea{flex:1;border:1px solid var(--line,#e4dfd5);border-radius:10px;background:var(--chip,#f3f1ec);padding:8px 10px;font:inherit;resize:vertical}
-.tl-coms .men{color:#3d5afe}
+.tl-coms .men{color:#1a7f4b}
 .tl-resps{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:46px;padding:6px 8px;border:1px solid var(--line,#e4dfd5);border-radius:11px;background:var(--chip,#f3f1ec)}
 .tl-resps input{flex:1;min-width:120px;border:0!important;background:transparent!important;padding:4px!important;height:auto!important;outline:none}
 .tl-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 4px 3px 3px;border-radius:999px;background:var(--panel,#fff);border:1px solid var(--line,#e4dfd5);font-size:13px;font-weight:650}
@@ -107,11 +107,11 @@ window.Telao = (function () {
 .tl-novaet{display:flex;gap:6px;margin-top:8px}.tl-novaet input{flex:1}
 .tl-acts{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
 .tl-acts .tl-btn{background:var(--chip,#f3f1ec);color:inherit;border:1px solid var(--line,#e4dfd5)}
-.tl-acts .tl-btn.pri{background:#3d5afe;color:#fff;border-color:#3d5afe}
+.tl-acts .tl-btn.pri{background:#1a7f4b;color:#fff;border-color:#1a7f4b}
 .tl-acts .tl-btn.dan{color:#e5484d}
 .tl-hist{font-size:12px;color:var(--mut,#6b6760);margin-top:10px}
 .tl-hist div{padding:2px 0}
-.tl-pbar{display:flex;align-items:center;gap:10px}.tl-pbar input{flex:1;accent-color:#3d5afe}
+.tl-pbar{display:flex;align-items:center;gap:10px}.tl-pbar input{flex:1;accent-color:#1a7f4b}
 `;
   function injetarCSS() { if (document.getElementById("tl-css")) return; const s = document.createElement("style"); s.id = "tl-css"; s.textContent = CSS; document.head.appendChild(s); }
 
@@ -200,7 +200,7 @@ window.Telao = (function () {
     const p = progresso(t), n = nivel(t), atr = diasAtraso(t), resps = respsDe(t).map(nomeResp);
     const nCom = (t.comentarios || []).length;
     const textoResp = resps.length <= 2 ? resps.join(" e ") : `${resps.slice(0, 2).join(", ")} +${resps.length - 2}`;
-    const cor = p >= 100 ? "#3fbf5f" : n >= 2 ? "#e5484d" : n === 1 ? "#f2a33a" : "#3d5afe";
+    const cor = p >= 100 ? "#3fbf5f" : n >= 2 ? "#e5484d" : n === 1 ? "#f2a33a" : "#1a7f4b";
     const et = t.etapas && t.etapas.length ? `☑ ${t.etapas.filter(e => e.feito).length}/${t.etapas.length}` : "";
     return `<div class="tl-card ${n ? "n" + n : ""}" data-id="${t.id}">
       <div class="alca" title="Arrastar" aria-label="Arrastar">⠿</div>
@@ -259,7 +259,7 @@ window.Telao = (function () {
         <div class="tl-acts"><button class="tl-btn pri" type="submit">Salvar</button><button class="tl-btn" type="button" data-x>Cancelar</button>${novo ? "" : `<button class="tl-btn dan" type="button" data-del>Excluir</button>`}</div>
         ${t ? `<div class="tl-f tl-coms"><label>Comentários</label>
           ${(d.comentarios || []).map(c => `<div class="tl-com"><span class="av" style="background:${corNome(c.nome || "")}">${esc(iniciais(c.nome || "?"))}</span><div><b>${esc(c.nome || "—")}</b> <small>${new Date(c.quando).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small><p>${esc(c.texto).replace(/@([\wÀ-ÿ]+)/g, '<b class="men">@$1</b>')}</p></div></div>`).join("") || `<div style="color:var(--mut,#6b6760);font-size:13px">Nenhum comentário ainda.</div>`}
-          <div class="tl-novaet"><textarea id="tlCom" rows="2" maxlength="1500" placeholder="Comentar… use @nome para avisar alguém"></textarea><button type="button" class="tl-btn pri" data-comentar style="background:#3d5afe;color:#fff">Enviar</button></div></div>` : ""}
+          <div class="tl-novaet"><textarea id="tlCom" rows="2" maxlength="1500" placeholder="Comentar… use @nome para avisar alguém"></textarea><button type="button" class="tl-btn pri" data-comentar style="background:#1a7f4b;color:#fff">Enviar</button></div></div>` : ""}
         ${t && t.historico ? `<div class="tl-hist"><b>Histórico</b>${t.historico.slice(-6).reverse().map(h => `<div>${new Date(h.quando).toLocaleString("pt-BR")} · ${esc(nomeResp(h.email) || "—")} · ${esc(h.acao)}</div>`).join("")}</div>` : ""}
       </form>`;
       const f = m.querySelector("form");
@@ -383,7 +383,7 @@ window.Telao = (function () {
     // área da tela do sprite M38 (192x96): x 6..185, y 6..82
     g.save();
     g.fillStyle = "#121a2b"; g.fillRect(x + 6, y + 6, 180, 77);
-    g.fillStyle = "#3d5afe"; g.fillRect(x + 6, y + 6, 180, 9);
+    g.fillStyle = "#1a7f4b"; g.fillRect(x + 6, y + 6, 180, 9);
     g.fillStyle = "#ffffff"; g.font = "bold 7px system-ui,sans-serif"; g.textBaseline = "middle";
     const sm = resumo(tarefas);
     let tt0 = titulo || "TELÃO DA EQUIPE"; while (g.measureText(tt0).width > 140 && tt0.length > 4) tt0 = tt0.slice(0, -2); if (tt0 !== (titulo || "TELÃO DA EQUIPE")) tt0 += "…";
@@ -400,7 +400,7 @@ window.Telao = (function () {
       let tt = t.titulo; while (g.measureText(tt).width > 64 && tt.length > 3) tt = tt.slice(0, -2); if (tt !== t.titulo) tt += "…";
       g.fillText(tt, x + 10, yy + 3);
       g.fillStyle = "#2a3550"; g.fillRect(x + 78, yy, 90, 6);
-      g.fillStyle = p >= 100 ? "#3fbf5f" : n >= 2 ? "#e5484d" : n ? "#f2a33a" : "#3d5afe"; g.fillRect(x + 78, yy, Math.round(90 * p / 100), 6);
+      g.fillStyle = p >= 100 ? "#3fbf5f" : n >= 2 ? "#e5484d" : n ? "#f2a33a" : "#1a7f4b"; g.fillRect(x + 78, yy, Math.round(90 * p / 100), 6);
       g.fillStyle = "#ffffff"; g.fillText(String(p), x + 171, yy + 3);
     });
     if (sm.escalonadas) { g.fillStyle = "#e5484d"; g.fillRect(x + 10, y + 77, 4, 2); g.font = "bold 5px system-ui,sans-serif"; g.fillText(`${sm.escalonadas} ESCALONADA${sm.escalonadas > 1 ? "S" : ""}`, x + 17, y + 78); }

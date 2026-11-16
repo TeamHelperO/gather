@@ -295,7 +295,7 @@ window.Projecao = (function () {
       g.fillText(est, x + w / 2, y + h / 2 + 8);
       etiqueta(g, x + 3, y + 3, "● AO VIVO", "#e5484d");
     } else {
-      g.fillStyle = "rgba(61,90,254,.08)"; g.fillRect(x, y, w, h);
+      g.fillStyle = "rgba(26,127,75,.08)"; g.fillRect(x, y, w, h);
       g.fillStyle = "#8a8578"; g.font = "bold 8px system-ui,sans-serif"; g.fillText("TELÃO DE PROJEÇÃO", x + w / 2, y + h / 2 - 6);
       g.font = "7px system-ui,sans-serif"; g.fillText(r && !salasComPalco().has(r.id) ? "Livre: quem entrar pode compartilhar a tela" : "Suba no palco para compartilhar sua tela", x + w / 2, y + h / 2 + 7);
     }

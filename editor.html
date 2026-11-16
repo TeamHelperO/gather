@@ -195,7 +195,7 @@ function render(c, v, ui){
     const sx = r.x*T*v.s + v.ox, sy = r.y*T*v.s + v.oy;
     const t = `${r.name} · ${r.w}×${r.h}`; const tw = c.measureText(t).width + 14;
     if (r.w*T*v.s < 60) continue;
-    c.fillStyle = (sel && sel.kind==="room" && sel.id===r.id) ? "rgba(61,90,254,.95)" : "rgba(20,16,32,.72)";
+    c.fillStyle = (sel && sel.kind==="room" && sel.id===r.id) ? "rgba(26,127,75,.95)" : "rgba(20,16,32,.72)";
     roundRect(c, sx+6, sy+6, Math.min(tw, r.w*T*v.s-12), 22, 7); c.fill();
     c.save(); c.beginPath(); c.rect(sx+6, sy+6, r.w*T*v.s-12, 22); c.clip();
     c.fillStyle = "#fff"; c.fillText(t, sx+13, sy+17); c.restore();
@@ -205,12 +205,12 @@ function render(c, v, ui){
   const itSel = sel && sel.kind==="item" ? itemById(sel.id) : sel && sel.kind==="auto" ? autoSel() : null;
   if (itSel){
     const b = caixa(itSel); const sx = b.x*v.s+v.ox, sy = b.y*v.s+v.oy;
-    c.strokeStyle = "#3d5afe"; c.lineWidth = 2; c.setLineDash([5,3]); c.strokeRect(sx-2, sy-2, b.w*v.s+4, b.h*v.s+4); c.setLineDash([]);
+    c.strokeStyle = "#1a7f4b"; c.lineWidth = 2; c.setLineDash([5,3]); c.strokeRect(sx-2, sy-2, b.w*v.s+4, b.h*v.s+4); c.setLineDash([]);
   }
   if (drag && drag.type==="create" && drag.rect){
     const q = drag.rect; const sx=q.x*T*v.s+v.ox, sy=q.y*T*v.s+v.oy;
-    c.fillStyle="rgba(61,90,254,.25)"; c.fillRect(sx,sy,q.w*T*v.s,q.h*T*v.s);
-    c.strokeStyle="#3d5afe"; c.lineWidth=2; c.strokeRect(sx,sy,q.w*T*v.s,q.h*T*v.s);
+    c.fillStyle="rgba(26,127,75,.25)"; c.fillRect(sx,sy,q.w*T*v.s,q.h*T*v.s);
+    c.strokeStyle="#1a7f4b"; c.lineWidth=2; c.strokeRect(sx,sy,q.w*T*v.s,q.h*T*v.s);
     badge(c, `${q.w} × ${q.h}`, sx+q.w*T*v.s/2, sy+q.h*T*v.s/2);
   }
 }
@@ -222,10 +222,10 @@ function handles(r, v){
 }
 function drawRoomSel(c, r, v){
   const x0=r.x*T*v.s+v.ox, y0=r.y*T*v.s+v.oy, w=r.w*T*v.s, h=r.h*T*v.s;
-  c.strokeStyle="#3d5afe"; c.lineWidth=3; c.strokeRect(x0,y0,w,h);
+  c.strokeStyle="#1a7f4b"; c.lineWidth=3; c.strokeRect(x0,y0,w,h);
   c.strokeStyle="#fff"; c.lineWidth=1; c.setLineDash([6,4]); c.strokeRect(x0,y0,w,h); c.setLineDash([]);
   for (const [k,[hx,hy]] of Object.entries(handles(r,v))){
-    c.fillStyle="#fff"; c.strokeStyle="#3d5afe"; c.lineWidth=3;
+    c.fillStyle="#fff"; c.strokeStyle="#1a7f4b"; c.lineWidth=3;
     c.beginPath(); c.arc(hx,hy,k.length===2?9:7,0,Math.PI*2); c.fill(); c.stroke();
   }
   if (drag && (drag.type==="resize"||drag.type==="moveRoom")) badge(c, `${r.w} × ${r.h}`, x0+w/2, y0+h/2);

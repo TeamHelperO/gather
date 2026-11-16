@@ -58,7 +58,7 @@ window.Gestor = (function () {
     const soma = k => sem.reduce((s, x) => s + (x[k] || 0), 0);
     abrirModal(`<div class="sm-h"><b>📊 Meu tempo nesta sala</b><button data-gfechar class="sc-x">×</button></div>
       <div class="gs-corpo">
-        <div class="gs-cards">${[["Online (7 dias)", soma("min_online"), "#3d5afe"], ["Em reunião", soma("min_reuniao"), "#f2a33a"], ["Ocupado / foco", soma("min_ocupado"), "#e5484d"], ["Ausente", soma("min_ausente"), "#9aa0ad"]]
+        <div class="gs-cards">${[["Online (7 dias)", soma("min_online"), "#1a7f4b"], ["Em reunião", soma("min_reuniao"), "#f2a33a"], ["Ocupado / foco", soma("min_ocupado"), "#e5484d"], ["Ausente", soma("min_ausente"), "#9aa0ad"]]
           .map(([l, v, c]) => `<div><b style="color:${c}">${H(v)}</b><small>${l}</small></div>`).join("")}</div>
         <div class="gs-dias">${dias.map(d => { const h = d.min_online / max * 100;
           return `<div class="gs-dia" title="${new Date(d.dia + "T12:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })}: ${H(d.min_online)} online, ${H(d.min_reuniao)} em reunião">

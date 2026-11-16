@@ -67,7 +67,7 @@
       ${r.vencendo.length ? `<h3>⏳ Vencem nos próximos 7 dias</h3><ul>${r.vencendo.map(t => li(t, `· ${fmt(dataLocal(t.prazo))} · ${e(r.respsDe(t).map(r.nome).join(", ") || "sem responsável")}`)).join("")}</ul>` : ""}
       <h3>👥 Por pessoa</h3><table style="width:100%;border-collapse:collapse;font-size:13px"><tr style="text-align:left;color:#6b6760"><th>Pessoa</th><th>Abertas</th><th>Atrasadas</th><th>Concluídas</th><th>Online</th><th>Reunião</th></tr>
       ${r.pessoas.map(x => `<tr style="border-top:1px solid #e4dfd5${x.sobrecarga ? ";background:#fff3f0" : ""}"><td style="padding:6px 4px"><b>${e(x.nome)}</b>${x.sobrecarga ? " ⚠" : ""}</td><td>${x.abertas}</td><td>${x.atrasadas}</td><td>${x.concluidas}</td><td>${x.minOnline ? horas(x.minOnline) : "—"}</td><td>${x.minReuniao ? horas(x.minReuniao) : "—"}</td></tr>`).join("")}</table>
-      ${link ? `<p style="margin-top:20px"><a href="${e(link)}" style="background:#3d5afe;color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:700">Abrir o escritório</a></p>` : ""}
+      ${link ? `<p style="margin-top:20px"><a href="${e(link)}" style="background:#1a7f4b;color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:700">Abrir o escritório</a></p>` : ""}
       <p style="color:#9a958c;font-size:11.5px;margin-top:18px">⚠ = muitas tarefas abertas em relação à equipe ou 3+ atrasadas. Presença conta só minutos online por estado, sem áudio, tela ou conversas.</p></div>`;
   }
 

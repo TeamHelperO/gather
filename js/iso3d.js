@@ -42,7 +42,7 @@ function caixaM(w, h, d, m, x = 0, y = 0, z = 0, sombra = true) {
 }
 function cilindro(r, h, m, x = 0, y = 0, z = 0, seg = 12) { const me = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), typeof m === "string" ? mat(m) : m); me.position.set(x, y + h / 2, z); me.castShadow = me.receiveShadow = true; return me; }
 function bola(r, m, x = 0, y = 0, z = 0, det = 0) { const me = new THREE.Mesh(new THREE.IcosahedronGeometry(r, det), typeof m === "string" ? mat(m, { flatShading: true }) : m); me.position.set(x, y, z); me.castShadow = me.receiveShadow = true; return me; }
-function telaTexto(titulo, cor = "#3d5afe", linhas = 4) {
+function telaTexto(titulo, cor = "#1a7f4b", linhas = 4) {
   const c = document.createElement("canvas"); c.width = 384; c.height = 192; const g = c.getContext("2d");
   g.fillStyle = "#121a2b"; g.fillRect(0, 0, 384, 192); g.fillStyle = cor; g.fillRect(0, 0, 384, 30);
   g.fillStyle = "#fff"; g.font = "800 17px Inter,system-ui,sans-serif"; g.textBaseline = "middle"; g.fillText(titulo, 12, 16);

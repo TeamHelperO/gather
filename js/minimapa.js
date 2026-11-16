@@ -43,9 +43,9 @@ window.Minimapa = (function () {
       const x = ox + p.x * esc, y = oy + p.y * esc;
       if (p.eu) {
         if (olhar != null) { // cone de visão
-          g.fillStyle = "rgba(61,90,254,.35)"; g.beginPath(); g.moveTo(x, y); g.arc(x, y, 16, olhar - 0.55, olhar + 0.55); g.closePath(); g.fill();
+          g.fillStyle = "rgba(26,127,75,.35)"; g.beginPath(); g.moveTo(x, y); g.arc(x, y, 16, olhar - 0.55, olhar + 0.55); g.closePath(); g.fill();
         }
-        g.fillStyle = "#3d5afe"; g.strokeStyle = "#fff"; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 4.5, 0, Math.PI * 2); g.fill(); g.stroke();
+        g.fillStyle = "#1a7f4b"; g.strokeStyle = "#fff"; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 4.5, 0, Math.PI * 2); g.fill(); g.stroke();
       } else { g.fillStyle = p.cor || "#7ee787"; g.strokeStyle = "rgba(0,0,0,.6)"; g.lineWidth = 1; g.beginPath(); g.arc(x, y, 3.2, 0, Math.PI * 2); g.fill(); g.stroke(); }
     }
   }
