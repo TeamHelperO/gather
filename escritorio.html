@@ -763,6 +763,8 @@ async function ligarAudio(){
     const r = await Voz.ativar(P.id);
     if (!r.comMicrofone) toast("Sem permissão do microfone: você ouve, mas não fala");
     Dados.registrarAtividade(EMAIL, "audio", r.comMicrofone ? "Ligou o áudio com microfone" : "Ligou o áudio só para ouvir");
+  } else if (Voz.silencio) {
+    toast("🤫 Na área silenciosa não tem microfone: use o chat escrito. Saia da sala para falar");
   } else if (Voz.bloqueado) {
     toast("🔇 O palestrante mutou a plateia. Use ✋ Levantar a mão para pedir a palavra");
   } else if (!Voz.temMic) {
@@ -777,6 +779,7 @@ function atualizarBotaoAudio(){
   if (!Voz.ligado) ROTULO(b, "headphones", "Ligar áudio");
   else if (!Voz.temMic) ROTULO(b, "volume-1", "Só ouvindo");
   else if (Voz.bloqueado) ROTULO(b, "mic-off", "Mutado pelo palestrante");
+  else if (Voz.silencio) ROTULO(b, "mic-off", "Área silenciosa");
   else ROTULO(b, Voz.micAberto ? "mic" : "mic-off", Voz.micAberto ? "Microfone ligado" : "Microfone mudo");
   b.classList.toggle("mudo", Voz.ligado && !Voz.micAberto);
 }
@@ -1199,7 +1202,11 @@ function checarSala(first){
   const nome = r ? r.name : "Área externa";
   if (nome === P.sala && !first) return;
   P.sala = nome;
-  const z = Voz.zona(P), regra = z.tipo === "fechada" ? "todos da sala se ouvem" : z.tipo === "silencio" ? "sem áudio" : "ouve quem está perto";
+  const z = Voz.zona(P), regra = z.tipo === "fechada" ? "todos da sala se ouvem" : z.tipo === "silencio" ? "sem microfone · só chat escrito" : "ouve quem está perto";
+  // Área silenciosa: o microfone desliga ao entrar e volta como estava ao sair
+  const noSilencio = z.tipo === "silencio";
+  if (noSilencio !== Voz.silencio){ Voz.zonaSilencio(noSilencio); atualizarBotaoAudio();
+    if (!first || noSilencio) toast(noSilencio ? "🤫 Área silenciosa: microfone desligado. Aqui é só chat escrito" : (Voz.ligado && Voz.micAberto ? "🎙️ Microfone ligado de novo" : "Você saiu da área silenciosa")); }
   // fora da sala oficial da Next, mostra também em qual espaço (e ID) a pessoa está, para não confundir duas cópias parecidas
   const espaco = EH_NEXT ? "" : `<b class="sala-espaco" title="Espaço ${String(infoEspaco.nome || "").replace(/[<>&"]/g, "")} · ID ${idPublico()}">${String(infoEspaco.nome || mapaId).replace(/[<>&]/g, "")} · ${idPublico()}</b>`;
   const el = document.getElementById("sala"); el.innerHTML = espaco + ICONE("map-pin", 17) + `<span>${nome.replace(/[<>&]/g, "")}</span><small>· ${regra}</small>`;

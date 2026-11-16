@@ -18,6 +18,8 @@ window.Voz = (function () {
   const SAIDA_NO_ELEMENTO = typeof HTMLMediaElement !== "undefined" && typeof HTMLMediaElement.prototype.setSinkId === "function";
 
   let ligado = false, stream = null, micAberto = true, ctxAudio = null, meuId = null;
+  let silencio = false; // dentro da Área silenciosa o microfone fica desligado (só chat escrito)
+  const micSai = () => micAberto && !silencio;
   let cam = null; // câmera ligada (vídeo chamada): MediaStream com a trilha de vídeo
   let iceServers = (window.CONFIG && CONFIG.ICE) || [];
   /* Busca servidores TURN (necessários em 4G/redes de empresa). /api/turn devolve [] se não estiver configurado. */
@@ -88,7 +90,7 @@ window.Voz = (function () {
     await carregarIce();
     await aplicarSaida(pref.saida, false);
     stream = await pegarMic(pref.mic);
-    if (stream) { nivelLocal = medidor(stream); for (const t of stream.getAudioTracks()) t.enabled = micAberto; }
+    if (stream) { nivelLocal = medidor(stream); for (const t of stream.getAudioTracks()) t.enabled = micSai(); }
     ligado = true;
     return { comMicrofone: !!stream };
   }
@@ -110,13 +112,17 @@ window.Voz = (function () {
     b = !!b; if (b === bloqueado) return;
     bloqueado = b;
     if (b) { micAberto = false; if (stream) for (const t of stream.getAudioTracks()) t.enabled = false; }
-    else if (abrirAoSoltar) { micAberto = true; if (stream) for (const t of stream.getAudioTracks()) t.enabled = true; }
+    else if (abrirAoSoltar) { micAberto = true; if (stream) for (const t of stream.getAudioTracks()) t.enabled = micSai(); }
+  }
+  function zonaSilencio(b) {
+    b = !!b; if (b === silencio) return; silencio = b;
+    if (stream) for (const t of stream.getAudioTracks()) t.enabled = micSai();
   }
   function alternarMic() {
     if (!stream) return false;
     if (bloqueado) return false;
     micAberto = !micAberto;
-    for (const t of stream.getAudioTracks()) t.enabled = micAberto;
+    for (const t of stream.getAudioTracks()) t.enabled = micSai();
     return micAberto;
   }
 
@@ -129,7 +135,7 @@ window.Voz = (function () {
     const tinha = !!stream, velho = stream;
     stream = novo; nivelLocal = medidor(stream);
     const trilha = stream.getAudioTracks()[0];
-    trilha.enabled = micAberto;
+    trilha.enabled = micSai();
     if (tinha) {
       for (const p of peers.values()) {
         const s = p.pc.getSenders().find(s => s.track && s.track.kind === "audio") || p.pc.getSenders()[0];
@@ -210,7 +216,7 @@ window.Voz = (function () {
   }
   /* Medidor do microfone para o painel (usa a ligação atual ou abre um teste temporário). */
   async function testeMic() {
-    if (ligado && stream) return { nivel: () => (micAberto && nivelLocal ? nivelLocal() : 0), parar() {} };
+    if (ligado && stream) return { nivel: () => (micSai() && nivelLocal ? nivelLocal() : 0), parar() {} };
     const s = await pegarMic(pref.mic); if (!s) return null;
     const n = medidor(s);
     return { nivel: () => (n ? n() : 0), parar() { s.getTracks().forEach(t => t.stop()); } };
@@ -293,7 +299,7 @@ window.Voz = (function () {
   }
   /* Chamado a cada quadro: abre/fecha ligações e ajusta volumes; marca quem está falando. */
   function atualizar(eu, outros, agora) {
-    if (nivelLocal && micAberto && nivelLocal() > 0.04) eu.vozAtiva = agora;
+    if (nivelLocal && micSai() && nivelLocal() > 0.04) eu.vozAtiva = agora;
     if (!ligado) return;
     for (const o of outros) {
       const v = o.audio === false ? 0 : regra(eu, o);
@@ -366,7 +372,7 @@ window.Voz = (function () {
     dispositivos, pedirPermissao, trocarMic, processamento, aplicarSaida, testarSaida, testeMic,
     volumePessoa, definirVolumePessoa,
     get pref() { return { ...pref, vols: { ...pref.vols } }; },
-    get ligado() { return ligado; }, get temMic() { return !!stream; }, get micAberto() { return micAberto && !!stream; },
+    get ligado() { return ligado; }, get temMic() { return !!stream; }, get micAberto() { return micSai() && !!stream; }, get silencio() { return silencio; }, zonaSilencio,
     get conexoes() { return peers.size; }, get iceServers() { return iceServers; }, get temTurn() { return temTurn(); }, get micAtual() { return stream ? (stream.getAudioTracks()[0] || {}).label || "" : ""; },
   };
 })();
