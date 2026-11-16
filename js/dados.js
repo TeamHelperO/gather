@@ -193,10 +193,11 @@
     /* ---------- salas virtuais: cada uma é um mapa com um ID curto (o mapa "principal" é o escritório da Next Co.) ---------- */
     normalizarSala(id) {
       id = String(id || "").trim().toLowerCase().replace(/^.*[?&]sala=/, "").replace(/[^a-z0-9_-]/g, "");
-      return id === "nextco" || id === "next" ? "principal" : id;
+      // g8aue6 virou o escritório principal da Next (16/11): links antigos caem no principal
+      return id === "nextco" || id === "next" || id === "g8aue6" ? "principal" : id;
     },
     salaDaUrl() { try { const q = new URLSearchParams(location.search).get("sala"); return q ? this.normalizarSala(q) : null; } catch (e) { return null; } },
-    ultimaSala() { try { return localStorage.getItem("nextco_sala") || null; } catch (e) { return null; } },
+    ultimaSala() { try { const v = localStorage.getItem("nextco_sala"); return v ? this.normalizarSala(v) : null; } catch (e) { return null; } },
     lembrarSala(id, nome) {
       try {
         localStorage.setItem("nextco_sala", id);
