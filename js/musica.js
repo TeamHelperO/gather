@@ -2,9 +2,9 @@
    MÚSICA AMBIENTE
    – Cada sala pode ter uma música do YouTube (o administrador cola o link).
      Toca para quem está DENTRO da sala, todos no mesmo ponto da música,
-     pelo player oficial do YouTube: ele fica visível num cartão pequeno
-     (regra do YouTube: o player não pode ser escondido nem virar só áudio).
-     Minimizar o cartão pausa a música só para você.
+     pelo player oficial do YouTube. O cartão pode ficar recolhido (só o nome
+     e o volume) e a música continua tocando. Ninguém pausa só para si: quem
+     não quiser ouvir baixa o próprio volume (ou pede ao administrador).
    – No corredor toca uma música de elevador baixinha, composta aqui mesmo
      (Web Audio, sem direitos autorais): acordes de bossa, baixo e vibrafone.
    – Volume: o da sala (definido pelo administrador) × o seu. Quando alguém
@@ -12,8 +12,9 @@
    ===================================================================== */
 window.Musica = (function () {
   let o = null, card = null, player = null, ytCarregando = false, ytPronto = false;
-  let salaId = null, videoAtual = null, minimizado = false, duck = 1, ultimaAssinatura = null;
+  let salaId = null, videoAtual = null, recolhido = true, duck = 1, ultimaAssinatura = null;
   const ls = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+  recolhido = ls.get("andar_musica_recolhido", true);
   let meuVol = ls.get("andar_musica_vol", 70), meuElev = ls.get("andar_elevador_vol", 60), elevMudo = ls.get("andar_elevador_mudo", false);
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -48,7 +49,7 @@ window.Musica = (function () {
         width: 200, height: 200, videoId: mus.yt,
         playerVars: { autoplay: 1, controls: 1, rel: 0, playsinline: 1, modestbranding: 1, start: 0 },
         events: {
-          onReady: () => { sincronizar(mus); aplicarVolume(); if (!minimizado) player.playVideo(); atualizarTitulo(); },
+          onReady: () => { sincronizar(mus); aplicarVolume(); player.playVideo(); atualizarTitulo(); },
           onStateChange: e => { if (e.data === 0) { player.seekTo(0, true); player.playVideo(); } if (e.data === 1) atualizarTitulo(); },
           onError: () => { const t = card && card.querySelector("[data-titulo]"); if (t) t.textContent = "Este vídeo não pode tocar fora do YouTube"; },
         },
@@ -66,7 +67,7 @@ window.Musica = (function () {
   }
   function atualizarTitulo() {
     const t = card && card.querySelector("[data-titulo]"); if (!t || !player || !player.getVideoData) return;
-    const d = player.getVideoData(); if (d && d.title) t.textContent = d.title;
+    const d = player.getVideoData(); if (d && d.title) { t.textContent = d.title; const t2 = card.querySelector("[data-titulo2]"); if (t2) t2.textContent = d.title; }
   }
   function parar() { if (player && player.stopVideo) player.stopVideo(); videoAtual = null; }
   function aplicarVolume() {
@@ -137,9 +138,15 @@ window.Musica = (function () {
     card.addEventListener("click", clique); card.addEventListener("input", mexeu);
   }
   function soltarPlayer() { if (player) { try { player.destroy(); } catch (e) {} player = null; } videoAtual = null; }
+  // fica logo abaixo das pílulas do canto de cima (sala, teste grátis), sem cobrir nenhuma
+  function posicionar() {
+    if (!card || innerWidth <= 760) return;
+    let y = 56; for (const sel of ["#sala", "#assPill"]) { const el = document.querySelector(sel); if (el && el.offsetParent) { const b = el.getBoundingClientRect(); if (b.left < 400) y = Math.max(y, b.bottom); } }
+    card.style.top = (y + 8) + "px";
+  }
   function render() {
     const r = salaObj(), mus = r && r.musica, admin = o.souAdmin();
-    if (!(r && r.type !== "corredor" && mus && mus.yt && !minimizado)) soltarPlayer(); // o cartão vai mudar: o player sai junto
+    if (!(r && r.type !== "corredor" && mus && mus.yt)) soltarPlayer(); // sem música aqui: o player sai junto
     if (r && r.type === "corredor") {
       const ligadoNoEspaco = o.mapa().musicaCorredor !== false;
       if (!ligadoNoEspaco && !admin) { card.hidden = true; return; }
@@ -155,12 +162,13 @@ window.Musica = (function () {
       return;
     }
     card.hidden = false;
-    if (minimizado) { card.className = "pill hud mus-card mini"; card.innerHTML = `<span class="mus-ic">🎵</span><b>Música pausada para você</b><button data-abrir>Ouvir</button>`; return; }
-    card.className = "pill hud mus-card";
+    // recolhido: o player continua na página (só sai da tela), então a música não para
+    card.className = "pill hud mus-card" + (recolhido ? " recolhido" : "");
     if (!card.querySelector("#musPlayer")) {
       card.innerHTML = `<div class="mus-player"><div id="musPlayer"></div></div>
-        <div class="mus-lado"><div class="mus-top"><span>🎵 Música da sala</span><button data-min title="Minimizar (pausa só para você)" aria-label="Minimizar">–</button></div>
+        <div class="mus-lado"><div class="mus-top"><span>🎵 Música da sala</span><button data-min title="Recolher (a música continua)" aria-label="Recolher">–</button></div>
         <b data-titulo>Carregando…</b>
+        <div class="mus-curto"><span class="mus-ic">🎵</span><b data-titulo2>Carregando…</b><input type="range" min="0" max="100" value="${meuVol}" data-meu aria-label="Meu volume da música"><button data-abrir title="Mostrar o player" aria-label="Mostrar o player">▾</button></div>
         <label class="mus-vol">Meu volume<input type="range" min="0" max="100" value="${meuVol}" data-meu aria-label="Meu volume da música"></label>
         ${admin ? `<label class="mus-vol">Volume da sala<input type="range" min="0" max="100" value="${mus.volume ?? 50}" data-sala aria-label="Volume da música para todos da sala"></label>
         <div class="mus-bts"><button data-por>Trocar</button><button data-tirar>Tirar</button></div>` : ""}</div>`;
@@ -170,8 +178,8 @@ window.Musica = (function () {
   function clique(e) {
     const b = e.target.closest("button"); if (!b) return;
     Elevador.destravar();
-    if (b.dataset.min !== undefined) { minimizado = true; render(); }
-    else if (b.dataset.abrir !== undefined) { minimizado = false; render(); tique(); }
+    if (b.dataset.min !== undefined) { recolhido = true; ls.set("andar_musica_recolhido", true); card.classList.add("recolhido"); posicionar(); }
+    else if (b.dataset.abrir !== undefined) { recolhido = false; ls.set("andar_musica_recolhido", false); card.classList.remove("recolhido"); posicionar(); }
     else if (b.dataset.por !== undefined) pedirLink();
     else if (b.dataset.tirar !== undefined) { const r = salaObj(); if (r) { delete r.musica; o.salvar(); render(); o.toast("Música tirada da sala"); } }
     else if (b.dataset.corredor !== undefined) { const m = o.mapa(); m.musicaCorredor = m.musicaCorredor === false; o.salvar(); render(); tique(); }
@@ -179,7 +187,7 @@ window.Musica = (function () {
   let salvarVolT = null;
   function mexeu(e) {
     const el = e.target;
-    if (el.dataset.meu !== undefined) { meuVol = +el.value; ls.set("andar_musica_vol", meuVol); aplicarVolume(); }
+    if (el.dataset.meu !== undefined) { meuVol = +el.value; ls.set("andar_musica_vol", meuVol); card.querySelectorAll("[data-meu]").forEach(x => { if (x !== el) x.value = meuVol; }); aplicarVolume(); }
     if (el.dataset.elev !== undefined) { meuElev = +el.value; elevMudo = meuElev === 0; ls.set("andar_elevador_vol", meuElev); ls.set("andar_elevador_mudo", elevMudo); aplicarVolume(); }
     if (el.dataset.sala !== undefined) { const r = salaObj(); if (r && r.musica) { r.musica.volume = +el.value; aplicarVolume(); clearTimeout(salvarVolT); salvarVolT = setTimeout(() => o.salvar(), 600); } }
   }
@@ -187,7 +195,7 @@ window.Musica = (function () {
     const r = salaObj(); if (!r) return;
     const fundo = document.createElement("div"); fundo.className = "mus-modal";
     fundo.innerHTML = `<form class="mus-caixa"><h3>Música da sala “${esc(r.name)}”</h3>
-      <p>Cole o link de um vídeo do YouTube. Ele toca para quem estiver dentro da sala, no mesmo trecho para todos, e recomeça quando acaba.</p>
+      <p>Cole o link de um vídeo do YouTube. Ele toca para todos que estiverem dentro da sala, no mesmo trecho, e recomeça quando acaba. Cada pessoa só pode baixar o próprio volume.</p>
       <input name="link" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" required>
       <small data-erro></small>
       <div class="mus-bts"><button type="button" data-cancelar>Cancelar</button><button type="submit" class="pri">Tocar na sala</button></div></form>`;
@@ -199,7 +207,7 @@ window.Musica = (function () {
       e.preventDefault(); const id = idDoLink(inp.value);
       if (!id) { f.querySelector("[data-erro]").textContent = "Esse não parece um link de vídeo do YouTube."; return; }
       r.musica = { yt: id, volume: (r.musica && r.musica.volume) ?? 50, desde: Date.now(), por: o.meuNome() };
-      o.salvar(); fundo.remove(); minimizado = false; videoAtual = null; render(); tique(); o.toast("🎵 Música posta na sala");
+      o.salvar(); fundo.remove(); videoAtual = null; render(); tique(); o.toast("🎵 Música posta na sala");
     };
   }
 
@@ -207,14 +215,15 @@ window.Musica = (function () {
   function tique() {
     if (!o) return;
     const r = salaObj(), id = r ? r.id : null, mus = r && r.musica && r.musica.yt ? r.musica : null;
-    if (id !== salaId) { salaId = id; minimizado = false; }
+    if (id !== salaId) salaId = id;
     // redesenha o cartão quando algo muda (outra sala, música posta/tirada por alguém, corredor ligado/desligado)
-    const assinatura = [id, r && r.type, mus && mus.yt, mus && mus.desde, o.souAdmin(), o.mapa().musicaCorredor, minimizado].join("|");
+    const assinatura = [id, r && r.type, mus && mus.yt, mus && mus.desde, o.souAdmin(), o.mapa().musicaCorredor].join("|");
     if (assinatura !== ultimaAssinatura) { ultimaAssinatura = assinatura; render(); }
+    posicionar();
     // corredor
     if (r && r.type === "corredor" && o.mapa().musicaCorredor !== false && !elevMudo) Elevador.ligar(); else Elevador.desligar();
     // música da sala
-    if (mus && !minimizado) {
+    if (mus) {
       const chave = mus.yt + "|" + mus.desde;
       if (chave !== videoAtual) { videoAtual = ytPronto ? chave : null; tocar(mus); }
     } else if (videoAtual) parar();
@@ -229,6 +238,14 @@ window.Musica = (function () {
 .mus-card.mini input[type=range]{width:90px}
 .mus-card button{font:inherit;font-size:12.5px;font-weight:700;border:0;border-radius:9px;padding:6px 10px;background:rgba(127,127,127,.16);color:inherit;cursor:pointer}
 .mus-card button:hover{background:rgba(127,127,127,.28)}
+.mus-curto{display:none}
+.mus-card.recolhido{padding:7px 10px}
+.mus-card.recolhido .mus-player{position:fixed;left:-10000px;top:0}
+.mus-card.recolhido .mus-lado>*:not(.mus-curto){display:none}
+.mus-card.recolhido .mus-lado{width:auto}
+.mus-card.recolhido .mus-curto{display:flex;align-items:center;gap:9px;font-size:13px}
+.mus-curto b{max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.mus-curto input{width:90px;accent-color:var(--brand,#1a7f4b)}
 .mus-player{width:200px;height:200px;border-radius:10px;overflow:hidden;background:#000;flex:none}
 .mus-player iframe{width:200px;height:200px;display:block}
 .mus-lado{display:flex;flex-direction:column;gap:7px;width:190px;font-size:13px}
