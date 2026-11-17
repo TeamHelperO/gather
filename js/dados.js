@@ -38,7 +38,7 @@
   }
   const paraUsuario = (p) => p && ({ id: p.id, email: p.email, nome: p.nome, papel: p.papel || "usuario", avatar: p.avatar, posicao: p.posicao, prefs: p.prefs || {}, criadoEm: p.criado_em, ultimoAcesso: p.ultimo_acesso });
   const paraTarefa = (r) => ({ id: r.id, titulo: r.titulo, descricao: r.descricao || "", responsavel: r.responsavel || "", prazo: r.prazo || "", status: r.status,
-    etapas: r.etapas || [], progressoManual: r.progresso_manual ?? 0, ordem: r.ordem, sala: r.sala ?? null, historico: r.historico || [], comentarios: r.comentarios || [], criadoPor: r.criado_por, criadoEm: r.criado_em, atualizadoEm: r.atualizado_em });
+    etapas: r.etapas || [], progressoManual: r.progresso_manual ?? 0, ordem: r.ordem, sala: r.sala ?? null, projeto: r.projeto ?? null, historico: r.historico || [], comentarios: r.comentarios || [], criadoPor: r.criado_por, criadoEm: r.criado_em, atualizadoEm: r.atualizado_em });
   const daTarefa = (t) => ({ id: t.id, titulo: t.titulo, descricao: t.descricao || null, responsavel: t.responsavel || null, prazo: t.prazo || null, status: t.status || "a_fazer",
     etapas: t.etapas || [], progresso_manual: t.etapas && t.etapas.length ? null : (+t.progressoManual || 0), ordem: t.ordem ?? 0, historico: t.historico || [], atualizado_em: agora() });
 
@@ -265,7 +265,9 @@
       t.historico = (t.historico || []).concat([{ quando: agora(), email: this.sessao(), acao: acao || (nova ? "criou" : "editou") }]).slice(-50);
       const linha = daTarefa(t); if (nova) linha.criado_por = usuarioAuth.id;
       if (t.sala !== undefined) linha.sala = t.sala || null;
+      if (t.projeto !== undefined) linha.projeto = t.projeto || null;
       let { data, error } = await sb.from("tarefas").upsert(linha).select().single();
+      if (error && /projeto/.test(error.message || "")) { delete linha.projeto; ({ data, error } = await sb.from("tarefas").upsert(linha).select().single()); } // banco ainda sem projetos
       if (error && /sala/.test(error.message || "")) { delete linha.sala; ({ data, error } = await sb.from("tarefas").upsert(linha).select().single()); } // banco ainda sem a coluna
       if (error) throw error;
       await this.registrarAtividade(null, "tarefa", `${acao || (nova ? "Criou a tarefa" : "Editou a tarefa")}: ${t.titulo}`, { tarefa: t.id });
@@ -280,6 +282,29 @@
       if (data) await this.registrarAtividade(null, "tarefa", `Excluiu a tarefa: ${data.titulo}`);
       return true;
     },
+    /* ---------- projetos do telão (cada um com responsável e prazo; as tarefas ficam dentro) ---------- */
+    // null = o banco ainda não tem a tabela (rodar_no_supabase_12.sql)
+    async listarProjetos() { const { data, error } = await sb.from("projetos").select("*").order("ordem"); if (error) return null;
+      return (data || []).map(r => ({ id: r.id, titulo: r.titulo, descricao: r.descricao || "", responsavel: r.responsavel || "", prazo: r.prazo || "", cor: r.cor || "#1a7f4b",
+        sala: r.sala ?? null, status: r.status || "ativo", ordem: r.ordem ?? 0, historico: r.historico || [], criadoPor: r.criado_por, criadoEm: r.criado_em })); },
+    async salvarProjeto(p, acao) {
+      const nova = !p.id, id = p.id || "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const historico = (p.historico || []).concat([{ quando: agora(), email: this.sessao(), acao: acao || (nova ? "criou" : "editou") }]).slice(-50);
+      const linha = { id, titulo: p.titulo, descricao: p.descricao || null, responsavel: p.responsavel || null, prazo: p.prazo || null, cor: p.cor || "#1a7f4b",
+        sala: p.sala || null, status: p.status || "ativo", ordem: p.ordem ?? 0, historico, atualizado_em: agora() };
+      if (nova) linha.criado_por = usuarioAuth.id;
+      const { error } = await sb.from("projetos").upsert(linha); if (error) throw error;
+      await this.registrarAtividade(null, "tarefa", `${acao || (nova ? "Criou o projeto" : "Editou o projeto")}: ${p.titulo}`, { projeto: id });
+      return { ...p, id, historico };
+    },
+    // apagar o projeto não apaga as tarefas: elas viram "tarefas avulsas"
+    async excluirProjeto(id) {
+      await sb.from("tarefas").update({ projeto: null }).eq("projeto", id);
+      const { data } = await sb.from("projetos").delete().eq("id", id).select("titulo").maybeSingle();
+      if (data) await this.registrarAtividade(null, "tarefa", `Excluiu o projeto: ${data.titulo}`);
+      return true;
+    },
+    ouvirProjetos(cb) { return sb.channel("projetos-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "projetos" }, () => cb()).subscribe(); },
     ouvirTarefas(cb) { return sb.channel("tarefas-" + Math.random().toString(36).slice(2, 7)).on("postgres_changes", { event: "*", schema: "public", table: "tarefas" }, () => cb()).subscribe(); },
 
     /* ---------- regras de acesso das salas (só admin altera) ---------- */

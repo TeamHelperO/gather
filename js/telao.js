@@ -20,6 +20,7 @@ window.Telao = (function () {
     const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
     return Math.floor((hoje - new Date(t.prazo + "T00:00:00")) / 86400000);
   }
+  function diasAtrasoData(prazo) { const hoje = new Date(); hoje.setHours(0, 0, 0, 0); return Math.floor((hoje - new Date(prazo + "T00:00:00")) / 86400000); }
   function nivel(t) {
     if (t.status === "feito") return 0;
     const a = diasAtraso(t); let n = a > 3 ? 3 : a > 1 ? 2 : a > 0 ? 1 : 0;
@@ -112,6 +113,31 @@ window.Telao = (function () {
 .tl-hist{font-size:12px;color:var(--mut,#6b6760);margin-top:10px}
 .tl-hist div{padding:2px 0}
 .tl-pbar{display:flex;align-items:center;gap:10px}.tl-pbar input{flex:1;accent-color:#1a7f4b}
+.tl-projs{flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;padding:12px 14px 14px;overflow:auto;align-content:start}
+.tl-proj{background:#f4f1ea;color:#1d1d1f;border-radius:14px;padding:14px 14px 12px;cursor:pointer;border-top:6px solid var(--c,#1a7f4b);display:flex;flex-direction:column;gap:8px;text-align:left;font:inherit}
+.tl-proj:hover{box-shadow:0 0 0 2px #8fa0ff}
+.tl-proj h3{margin:0;font-size:16px;word-break:break-word}
+.tl-proj .lin{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#5d5852;flex-wrap:wrap}
+.tl-proj .lin b{color:#1d1d1f}
+.tl-proj .rot{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#8a847a}
+.tl-proj .av{width:24px;height:24px;border-radius:50%;color:#fff;display:grid;place-items:center;font-size:10px;font-weight:800;flex:none}
+.tl-proj .bar{height:8px;background:#ddd6c8;border-radius:4px;overflow:hidden;flex:1}.tl-proj .bar i{display:block;height:100%}
+.tl-proj .atr{color:#b3261e;font-weight:700}
+.tl-proj .avs{display:inline-flex}.tl-proj .avs .av{width:22px;height:22px;font-size:9px}.tl-proj .avs .av+.av{margin-left:-6px;box-shadow:0 0 0 2px #f4f1ea}
+.tl-proj.avulsas{border-top-color:#9a948a;background:#e9e5dc}
+.tl-proj.fechado{opacity:.6}
+.tl-pnovo{border:2px dashed #33405f;background:none;color:#9fb0d6;border-radius:14px;min-height:150px;font:inherit;font-weight:700;cursor:pointer}
+.tl-pbarra{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;background:#182238;border-bottom:1px solid #24304c;font-size:13px}
+.tl-pbarra .volta{border:1px solid #2a3550;background:#121a2b;color:#cfd6e6;border-radius:9px;padding:6px 10px;font:inherit;font-weight:700;cursor:pointer}
+.tl-pbarra h3{margin:0;font-size:16px;display:flex;align-items:center;gap:8px}.tl-pbarra h3 i{width:12px;height:12px;border-radius:4px}
+.tl-pbarra .av{width:22px;height:22px;border-radius:50%;color:#fff;display:inline-grid;place-items:center;font-size:9.5px;font-weight:800;vertical-align:middle;margin-right:4px}
+.tl-pbarra .rot{color:#8fa0c8;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-right:4px}
+.tl-pbarra .atr{color:#ff8a80;font-weight:800}
+.tl-card .ptag{display:inline-block;font-size:10.5px;font-weight:800;border-radius:5px;padding:1px 6px;margin-bottom:5px;color:#fff}
+.tl-card .fora{color:#b3261e;font-weight:700}
+.tl-cores{display:flex;gap:8px;flex-wrap:wrap}.tl-cores label{width:30px;height:30px;border-radius:9px;cursor:pointer;position:relative}
+.tl-cores input{position:absolute;opacity:0}.tl-cores input:checked+span{position:absolute;inset:-3px;border:3px solid #1d1d1f;border-radius:11px}
+.tl-aviso{margin:10px 14px 0;background:#3a2f12;color:#ffd98a;border-radius:10px;padding:9px 12px;font-size:13px}
 `;
   function injetarCSS() { if (document.getElementById("tl-css")) return; const s = document.createElement("style"); s.id = "tl-css"; s.textContent = CSS; document.head.appendChild(s); }
 
@@ -120,15 +146,16 @@ window.Telao = (function () {
   function abrir(opts) {
     injetarCSS();
     // cada sala tem o seu telão: só as tarefas daquela sala (sem sala = sala padrão, a Área de trabalho)
-    estado = { email: opts.email, cheia: !!opts.telaCheia, aoFechar: opts.aoFechar, filtro: "todas", tarefas: [], usuarios: [], nome: opts.nome || "",
+    estado = { email: opts.email, cheia: !!opts.telaCheia, aoFechar: opts.aoFechar, filtro: "todas", filtroP: "ativos", tarefas: [], todas: [], projetos: null, projeto: null, usuarios: [], nome: opts.nome || "",
       sala: opts.sala || null, nomeSala: opts.nomeSala || "", salaPadrao: opts.salaPadrao || null, focar: opts.focar || null };
     const tvURL = "telao.html" + (estado.sala ? `?sala=${encodeURIComponent(estado.sala)}&nome=${encodeURIComponent(estado.nomeSala)}&padrao=${encodeURIComponent(estado.salaPadrao || "")}` : "");
     const raiz = document.createElement("div"); raiz.className = "tl" + (estado.cheia ? " cheia" : "");
     raiz.innerHTML = `<div class="tl-box">
       <div class="tl-head"><h2>📊 ${estado.nomeSala ? "TELÃO · " + esc(estado.nomeSala).toUpperCase() : "TELÃO DA EQUIPE"}</h2><div class="tl-sum" id="tlSum"></div><div class="tl-sp"></div>
-        <button class="tl-btn w" data-nova>+ Nova tarefa</button>
+        <button class="tl-btn w" data-nova id="tlNova">+ Nova tarefa</button>
         ${estado.cheia ? `<a class="tl-btn g" href="escritorio.html" style="text-decoration:none">← Escritório</a>` : `<a class="tl-btn g" href="${tvURL}" target="_blank" rel="noopener" style="text-decoration:none" title="Abrir em tela cheia (TV)">⛶</a><button class="tl-btn x" data-fechar aria-label="Fechar">×</button>`}
       </div>
+      <div id="tlPbarra"></div><div id="tlAviso"></div>
       <div class="tl-fil" id="tlFil"></div>
       <div class="tl-board" id="tlBoard"></div>
     </div>
@@ -139,7 +166,9 @@ window.Telao = (function () {
     raiz.addEventListener("pointerdown", inicioArraste);
     if (!estado.cheia) raiz.addEventListener("pointerdown", e => { if (e.target === raiz) fechar(); });
     addEventListener("keydown", tecla);
-    if (Dados.ouvirTarefas) estado.canal = Dados.ouvirTarefas(() => { if (!estado) return; if (arr && arr.ativo) estado.pendente = true; else recarregar(); });
+    const aoMudar = () => { if (!estado) return; if (arr && arr.ativo) estado.pendente = true; else recarregar(); };
+    if (Dados.ouvirTarefas) estado.canal = Dados.ouvirTarefas(aoMudar);
+    if (Dados.ouvirProjetos) estado.canalP = Dados.ouvirProjetos(aoMudar);
     recarregar();
     return { fechar };
   }
@@ -147,22 +176,95 @@ window.Telao = (function () {
   function fechar() {
     if (!estado) return; removeEventListener("keydown", tecla);
     if (estado.canal && Dados.cliente) Dados.cliente.removeChannel(estado.canal);
+    if (estado.canalP && Dados.cliente) Dados.cliente.removeChannel(estado.canalP);
     estado.raiz.remove(); const cb = estado.aoFechar; estado = null; if (cb) cb();
   }
+  /* projetos: cada um tem responsável e prazo; dentro dele, o Kanban das tarefas.
+     estado.projeto: null = lista de projetos · "_avulsas" = tarefas sem projeto · id = um projeto */
+  const AVULSAS = "_avulsas";
   async function recarregar() {
     if (!estado) return; estado.pendente = false;
-    estado.tarefas = filtrarSala(await Dados.listarTarefas(), estado.sala, estado.salaPadrao);
+    const [todas, projetos, usuarios] = await Promise.all([Dados.listarTarefas(), Dados.listarProjetos ? Dados.listarProjetos() : null, Dados.listarUsuarios()]);
     if (!estado) return;
-    estado.usuarios = await Dados.listarUsuarios();
+    estado.usuarios = usuarios;
+    estado.projetos = projetos ? filtrarSala(projetos, estado.sala, estado.salaPadrao) : null;
+    const ids = new Set((estado.projetos || []).map(p => p.id));
+    // tarefas deste telão: as dos projetos daqui + as avulsas da sala
+    estado.todas = todas.filter(t => (t.projeto && ids.has(t.projeto)) || (!t.projeto || !projetos || !projetos.some(p => p.id === t.projeto)) && filtrarSala([t], estado.sala, estado.salaPadrao).length);
+    if (estado.projeto && estado.projeto !== AVULSAS && !ids.has(estado.projeto)) estado.projeto = null; // projeto apagado
+    if (!estado.projetos) estado.projeto = AVULSAS; // banco sem projetos: quadro único, como antes
+    estado.tarefas = tarefasDoProjeto(estado.projeto);
     desenhar();
-    if (estado.focar) { const t = estado.tarefas.find(x => x.id === estado.focar); estado.focar = null; if (t) editar(t); }
+    if (estado.focar) { const t = estado.todas.find(x => x.id === estado.focar); estado.focar = null; if (t) { if (estado.projetos) { estado.projeto = t.projeto && ids.has(t.projeto) ? t.projeto : AVULSAS; estado.tarefas = tarefasDoProjeto(estado.projeto); desenhar(); } editar(t); } }
   }
+  function tarefasDoProjeto(id) {
+    if (!id) return estado.todas;
+    const ids = new Set((estado.projetos || []).map(p => p.id));
+    return id === AVULSAS ? estado.todas.filter(t => !t.projeto || !ids.has(t.projeto)) : estado.todas.filter(t => t.projeto === id);
+  }
+  const projDe = id => (estado.projetos || []).find(p => p.id === id) || null;
+  function abrirProjeto(id) { estado.projeto = id; estado.filtro = "todas"; estado.tarefas = tarefasDoProjeto(id); desenhar(); estado.raiz.querySelector("#tlBoard").scrollLeft = 0; }
   function nomeResp(r) { if (!r) return ""; const u = estado.usuarios.find(u => u.email === r); return u ? u.nome : r; }
   // vários responsáveis por tarefa: guardados no mesmo campo, separados por ";" (e-mail de usuário ou nome livre)
   const respsDe = t => String((t && t.responsavel) || "").split(";").map(x => x.trim()).filter(Boolean);
   function minha(t) { return respsDe(t).some(r => r === estado.email || r === estado.nome || nomeResp(r) === estado.nome); }
+  const meuResp = r => r === estado.email || r === estado.nome || nomeResp(r) === estado.nome;
+  const avatar = (n, cls = "av") => `<span class="${cls}" style="background:${corNome(n)}">${esc(iniciais(n))}</span>`;
+  function desenharProjetos() {
+    const r = estado.raiz, ps = estado.projetos;
+    const abertos = ps.filter(p => p.status === "ativo"), atrasados = abertos.filter(p => p.prazo && diasAtrasoData(p.prazo) > 0);
+    r.querySelector("#tlSum").innerHTML = `<b>${abertos.length}</b> projeto${abertos.length === 1 ? "" : "s"} em andamento · ${atrasados.length ? `<b>⚠ ${atrasados.length} atrasado${atrasados.length > 1 ? "s" : ""}</b>` : "nenhum atrasado"}`;
+    r.querySelector("#tlNova").textContent = "+ Novo projeto"; r.querySelector("#tlNova").dataset.nova = "projeto";
+    r.querySelector("#tlPbarra").innerHTML = "";
+    const fil = [["ativos", "Em andamento"], ["meus", "Sou responsável"], ["comigo", "Com tarefas minhas"], ["semana", "📅 Minha semana"], ["fechados", "Concluídos"]];
+    r.querySelector("#tlFil").innerHTML = fil.map(([k, l]) => `<button data-filp="${k}" class="${estado.filtroP === k ? "on" : ""}">${l}</button>`).join("");
+    const board = r.querySelector("#tlBoard");
+    if (estado.filtroP === "semana") { board.className = "tl-board"; board.innerHTML = minhaSemana(estado.todas); return; }
+    const passa = p => estado.filtroP === "fechados" ? p.status !== "ativo"
+      : p.status === "ativo" && (estado.filtroP === "ativos" || (estado.filtroP === "meus" && meuResp(p.responsavel)) || (estado.filtroP === "comigo" && tarefasDoProjeto(p.id).some(t => t.status !== "feito" && minha(t))));
+    const lista = ps.filter(passa).sort((a, b) => (a.prazo || "9999") < (b.prazo || "9999") ? -1 : 1);
+    const avulsas = tarefasDoProjeto(AVULSAS);
+    board.className = "tl-projs";
+    board.innerHTML = lista.map(cartaoProjeto).join("")
+      + (estado.filtroP === "ativos" && avulsas.length ? cartaoProjeto({ id: AVULSAS, titulo: "Tarefas avulsas", descricao: "Tarefas que não estão em nenhum projeto", status: "ativo" }) : "")
+      + (estado.filtroP === "ativos" ? `<button class="tl-pnovo" data-nova="projeto">+ Novo projeto</button>` : "")
+      + (!lista.length && estado.filtroP !== "ativos" ? `<div class="tl-vazio" style="grid-column:1/-1;padding:40px">Nenhum projeto aqui.</div>` : "");
+  }
+  function cartaoProjeto(p) {
+    const ts = tarefasDoProjeto(p.id), sm = resumo(ts), atr = p.prazo && p.status === "ativo" ? diasAtrasoData(p.prazo) : 0;
+    const atrasadas = ts.filter(t => diasAtraso(t) > 0).length;
+    const equipe = [...new Set(ts.flatMap(respsDe).map(nomeResp))];
+    const prox = ts.filter(t => t.status !== "feito" && t.prazo).sort((a, b) => a.prazo < b.prazo ? -1 : 1)[0];
+    const cor = sm.media >= 100 ? "#3fbf5f" : atrasadas ? "#e5484d" : "#1a7f4b";
+    const av = p.id === AVULSAS;
+    return `<button class="tl-proj ${av ? "avulsas" : ""} ${p.status !== "ativo" ? "fechado" : ""}" data-proj="${p.id}" style="--c:${esc(p.cor || "#1a7f4b")}">
+      <h3>${esc(p.titulo)}${p.status === "concluido" ? " ✅" : p.status === "arquivado" ? " 🗄️" : ""}</h3>
+      ${av ? `<div class="lin">${esc(p.descricao)}</div>` : `<div class="lin"><span class="rot">Responsável</span>${p.responsavel ? `${avatar(nomeResp(p.responsavel))}<b>${esc(nomeResp(p.responsavel))}</b>` : "<span>sem responsável</span>"}</div>
+      <div class="lin"><span class="rot">Entrega</span>${p.prazo ? `<b class="${atr > 0 ? "atr" : ""}">${fmtData(p.prazo)}${atr > 0 ? ` · atrasado ${atr}d` : ""}</b>` : "<span>sem prazo</span>"}</div>`}
+      <div class="lin"><div class="bar"><i style="width:${sm.media}%;background:${cor}"></i></div><b>${sm.media}%</b></div>
+      <div class="lin"><span>${sm.feitas}/${sm.total} tarefa${sm.total === 1 ? "" : "s"}</span>${atrasadas ? `<span class="atr">· ${atrasadas} atrasada${atrasadas > 1 ? "s" : ""}</span>` : ""}${sm.escalonadas ? `<span class="atr">· ⚠ ${sm.escalonadas}</span>` : ""}
+        ${equipe.length ? `<span class="avs" style="margin-left:auto" title="${esc(equipe.join(", "))}">${equipe.slice(0, 5).map(n => avatar(n)).join("")}</span>` : ""}</div>
+      ${prox ? `<div class="lin"><span class="rot">Próxima</span><span>${esc(prox.titulo.slice(0, 40))} · ${esc(respsDe(prox).map(nomeResp)[0] || "sem resp.")} · ${fmtData(prox.prazo)}</span></div>` : ""}
+    </button>`;
+  }
+  function barraProjeto() {
+    if (!estado.projetos) return "";
+    const p = estado.projeto === AVULSAS ? null : projDe(estado.projeto), sm = resumo(estado.tarefas);
+    const atr = p && p.prazo && p.status === "ativo" ? diasAtrasoData(p.prazo) : 0;
+    return `<div class="tl-pbarra"><button class="volta" data-voltar>← Projetos</button>
+      <h3><i style="background:${esc(p ? p.cor : "#9a948a")}"></i>${esc(p ? p.titulo : "Tarefas avulsas")}</h3>
+      ${p ? `<span><span class="rot">Responsável do projeto</span>${p.responsavel ? avatar(nomeResp(p.responsavel)) + esc(nomeResp(p.responsavel)) : "—"}</span>
+      <span><span class="rot">Entrega</span>${p.prazo ? `<b class="${atr > 0 ? "atr" : ""}">${fmtData(p.prazo)}${atr > 0 ? ` (atrasado ${atr}d)` : ""}</b>` : "—"}</span>` : ""}
+      <span><b>${sm.media}%</b> · ${sm.feitas}/${sm.total} feitas</span>
+      ${p ? `<button class="volta" data-editproj style="margin-left:auto">✏️ Editar projeto</button>` : ""}</div>`;
+  }
   function desenhar() {
+    if (estado.projetos && !estado.projeto) return desenharProjetos();
     const r = estado.raiz, ts = estado.tarefas, sm = resumo(ts);
+    r.querySelector("#tlBoard").className = "tl-board";
+    r.querySelector("#tlNova").textContent = "+ Nova tarefa"; r.querySelector("#tlNova").dataset.nova = "";
+    r.querySelector("#tlPbarra").innerHTML = barraProjeto();
+    r.querySelector("#tlAviso").innerHTML = estado.projetos ? "" : `<div class="tl-aviso">Para organizar as tarefas em projetos, rode o arquivo <b>rodar_no_supabase_12.sql</b> no Supabase.</div>`;
     r.querySelector("#tlSum").innerHTML = `<b>${sm.media}%</b> concluído · ${sm.ativas} abertas · ${sm.escalonadas ? `<b>⚠ ${sm.escalonadas} escalonada${sm.escalonadas > 1 ? "s" : ""}</b>` : "nada escalonado"}`;
     const fil = [["todas", "Todas"], ["minhas", "Minhas"], ["semana", "📅 Minha semana"], ["escalonadas", "⚠ Escalonadas"], ["semdono", "Sem responsável"]];
     r.querySelector("#tlFil").innerHTML = fil.map(([k, l]) => `<button data-fil="${k}" class="${estado.filtro === k ? "on" : ""}">${l}</button>`).join("");
@@ -202,11 +304,14 @@ window.Telao = (function () {
     const textoResp = resps.length <= 2 ? resps.join(" e ") : `${resps.slice(0, 2).join(", ")} +${resps.length - 2}`;
     const cor = p >= 100 ? "#3fbf5f" : n >= 2 ? "#e5484d" : n === 1 ? "#f2a33a" : "#1a7f4b";
     const et = t.etapas && t.etapas.length ? `☑ ${t.etapas.filter(e => e.feito).length}/${t.etapas.length}` : "";
+    const pj = t.projeto && projDe(t.projeto), fora = pj && pj.prazo && t.prazo && t.prazo > pj.prazo;
     return `<div class="tl-card ${n ? "n" + n : ""}" data-id="${t.id}">
       <div class="alca" title="Arrastar" aria-label="Arrastar">⠿</div>
+      ${pj && estado.projeto !== t.projeto ? `<span class="ptag" style="background:${esc(pj.cor)}">${esc(pj.titulo)}</span>` : ""}
       <div class="t">${esc(t.titulo)}</div>
       <div class="meta">${resps.length ? `<span class="avs" title="${esc(resps.join(", "))}">${resps.slice(0, 3).map(n => `<span class="av" style="background:${corNome(n)}">${esc(iniciais(n))}</span>`).join("")}</span><span>${esc(textoResp)}</span>` : `<span>Sem responsável</span>`}
         ${t.prazo ? `<span class="${atr > 0 ? "atr" : ""}">· ${atr > 0 ? `atrasada ${atr}d` : "até " + fmtData(t.prazo)}</span>` : ""}${et ? `<span>· ${et}</span>` : ""}${nCom ? `<span>· 💬 ${nCom}</span>` : ""}</div>
+      ${fora ? `<div class="meta"><span class="fora">⚠ prazo depois da entrega do projeto (${fmtData(pj.prazo)})</span></div>` : ""}
       <div class="meta" style="margin-top:6px"><div class="bar" style="flex:1;margin:0"><i style="width:${p}%;background:${cor}"></i></div><span class="pc">${p}%</span></div>
       ${n ? `<div class="esc">⚠ ${NIVEL[n]}</div>` : ""}
     </div>`;
@@ -219,14 +324,20 @@ window.Telao = (function () {
     const r = estado.raiz;
     if (e.target.closest("[data-fechar]")) return fechar();
     const f = e.target.closest("[data-fil]"); if (f) { estado.filtro = f.dataset.fil; return desenhar(); }
-    const nv = e.target.closest("[data-nova]"); if (nv) return editar(null, nv.dataset.nova || "a_fazer");
-    const c = e.target.closest(".tl-card"); if (c && !e.target.closest(".alca")) return editar(estado.tarefas.find(t => t.id === c.dataset.id));
+    const fp = e.target.closest("[data-filp]"); if (fp) { estado.filtroP = fp.dataset.filp; return desenhar(); }
+    if (e.target.closest("[data-voltar]")) { estado.projeto = null; return desenhar(); }
+    if (e.target.closest("[data-editproj]")) return editarProjeto(projDe(estado.projeto));
+    const pj = e.target.closest("[data-proj]"); if (pj) return abrirProjeto(pj.dataset.proj);
+    const nv = e.target.closest("[data-nova]"); if (nv) return nv.dataset.nova === "projeto" ? editarProjeto(null) : editar(null, nv.dataset.nova || "a_fazer");
+    const c = e.target.closest(".tl-card"); if (c && !e.target.closest(".alca")) return editar(estado.todas.find(t => t.id === c.dataset.id));
   }
 
   /* ---------- formulário ---------- */
   function editar(t, status) {
     const novo = !t;
-    const d = t ? JSON.parse(JSON.stringify(t)) : { titulo: "", descricao: "", responsavel: "", prazo: "", status: status || "a_fazer", etapas: [], progressoManual: 0, sala: estado.sala || null };
+    const projAtual = estado.projeto && estado.projeto !== AVULSAS ? projDe(estado.projeto) : null;
+    const d = t ? JSON.parse(JSON.stringify(t)) : { titulo: "", descricao: "", responsavel: "", prazo: "", status: status || "a_fazer", etapas: [], progressoManual: 0,
+      sala: (projAtual && projAtual.sala) || estado.sala || null, projeto: projAtual ? projAtual.id : null };
     d.etapas = d.etapas || [];
     const m = estado.raiz.querySelector("#tlModal");
     const opts = estado.usuarios.map(u => `<option value="${esc(u.email)}">${esc(u.nome)}</option>`).join("");
@@ -241,11 +352,13 @@ window.Telao = (function () {
         <h3>${novo ? "Nova tarefa" : "Editar tarefa"}<button type="button" class="tl-btn" data-x style="background:none;font-size:22px">×</button></h3>
         <div class="tl-f"><label>Tarefa</label><input name="titulo" required maxlength="120" value="${esc(d.titulo)}" placeholder="Ex.: Campanha Black Friday do cliente X"></div>
         <div class="tl-row">
-          <div class="tl-f"><label>Responsáveis</label>
+          <div class="tl-f"><label>Responsáveis da tarefa</label>
             <div class="tl-resps">${respsDe(d).map((r, i) => `<span class="tl-chip"><span class="av" style="background:${corNome(nomeResp(r))}">${esc(iniciais(nomeResp(r)))}</span>${esc(nomeResp(r))}<button type="button" data-rmresp="${i}" aria-label="Tirar ${esc(nomeResp(r))}">×</button></span>`).join("")}
               <input name="responsavel" list="tlUsers" placeholder="${respsDe(d).length ? "+ adicionar" : "Nome ou e-mail e Enter"}"></div><datalist id="tlUsers">${opts}</datalist></div>
-          <div class="tl-f"><label>Prazo</label><input name="prazo" type="date" value="${esc(d.prazo || "")}"></div>
+          <div class="tl-f"><label>Prazo de entrega</label><input name="prazo" type="date" value="${esc(d.prazo || "")}">
+            ${(() => { const pj = d.projeto && projDe(d.projeto); return pj && pj.prazo && d.prazo && d.prazo > pj.prazo ? `<small style="color:#b3261e;font-weight:700">⚠ Depois da entrega do projeto (${fmtData(pj.prazo)})</small>` : pj && pj.prazo ? `<small style="color:var(--mut,#6b6760)">Projeto entrega em ${fmtData(pj.prazo)}</small>` : ""; })()}</div>
         </div>
+        ${estado.projetos ? `<div class="tl-f"><label>Projeto</label><select name="projeto"><option value="">Sem projeto (tarefa avulsa)</option>${estado.projetos.filter(p => p.status === "ativo" || p.id === d.projeto).map(p => `<option value="${esc(p.id)}" ${p.id === d.projeto ? "selected" : ""}>${esc(p.titulo)}</option>`).join("")}</select></div>` : ""}
         <div class="tl-row">
           <div class="tl-f"><label>Status</label><select name="status">${STATUS.map(s => `<option value="${s.id}" ${s.id === d.status ? "selected" : ""}>${s.nome}</option>`).join("")}</select></div>
           <div class="tl-f"><label>Progresso</label>${d.etapas.length ? `<div style="padding:9px 0;font-weight:800">${p}% <span style="font-weight:400;color:var(--mut,#6b6760)">(pelas etapas)</span></div>` : `<div class="tl-pbar"><input name="progressoManual" type="range" min="0" max="100" step="5" value="${+d.progressoManual || 0}"><b id="tlPv">${+d.progressoManual || 0}%</b></div>`}</div>
@@ -264,6 +377,7 @@ window.Telao = (function () {
       </form>`;
       const f = m.querySelector("form");
       const ler = () => { d.titulo = f.titulo.value; d.descricao = f.descricao.value; d.prazo = f.prazo.value; d.status = f.status.value;
+        if (f.projeto) { d.projeto = f.projeto.value || null; const pj = projDe(d.projeto); if (pj && pj.sala) d.sala = pj.sala; }
         addResp(f.responsavel.value);
         if (f.progressoManual) d.progressoManual = +f.progressoManual.value; };
       // responsáveis: escolher da lista (ou digitar e Enter) adiciona; × tira
@@ -273,6 +387,7 @@ window.Telao = (function () {
       if (f.progressoManual) f.progressoManual.oninput = e => { m.querySelector("#tlPv").textContent = e.target.value + "%"; };
       f.status.onchange = () => { ler(); render(); };
       f.prazo.onchange = () => { ler(); render(); };
+      if (f.projeto) f.projeto.onchange = () => { ler(); render(); };
       const addEt = () => { const i = m.querySelector("#tlEt"); const v = i.value.trim(); if (!v) return; ler(); d.etapas.push({ id: Math.random().toString(36).slice(2, 8), texto: v, feito: false }); render(); m.querySelector("#tlEt").focus(); };
       m.querySelector("#tlEt").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); addEt(); } };
       m.querySelector("[data-addet]").onclick = addEt;
@@ -301,7 +416,8 @@ window.Telao = (function () {
         let acao = novo ? "Criou a tarefa" : "Editou a tarefa";
         if (!novo && t.status !== d.status) acao = `Moveu para "${STATUS.find(s => s.id === d.status).nome}"`;
         if (!novo && d.status === "feito" && t.status !== "feito") acao = "Concluiu a tarefa";
-        if (novo) d.ordem = Math.max(0, ...estado.tarefas.filter(x => x.status === d.status).map(x => (x.ordem ?? 0) + 1));
+        if (novo) d.ordem = Math.max(0, ...estado.todas.filter(x => x.status === d.status).map(x => (x.ordem ?? 0) + 1));
+        if (!novo && (t.projeto || null) !== (d.projeto || null)) acao = d.projeto ? `Moveu para o projeto "${(projDe(d.projeto) || {}).titulo || ""}"` : "Tirou do projeto";
         const salva = await Dados.salvarTarefa(d, estado.email, acao); if (salva && salva.id) d.id = salva.id;
         // avisa quem acabou de virar responsável
         const antes = new Set(novo ? [] : respsDe(t)), meuId = Dados.meuId && Dados.meuId();
@@ -313,6 +429,51 @@ window.Telao = (function () {
     render();
     m.classList.remove("hidden");
     setTimeout(() => { const i = m.querySelector("[name=titulo]"); if (novo && i) i.focus(); }, 30);
+  }
+
+  /* ---------- formulário do projeto ---------- */
+  const CORES = ["#1a7f4b", "#2b6de8", "#7248b9", "#d9480f", "#c2255c", "#0b7d7d", "#a86a00", "#495057"];
+  function editarProjeto(p) {
+    const novo = !p, m = estado.raiz.querySelector("#tlModal");
+    const d = p ? JSON.parse(JSON.stringify(p)) : { titulo: "", descricao: "", responsavel: estado.email, prazo: "", cor: CORES[(estado.projetos || []).length % CORES.length], status: "ativo", sala: estado.sala || null };
+    const opts = estado.usuarios.map(u => `<option value="${esc(u.email)}" ${u.email === d.responsavel ? "selected" : ""}>${esc(u.nome)}</option>`).join("");
+    const ts = p ? tarefasDoProjeto(p.id) : [];
+    m.innerHTML = `<form class="tl-form" autocomplete="off">
+      <h3>${novo ? "Novo projeto" : "Editar projeto"}<button type="button" class="tl-btn" data-x style="background:none;font-size:22px">×</button></h3>
+      <div class="tl-f"><label>Projeto</label><input name="titulo" required maxlength="100" value="${esc(d.titulo)}" placeholder="Ex.: Lançamento do site do cliente X"></div>
+      <div class="tl-row">
+        <div class="tl-f"><label>Responsável do projeto</label><select name="responsavel"><option value="">— escolha —</option>${opts}${d.responsavel && !estado.usuarios.some(u => u.email === d.responsavel) ? `<option selected value="${esc(d.responsavel)}">${esc(d.responsavel)}</option>` : ""}</select></div>
+        <div class="tl-f"><label>Entrega do projeto</label><input name="prazo" type="date" value="${esc(d.prazo || "")}"></div>
+      </div>
+      <div class="tl-f"><label>Cor</label><div class="tl-cores">${CORES.map(c => `<label style="background:${c}"><input type="radio" name="cor" value="${c}" ${c === d.cor ? "checked" : ""}><span></span></label>`).join("")}</div></div>
+      ${novo ? "" : `<div class="tl-f"><label>Situação</label><select name="status">${[["ativo", "Em andamento"], ["concluido", "Concluído"], ["arquivado", "Arquivado"]].map(([k, l]) => `<option value="${k}" ${k === d.status ? "selected" : ""}>${l}</option>`).join("")}</select></div>`}
+      <div class="tl-f"><label>Descrição</label><textarea name="descricao" rows="3" maxlength="1000" placeholder="Objetivo, cliente, links…">${esc(d.descricao || "")}</textarea></div>
+      <p style="font-size:13px;color:var(--mut,#6b6760);margin:6px 0 0">O responsável do projeto acompanha a entrega. Cada tarefa dentro do projeto tem o seu próprio responsável e prazo.</p>
+      <div class="tl-acts"><button class="tl-btn pri" type="submit">${novo ? "Criar projeto" : "Salvar"}</button><button class="tl-btn" type="button" data-x>Cancelar</button>${novo ? "" : `<button class="tl-btn dan" type="button" data-del>Excluir projeto</button>`}</div>
+    </form>`;
+    const f = m.querySelector("form");
+    m.querySelectorAll("[data-x]").forEach(b => b.onclick = () => m.classList.add("hidden"));
+    const del = m.querySelector("[data-del]");
+    if (del) del.onclick = async () => {
+      if (!del.dataset.ok) { del.dataset.ok = 1; del.textContent = ts.length ? `Confirmar (as ${ts.length} tarefas viram avulsas)` : "Confirmar exclusão"; return; }
+      await Dados.excluirProjeto(p.id); m.classList.add("hidden"); estado.projeto = null; recarregar();
+    };
+    f.onsubmit = async e => {
+      e.preventDefault(); if (!f.titulo.value.trim()) return f.titulo.focus();
+      const antes = p ? p.responsavel : null;
+      Object.assign(d, { titulo: f.titulo.value.trim(), responsavel: f.responsavel.value, prazo: f.prazo.value, cor: (f.querySelector("[name=cor]:checked") || {}).value || d.cor, descricao: f.descricao.value, status: f.status ? f.status.value : "ativo" });
+      if (novo) d.ordem = (estado.projetos || []).length;
+      let salvo;
+      try { salvo = await Dados.salvarProjeto(d, novo ? "Criou o projeto" : p.status !== d.status ? (d.status === "concluido" ? "Concluiu o projeto" : d.status === "arquivado" ? "Arquivou o projeto" : "Reabriu o projeto") : "Editou o projeto"); }
+      catch (err) { alert("Não consegui salvar o projeto: " + (err.message || "")); return; }
+      const u = estado.usuarios.find(u => u.email === d.responsavel), meuId = Dados.meuId && Dados.meuId();
+      if (u && d.responsavel !== antes && u.id !== meuId && Dados.criarAvisos) Dados.criarAvisos([{ para: u.id, tipo: "tarefa", texto: `${estado.nome || "Alguém"} colocou você como responsável pelo projeto “${d.titulo}”${d.prazo ? " (entrega " + fmtData(d.prazo) + ")" : ""}`, dados: { mapa: window.mapaIdAtual || null } }]);
+      m.classList.add("hidden");
+      if (novo) estado.projeto = salvo.id;
+      recarregar();
+    };
+    m.classList.remove("hidden");
+    setTimeout(() => { if (novo) f.titulo.focus(); }, 30);
   }
 
   /* ---------- arrastar entre colunas ---------- */
@@ -342,7 +503,8 @@ window.Telao = (function () {
   function posicionar(e) {
     arr.ghost.style.left = (e.clientX - arr.dx) + "px"; arr.ghost.style.top = (e.clientY - arr.dy) + "px";
     const el = document.elementFromPoint(e.clientX, e.clientY);
-    const col = el && el.closest && el.closest(".tl-col");
+    let col = el && el.closest && el.closest(".tl-col");
+    if (col && !col.dataset.st) col = null; // colunas da "Minha semana" não são status: lá não dá para soltar
     estado.raiz.querySelectorAll(".tl-col.alvo").forEach(c => c !== col && c.classList.remove("alvo"));
     // rolar o quadro na horizontal perto das bordas (celular)
     const board = estado.raiz.querySelector("#tlBoard"), br = board.getBoundingClientRect();
@@ -366,7 +528,7 @@ window.Telao = (function () {
     // nova ordem da coluna de destino
     const ids = []; for (const n of a.alvo.lista.children) { if (n === a.ph) ids.push(a.id); else if (n.dataset && n.dataset.id && n.dataset.id !== a.id) ids.push(n.dataset.id); }
     a.ph.remove();
-    const t = estado.tarefas.find(x => x.id === a.id), antes = t.status;
+    const t = estado.todas.find(x => x.id === a.id), antes = t.status;
     await Dados.salvarOrdem(ids.map((id, i) => ({ id, status: a.alvo.status, ordem: i })));
     if (antes !== a.alvo.status) {
       const nt = { ...t, status: a.alvo.status, ordem: ids.indexOf(a.id) };
