@@ -208,6 +208,7 @@ window.Telao = (function () {
   // vários responsáveis por tarefa: guardados no mesmo campo, separados por ";" (e-mail de usuário ou nome livre)
   const respsDe = t => String((t && t.responsavel) || "").split(";").map(x => x.trim()).filter(Boolean);
   function minha(t) { return respsDe(t).some(r => r === estado.email || r === estado.nome || nomeResp(r) === estado.nome); }
+  const listaNomes = l => l.length <= 2 ? l.join(" e ") : `${l.slice(0, 2).join(", ")} +${l.length - 2}`;
   const meuResp = r => r === estado.email || r === estado.nome || nomeResp(r) === estado.nome;
   const avatar = (n, cls = "av") => `<span class="${cls}" style="background:${corNome(n)}">${esc(iniciais(n))}</span>`;
   function desenharProjetos() {
@@ -221,7 +222,7 @@ window.Telao = (function () {
     const board = r.querySelector("#tlBoard");
     if (estado.filtroP === "semana") { board.className = "tl-board"; board.innerHTML = minhaSemana(estado.todas); return; }
     const passa = p => estado.filtroP === "fechados" ? p.status !== "ativo"
-      : p.status === "ativo" && (estado.filtroP === "ativos" || (estado.filtroP === "meus" && meuResp(p.responsavel)) || (estado.filtroP === "comigo" && tarefasDoProjeto(p.id).some(t => t.status !== "feito" && minha(t))));
+      : p.status === "ativo" && (estado.filtroP === "ativos" || (estado.filtroP === "meus" && respsDe(p).some(meuResp)) || (estado.filtroP === "comigo" && tarefasDoProjeto(p.id).some(t => t.status !== "feito" && minha(t))));
     const lista = ps.filter(passa).sort((a, b) => (a.prazo || "9999") < (b.prazo || "9999") ? -1 : 1);
     const avulsas = tarefasDoProjeto(AVULSAS);
     board.className = "tl-projs";
@@ -239,7 +240,7 @@ window.Telao = (function () {
     const av = p.id === AVULSAS;
     return `<button class="tl-proj ${av ? "avulsas" : ""} ${p.status !== "ativo" ? "fechado" : ""}" data-proj="${p.id}" style="--c:${esc(p.cor || "#1a7f4b")}">
       <h3>${esc(p.titulo)}${p.status === "concluido" ? " ✅" : p.status === "arquivado" ? " 🗄️" : ""}</h3>
-      ${av ? `<div class="lin">${esc(p.descricao)}</div>` : `<div class="lin"><span class="rot">Responsável</span>${p.responsavel ? `${avatar(nomeResp(p.responsavel))}<b>${esc(nomeResp(p.responsavel))}</b>` : "<span>sem responsável</span>"}</div>
+      ${av ? `<div class="lin">${esc(p.descricao)}</div>` : `<div class="lin"><span class="rot">Responsáve${respsDe(p).length > 1 ? "is" : "l"}</span>${respsDe(p).length ? `<span class="avs">${respsDe(p).slice(0, 4).map(r => avatar(nomeResp(r))).join("")}</span><b>${esc(listaNomes(respsDe(p).map(nomeResp)))}</b>` : "<span>sem responsável</span>"}</div>
       <div class="lin"><span class="rot">Entrega</span>${p.prazo ? `<b class="${atr > 0 ? "atr" : ""}">${fmtData(p.prazo)}${atr > 0 ? ` · atrasado ${atr}d` : ""}</b>` : "<span>sem prazo</span>"}</div>`}
       <div class="lin"><div class="bar"><i style="width:${sm.media}%;background:${cor}"></i></div><b>${sm.media}%</b></div>
       <div class="lin"><span>${sm.feitas}/${sm.total} tarefa${sm.total === 1 ? "" : "s"}</span>${atrasadas ? `<span class="atr">· ${atrasadas} atrasada${atrasadas > 1 ? "s" : ""}</span>` : ""}${sm.escalonadas ? `<span class="atr">· ⚠ ${sm.escalonadas}</span>` : ""}
@@ -253,7 +254,7 @@ window.Telao = (function () {
     const atr = p && p.prazo && p.status === "ativo" ? diasAtrasoData(p.prazo) : 0;
     return `<div class="tl-pbarra"><button class="volta" data-voltar>← Projetos</button>
       <h3><i style="background:${esc(p ? p.cor : "#9a948a")}"></i>${esc(p ? p.titulo : "Tarefas avulsas")}</h3>
-      ${p ? `<span><span class="rot">Responsável do projeto</span>${p.responsavel ? avatar(nomeResp(p.responsavel)) + esc(nomeResp(p.responsavel)) : "—"}</span>
+      ${p ? `<span><span class="rot">Responsáve${respsDe(p).length > 1 ? "is" : "l"} do projeto</span>${respsDe(p).length ? respsDe(p).map(r => avatar(nomeResp(r))).join("") + esc(listaNomes(respsDe(p).map(nomeResp))) : "—"}</span>
       <span><span class="rot">Entrega</span>${p.prazo ? `<b class="${atr > 0 ? "atr" : ""}">${fmtData(p.prazo)}${atr > 0 ? ` (atrasado ${atr}d)` : ""}</b>` : "—"}</span>` : ""}
       <span><b>${sm.media}%</b> · ${sm.feitas}/${sm.total} feitas</span>
       ${p ? `<button class="volta" data-editproj style="margin-left:auto">✏️ Editar projeto</button>` : ""}</div>`;
@@ -346,9 +347,11 @@ window.Telao = (function () {
       const u = estado.usuarios.find(u => u.email === v || u.nome === v), val = u ? u.email : v.replace(/;/g, " ");
       const l = respsDe(d); if (!l.includes(val)) l.push(val); d.responsavel = l.join(";");
     };
+    let desenhando = false;
     const render = () => {
+      if (desenhando) return; desenhando = true;
       const p = progresso(d);
-      m.innerHTML = `<form class="tl-form" autocomplete="off">
+      try { m.innerHTML = `<form class="tl-form" autocomplete="off">
         <h3>${novo ? "Nova tarefa" : "Editar tarefa"}<button type="button" class="tl-btn" data-x style="background:none;font-size:22px">×</button></h3>
         <div class="tl-f"><label>Tarefa</label><input name="titulo" required maxlength="120" value="${esc(d.titulo)}" placeholder="Ex.: Campanha Black Friday do cliente X"></div>
         <div class="tl-row">
@@ -374,7 +377,7 @@ window.Telao = (function () {
           ${(d.comentarios || []).map(c => `<div class="tl-com"><span class="av" style="background:${corNome(c.nome || "")}">${esc(iniciais(c.nome || "?"))}</span><div><b>${esc(c.nome || "—")}</b> <small>${new Date(c.quando).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small><p>${esc(c.texto).replace(/@([\wÀ-ÿ]+)/g, '<b class="men">@$1</b>')}</p></div></div>`).join("") || `<div style="color:var(--mut,#6b6760);font-size:13px">Nenhum comentário ainda.</div>`}
           <div class="tl-novaet"><textarea id="tlCom" rows="2" maxlength="1500" placeholder="Comentar… use @nome para avisar alguém"></textarea><button type="button" class="tl-btn pri" data-comentar style="background:#1a7f4b;color:#fff">Enviar</button></div></div>` : ""}
         ${t && t.historico ? `<div class="tl-hist"><b>Histórico</b>${t.historico.slice(-6).reverse().map(h => `<div>${new Date(h.quando).toLocaleString("pt-BR")} · ${esc(nomeResp(h.email) || "—")} · ${esc(h.acao)}</div>`).join("")}</div>` : ""}
-      </form>`;
+      </form>`; } finally { desenhando = false; }
       const f = m.querySelector("form");
       const ler = () => { d.titulo = f.titulo.value; d.descricao = f.descricao.value; d.prazo = f.prazo.value; d.status = f.status.value;
         if (f.projeto) { d.projeto = f.projeto.value || null; const pj = projDe(d.projeto); if (pj && pj.sala) d.sala = pj.sala; }
@@ -436,22 +439,34 @@ window.Telao = (function () {
   function editarProjeto(p) {
     const novo = !p, m = estado.raiz.querySelector("#tlModal");
     const d = p ? JSON.parse(JSON.stringify(p)) : { titulo: "", descricao: "", responsavel: estado.email, prazo: "", cor: CORES[(estado.projetos || []).length % CORES.length], status: "ativo", sala: estado.sala || null };
-    const opts = estado.usuarios.map(u => `<option value="${esc(u.email)}" ${u.email === d.responsavel ? "selected" : ""}>${esc(u.nome)}</option>`).join("");
+    const opts = estado.usuarios.map(u => `<option value="${esc(u.email)}">${esc(u.nome)}</option>`).join("");
     const ts = p ? tarefasDoProjeto(p.id) : [];
-    m.innerHTML = `<form class="tl-form" autocomplete="off">
+    const addResp = v => { v = String(v || "").trim().replace(/[;,]+$/, ""); if (!v) return;
+      const u = estado.usuarios.find(u => u.email === v || u.nome === v), val = u ? u.email : v.replace(/;/g, " ");
+      const l = respsDe(d); if (!l.includes(val)) l.push(val); d.responsavel = l.join(";"); };
+    const ler = f => { d.titulo = f.titulo.value; d.prazo = f.prazo.value; d.descricao = f.descricao.value; d.cor = (f.querySelector("[name=cor]:checked") || {}).value || d.cor; if (f.status) d.status = f.status.value; addResp(f.responsavel.value); };
+    let desenhando = false;
+    const render = () => {
+    if (desenhando) return; desenhando = true;
+    try { m.innerHTML = `<form class="tl-form" autocomplete="off">
       <h3>${novo ? "Novo projeto" : "Editar projeto"}<button type="button" class="tl-btn" data-x style="background:none;font-size:22px">×</button></h3>
       <div class="tl-f"><label>Projeto</label><input name="titulo" required maxlength="100" value="${esc(d.titulo)}" placeholder="Ex.: Lançamento do site do cliente X"></div>
       <div class="tl-row">
-        <div class="tl-f"><label>Responsável do projeto</label><select name="responsavel"><option value="">— escolha —</option>${opts}${d.responsavel && !estado.usuarios.some(u => u.email === d.responsavel) ? `<option selected value="${esc(d.responsavel)}">${esc(d.responsavel)}</option>` : ""}</select></div>
+        <div class="tl-f"><label>Responsáveis do projeto</label>
+          <div class="tl-resps">${respsDe(d).map((r, i) => `<span class="tl-chip"><span class="av" style="background:${corNome(nomeResp(r))}">${esc(iniciais(nomeResp(r)))}</span>${esc(nomeResp(r))}<button type="button" data-rmresp="${i}" aria-label="Tirar ${esc(nomeResp(r))}">×</button></span>`).join("")}
+            <input name="responsavel" list="tlUsersP" placeholder="${respsDe(d).length ? "+ adicionar" : "Nome ou e-mail e Enter"}"></div><datalist id="tlUsersP">${opts}</datalist></div>
         <div class="tl-f"><label>Entrega do projeto</label><input name="prazo" type="date" value="${esc(d.prazo || "")}"></div>
       </div>
       <div class="tl-f"><label>Cor</label><div class="tl-cores">${CORES.map(c => `<label style="background:${c}"><input type="radio" name="cor" value="${c}" ${c === d.cor ? "checked" : ""}><span></span></label>`).join("")}</div></div>
       ${novo ? "" : `<div class="tl-f"><label>Situação</label><select name="status">${[["ativo", "Em andamento"], ["concluido", "Concluído"], ["arquivado", "Arquivado"]].map(([k, l]) => `<option value="${k}" ${k === d.status ? "selected" : ""}>${l}</option>`).join("")}</select></div>`}
       <div class="tl-f"><label>Descrição</label><textarea name="descricao" rows="3" maxlength="1000" placeholder="Objetivo, cliente, links…">${esc(d.descricao || "")}</textarea></div>
-      <p style="font-size:13px;color:var(--mut,#6b6760);margin:6px 0 0">O responsável do projeto acompanha a entrega. Cada tarefa dentro do projeto tem o seu próprio responsável e prazo.</p>
+      <p style="font-size:13px;color:var(--mut,#6b6760);margin:6px 0 0">Os responsáveis do projeto acompanham a entrega. Cada tarefa dentro do projeto tem o seu próprio responsável e prazo.</p>
       <div class="tl-acts"><button class="tl-btn pri" type="submit">${novo ? "Criar projeto" : "Salvar"}</button><button class="tl-btn" type="button" data-x>Cancelar</button>${novo ? "" : `<button class="tl-btn dan" type="button" data-del>Excluir projeto</button>`}</div>
-    </form>`;
+    </form>`; } finally { desenhando = false; }
     const f = m.querySelector("form");
+    f.responsavel.onkeydown = e => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); ler(f); render(); m.querySelector("[name=responsavel]").focus(); } };
+    f.responsavel.onchange = () => { if (estado.usuarios.some(u => u.email === f.responsavel.value)) { ler(f); render(); m.querySelector("[name=responsavel]").focus(); } };
+    m.querySelectorAll("[data-rmresp]").forEach(b => b.onclick = () => { ler(f); const l = respsDe(d); l.splice(+b.dataset.rmresp, 1); d.responsavel = l.join(";"); render(); });
     m.querySelectorAll("[data-x]").forEach(b => b.onclick = () => m.classList.add("hidden"));
     const del = m.querySelector("[data-del]");
     if (del) del.onclick = async () => {
@@ -460,20 +475,23 @@ window.Telao = (function () {
     };
     f.onsubmit = async e => {
       e.preventDefault(); if (!f.titulo.value.trim()) return f.titulo.focus();
-      const antes = p ? p.responsavel : null;
-      Object.assign(d, { titulo: f.titulo.value.trim(), responsavel: f.responsavel.value, prazo: f.prazo.value, cor: (f.querySelector("[name=cor]:checked") || {}).value || d.cor, descricao: f.descricao.value, status: f.status ? f.status.value : "ativo" });
+      ler(f); d.titulo = d.titulo.trim(); d.status = d.status || "ativo";
+      const antes = new Set(p ? respsDe(p) : []);
       if (novo) d.ordem = (estado.projetos || []).length;
       let salvo;
       try { salvo = await Dados.salvarProjeto(d, novo ? "Criou o projeto" : p.status !== d.status ? (d.status === "concluido" ? "Concluiu o projeto" : d.status === "arquivado" ? "Arquivou o projeto" : "Reabriu o projeto") : "Editou o projeto"); }
       catch (err) { alert("Não consegui salvar o projeto: " + (err.message || "")); return; }
-      const u = estado.usuarios.find(u => u.email === d.responsavel), meuId = Dados.meuId && Dados.meuId();
-      if (u && d.responsavel !== antes && u.id !== meuId && Dados.criarAvisos) Dados.criarAvisos([{ para: u.id, tipo: "tarefa", texto: `${estado.nome || "Alguém"} colocou você como responsável pelo projeto “${d.titulo}”${d.prazo ? " (entrega " + fmtData(d.prazo) + ")" : ""}`, dados: { mapa: window.mapaIdAtual || null } }]);
+      const meuId = Dados.meuId && Dados.meuId();
+      const novos = respsDe(d).filter(r => !antes.has(r)).map(r => estado.usuarios.find(u => u.email === r)).filter(u => u && u.id !== meuId);
+      if (novos.length && Dados.criarAvisos) Dados.criarAvisos(novos.map(u => ({ para: u.id, tipo: "tarefa", texto: `${estado.nome || "Alguém"} colocou você como responsável pelo projeto “${d.titulo}”${d.prazo ? " (entrega " + fmtData(d.prazo) + ")" : ""}`, dados: { mapa: window.mapaIdAtual || null } })));
       m.classList.add("hidden");
       if (novo) estado.projeto = salvo.id;
       recarregar();
     };
+    };
+    render();
     m.classList.remove("hidden");
-    setTimeout(() => { if (novo) f.titulo.focus(); }, 30);
+    setTimeout(() => { const i = m.querySelector("[name=titulo]"); if (novo && i) i.focus(); }, 30);
   }
 
   /* ---------- arrastar entre colunas ---------- */
