@@ -140,8 +140,8 @@ window.Musica = (function () {
   function soltarPlayer() { if (player) { try { player.destroy(); } catch (e) {} player = null; } videoAtual = null; }
   // fica logo abaixo das pílulas do canto de cima (sala, teste grátis), sem cobrir nenhuma
   function posicionar() {
-    if (!card || innerWidth <= 760) return;
-    let y = 56; for (const sel of ["#sala", "#assPill"]) { const el = document.querySelector(sel); if (el && el.offsetParent) { const b = el.getBoundingClientRect(); if (b.left < 400) y = Math.max(y, b.bottom); } }
+    if (!card) return;
+    let y = 56; for (const sel of ["#sala", "#assPill", "#miniMapa", "#faixaVideo"]) { const el = document.querySelector(sel); if (el && el.offsetParent) { const b = el.getBoundingClientRect(); if (b.width && b.left < 300 && b.top < 260) y = Math.max(y, b.bottom); } }
     card.style.top = (y + 8) + "px";
   }
   function render() {
@@ -261,7 +261,9 @@ window.Musica = (function () {
 .mus-caixa small{color:#c0392b;min-height:1em}
 .mus-caixa .mus-bts button{font:inherit;padding:9px 14px;border-radius:10px;border:1px solid #e4dfd5;background:#f3f1ec;cursor:pointer}
 .mus-caixa .mus-bts{justify-content:flex-end}.mus-caixa .pri{background:var(--brand,#1a7f4b)!important;color:#fff;border-color:transparent!important;font-weight:700}
-@media (max-width:760px){.mus-card{top:auto;bottom:150px}.mus-lado{width:150px}}`;
+@media (max-width:760px){.mus-card{left:8px;max-width:calc(100vw - 70px)}.mus-card.mini,.mus-card.recolhido{padding:5px 8px;font-size:12px}
+  .mus-card button{padding:5px 8px;font-size:12px}.mus-curto b{max-width:110px}.mus-curto input{width:70px}
+  .mus-player,.mus-player iframe{width:140px!important;height:140px!important}.mus-lado{width:140px}}`;
   document.head.appendChild(css);
 
   return {

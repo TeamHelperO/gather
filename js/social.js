@@ -19,7 +19,7 @@ window.Social = (function () {
   const STATUS = { disponivel: { nome: "Disponível", cor: "#3fbf5f" }, ocupado: { nome: "Ocupado", cor: "#e5484d" }, reuniao: { nome: "Em reunião", cor: "#f2a33a" }, ausente: { nome: "Ausente", cor: "#9aa0ad" } };
   let status = ls.get("nextco_status", "disponivel"), autoAusente = false, ultimaAcao = Date.now();
   if (status === "ausente") status = "disponivel"; // ao entrar, volta a disponível
-  const AUSENTE_MIN = 10;
+  const AUSENTE_MIN = 60; // 1 hora sem fazer nada
   function mudarStatus(s, auto) {
     if (!STATUS[s]) return;
     status = s; autoAusente = !!auto; if (!auto) autoOcupado = false;
@@ -30,7 +30,7 @@ window.Social = (function () {
   /* sentado em silêncio por muito tempo: fica "Ocupado" sozinho (e volta a "Disponível" ao levantar ou falar) */
   let autoOcupado = false;
   function ocupadoAuto(liga) {
-    if (liga && status === "disponivel" && !autoOcupado) { autoOcupado = true; status = "ocupado"; opt && opt.presencaMudou && opt.presencaMudou(); desenharTopo(); opt.toast("🔴 Você está sentado em silêncio há 5 min: status mudou para Ocupado"); }
+    if (liga && status === "disponivel" && !autoOcupado) { autoOcupado = true; status = "ocupado"; opt && opt.presencaMudou && opt.presencaMudou(); desenharTopo(); opt.toast("🔴 20 min sentado sem falar e sem câmera: status mudou para Ocupado e o microfone foi mutado"); return true; }
     else if (!liga && autoOcupado) { autoOcupado = false; if (status === "ocupado") { status = ls.get("nextco_status", "disponivel") === "ausente" ? "disponivel" : ls.get("nextco_status", "disponivel"); opt && opt.presencaMudou && opt.presencaMudou(); desenharTopo(); } }
   }
   function atividade() {
@@ -107,7 +107,7 @@ window.Social = (function () {
     const r = bt.getBoundingClientRect();
     const pop = abrirPop(r.left, r.bottom + 6, `<div class="soc-menu">${Object.entries(STATUS).map(([k, s]) =>
       `<button data-set="${k}" class="${status === k ? "on" : ""}"><i class="dot" style="background:${s.cor}"></i>${s.nome}</button>`).join("")}
-      <p>Fica "Ausente" sozinho depois de ${AUSENTE_MIN} min parado (e o microfone é mutado).</p>${window.AppStatus ? AppStatus.secaoMenu() : ""}</div>`);
+      <p>Automático: "Ocupado" depois de 20 min sentado sem falar e sem câmera; "Ausente" depois de 1 hora sem fazer nada. Os dois mutam o microfone.</p>${window.AppStatus ? AppStatus.secaoMenu() : ""}</div>`);
     pop.onclick = e => { const b = e.target.closest("[data-set]"); if (b) { mudarStatus(b.dataset.set); fecharPop(); opt.toast(`Status: ${STATUS[b.dataset.set].nome}`); } };
     if (window.AppStatus) AppStatus.ligarMenu(pop, () => menuStatus(bt));
   }

@@ -37,8 +37,11 @@ body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 @media (max-width:760px){
   .emotes.hud button span{display:none}
   .emotes.hud button{padding:11px}
-  .emotes.hud #btnAudio span{display:inline}
+  .emotes.hud #btnAudio span{display:none} /* celular: só o ícone (verde ligado, vermelho mudo) e todos os botões cabem */
+  .emotes.hud{gap:2px;padding:4px}.emotes.hud button{padding:10px}
   #sala.hud small{display:none}
+  #eu.hud #nome{display:none} #eu.hud{padding:4px} /* só a foto: sobra espaço para o nome da sala */
+  #sala{max-width:none!important;flex:1;min-width:0}
 }
 .sala-espaco{background:#1a7f4b;color:#fff;border-radius:999px;padding:2px 9px;font-size:12px;margin-right:8px;white-space:nowrap;max-width:46vw;overflow:hidden;text-overflow:ellipsis}
 .cfg-logo{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.cfg-logo-prev{width:120px;height:80px;border-radius:10px;display:grid;place-items:center;background:repeating-conic-gradient(#0001 0 25%,#0000 0 50%) 0 0/16px 16px;border:1px solid rgba(127,127,127,.3)}.cfg-logo-prev img{max-width:110px;max-height:72px}
@@ -1062,8 +1065,11 @@ function emote(row){
 }
 /* ---------- rotina automática ----------
    – 5 min em pé sem fazer nada (sem andar, teclar, clicar nem falar): vai para a Área silenciosa (lá não tem áudio, só chat escrito).
-   – 5 min sentado sem o microfone captar voz: status vira "Ocupado" (volta a "Disponível" ao levantar ou falar). */
+   – 20 min sentado, sem falar (microfone desligado ou em silêncio) e com a câmera desligada: status vira "Ocupado"
+     e o microfone é mutado. Volta a "Disponível" ao levantar, falar ou ligar a câmera.
+   – "Ausente" só depois de 1 hora sem fazer nada (fica em js/social.js). */
 const inativoMs = () => window.TESTE_INATIVO_MS || 5 * 60e3; // 5 min
+const ocupadoMs = () => window.TESTE_OCUPADO_MS || 20 * 60e3; // 20 min
 let ultimaAtividade = performance.now(), sentouEm = 0, ultimoAssento = null;
 for (const ev of ["keydown", "pointerdown", "touchstart", "wheel"]) addEventListener(ev, () => { ultimaAtividade = performance.now(); }, { passive: true });
 function irParaSilencio(){
@@ -1087,9 +1093,11 @@ setInterval(() => {
     const naReuniao = sala && Reuniao.ativaEm(sala), noSilencio = sala && sala.type === "silenciosa";
     if (!noSilencio && !naReuniao && !ocupadoTela && !Projecao.minhaSala && agora - ultimaAtividade > inativoMs()) { irParaSilencio(); ultimaAtividade = agora; }
   } else {
-    const falouRecente = P.vozAtiva && agora - P.vozAtiva < inativoMs();
-    if (falouRecente) Social.ocupadoAuto(false);
-    else if (agora - sentouEm > inativoMs()) Social.ocupadoAuto(true);
+    const falouRecente = P.vozAtiva && agora - P.vozAtiva < ocupadoMs(), camLigada = Voz.camAberta;
+    if (falouRecente || camLigada) Social.ocupadoAuto(false);
+    else if (agora - sentouEm > ocupadoMs() && agora - ultimaAtividade > ocupadoMs() && Social.ocupadoAuto(true)) {
+      if (Voz.ligado && Voz.micAberto) { Voz.alternarMic(); atualizarBotaoAudio(); }
+    }
   }
 }, 5000);
 /* convite de reunião aceito: vai direto para uma cadeira livre da sala (a mais perto do telão) */
