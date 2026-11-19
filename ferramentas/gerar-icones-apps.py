@@ -1,0 +1,8 @@
+# Gera js/icones-apps.js a partir do pacote simple-icons (CC0).
+# Uso: npm pack simple-icons && tar xzf simple-icons-*.tgz && python3 ferramentas/gerar-icones-apps.py package
+import json, re, sys
+pkg = sys.argv[1] if len(sys.argv) > 1 else "package"
+d = {x["slug"]: x for x in json.load(open(f"{pkg}/data/simple-icons.json"))}
+M = {"figma":"figma","photopea":"photopea","davinci":"davinciresolve","blender":"blender","cursor":"cursor","github":"github","gitlab":"gitlab","sublime":"sublimetext","intellij":"intellijidea","pycharm":"pycharm","webstorm":"webstorm","androidstudio":"androidstudio","xcode":"xcode","unity":"unity","godot":"godotengine","vercel":"vercel","supabase":"supabase","notion":"notion","gdocs":"googledocs","gsheets":"googlesheets","gslides":"googleslides","gforms":"googleforms","gdrive":"googledrive","webflow":"webflow","metaads":"meta","googleads":"googleads","ganalytics":"googleanalytics","trello":"trello","miro":"miro","asana":"asana","clickup":"clickup","linear":"linear","jira":"jira","gmail":"gmail","meet":"googlemeet","gcalendar":"googlecalendar","whatsapp":"whatsapp","discord":"discord","claude":"claude","obs":"obsstudio"}
+out = {k: ["#" + d[s]["hex"], re.search(r' d="([^"]+)"', open(f"{pkg}/icons/{s}.svg").read()).group(1)] for k, s in M.items()}
+open("js/icones-apps.js", "w").write("/* Ícones oficiais (Simple Icons, licença CC0 — https://simpleicons.org). As marcas pertencem aos donos;\n   aqui servem só para mostrar qual app a pessoa está usando. Gerado por ferramentas/gerar-icones-apps.py */\nwindow.ICONES_APPS = " + json.dumps(out, separators=(",", ":")) + ";\n")

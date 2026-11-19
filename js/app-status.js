@@ -58,18 +58,28 @@
   window.postMessage({ fonte: "andar-pagina", tipo: "quem" }, location.origin);
 
   /* ---------- selo desenhado ao lado do nome (2D e 3D) ---------- */
+  // ícone oficial (js/icones-apps.js) quando existe; senão, selo com a sigla
+  const ICO = () => window.ICONES_APPS || {};
+  const caminhos = {};
   function desenharSelo(ctx, x, y, id) { // x,y = canto esquerdo, centro vertical; devolve a largura usada
     const a = APPS[id]; if (!a) return 0;
+    const ic = ICO()[id], fundo = ic ? ic[0] : a[1];
     ctx.save(); ctx.font = "900 9px Inter,system-ui,sans-serif";
-    const w = Math.max(19, ctx.measureText(a[2]).width + 10);
-    ctx.fillStyle = a[1]; ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = 1.5;
+    const w = ic ? 19 : Math.max(19, ctx.measureText(a[2]).width + 10);
+    ctx.fillStyle = fundo; ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.roundRect(x, y - 9.5, w, 19, 6); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = claro(a[1]) ? "#16141f" : "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(a[2], x + w / 2, y + 0.5);
+    ctx.fillStyle = claro(fundo) ? "#16141f" : "#fff";
+    if (ic) { const c = caminhos[id] || (caminhos[id] = new Path2D(ic[1])); ctx.translate(x + 3.5, y - 6); ctx.scale(12 / 24, 12 / 24); ctx.fill(c); }
+    else { ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(a[2], x + w / 2, y + 0.5); }
     ctx.restore(); return w;
   }
   function claro(hex) { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) > 170; }
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  function seloHtml(id) { const a = APPS[id]; if (!a) return ""; return `<i class="app-selo" style="background:${a[1]};color:${claro(a[1]) ? "#16141f" : "#fff"}">${esc(a[2])}</i>`; }
+  function seloHtml(id) {
+    const a = APPS[id]; if (!a) return ""; const ic = ICO()[id], fundo = ic ? ic[0] : a[1], cor = claro(fundo) ? "#16141f" : "#fff";
+    return ic ? `<i class="app-selo ic" style="background:${fundo};color:${cor}" title="${esc(a[0])}"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="${ic[1]}"/></svg></i>`
+      : `<i class="app-selo" style="background:${fundo};color:${cor}" title="${esc(a[0])}">${esc(a[2])}</i>`;
+  }
 
   /* ---------- seção no menu de status ---------- */
   function secaoMenu() {
@@ -105,7 +115,8 @@
   }
 
   const css = document.createElement("style");
-  css.textContent = `.app-selo{display:inline-grid;place-items:center;min-width:20px;height:18px;padding:0 4px;border-radius:5px;font:900 9.5px Inter,system-ui,sans-serif;font-style:normal;margin-right:6px;vertical-align:middle}
+  css.textContent = `.app-selo.ic{width:20px;min-width:20px;padding:0}.app-selo.ic svg{width:12px;height:12px}
+.app-selo{display:inline-grid;place-items:center;min-width:20px;height:18px;padding:0 4px;border-radius:5px;font:900 9.5px Inter,system-ui,sans-serif;font-style:normal;margin-right:6px;vertical-align:middle}
 .app-sec{border-top:1px solid var(--line,#e4dfd5);margin-top:8px;padding:10px 10px 4px;display:grid;gap:6px;min-width:240px}
 .app-lin{display:flex;justify-content:space-between;align-items:center}.app-agora{display:flex;align-items:center;font-weight:700}.app-sec .mut{opacity:.6;font-weight:600}
 .app-sec p{margin:0;font-size:12px;opacity:.75}.app-sec a{color:inherit;text-decoration:underline}
